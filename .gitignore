@@ -4,8 +4,10 @@ __pycache__/
 .venv/
 venv/
 .env
+*.db
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
 dist/
 build/
+.claude/settings.local.json
