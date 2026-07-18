@@ -43,18 +43,37 @@ Configuration is read from environment variables (or a local `.env` file, not co
 | ------------------------ | -------------------------- | ----------------------- |
 | `NEWSAGENT_DATABASE_URL` | `sqlite:///./newsagent.db` | SQLAlchemy database URL |
 
-## Running the API
+## Running locally
+
+### Backend API
+
+From the project root (with Python venv active):
 
 ```bash
 uvicorn newsagent.api.main:app --reload
 ```
 
-Then open http://127.0.0.1:8000/docs for the interactive API docs, or hit
-http://127.0.0.1:8000/health to verify it's up. The `/admin/*` and `/me/*` endpoints are currently
-stubs — real logic lands with the admin panel and preferences page issues.
+- Interactive API docs: http://127.0.0.1:8000/docs
+- Health check: http://127.0.0.1:8000/health
+- The `/admin/*` and `/me/*` endpoints are stubs; real logic lands with the admin panel and
+  preferences page issues.
 
-The frontend and the digest pipeline are not built yet — tracked as
-[open issues](https://github.com/MONS-Designers/news-agent/issues).
+### Frontend
+
+From `frontend/` directory:
+
+```bash
+npm install         # one time, or after updating package.json
+npm run dev         # start dev server
+```
+
+- Frontend: http://127.0.0.1:5173/
+- The dev server proxies `/api/*` to http://localhost:8000 (the backend) by default.
+- Two routes: `/admin` (source approval) and `/preferences` (topic subscriptions) — both currently
+  call the backend stub endpoints.
+
+Run both servers in separate terminals to test end-to-end. The digest pipeline is not built yet —
+tracked as [open issues](https://github.com/MONS-Designers/news-agent/issues).
 
 ## Development
 
