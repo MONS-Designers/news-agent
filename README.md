@@ -43,7 +43,17 @@ Configuration is read from environment variables (or a local `.env` file, not co
 | ------------------------ | -------------------------- | ----------------------- |
 | `NEWSAGENT_DATABASE_URL` | `sqlite:///./newsagent.db` | SQLAlchemy database URL |
 
-There is no runnable app yet — the API server, frontend, and pipeline are tracked as
+## Running the API
+
+```bash
+uvicorn newsagent.api.main:app --reload
+```
+
+Then open http://127.0.0.1:8000/docs for the interactive API docs, or hit
+http://127.0.0.1:8000/health to verify it's up. The `/admin/*` and `/me/*` endpoints are currently
+stubs — real logic lands with the admin panel and preferences page issues.
+
+The frontend and the digest pipeline are not built yet — tracked as
 [open issues](https://github.com/MONS-Designers/news-agent/issues).
 
 ## Development
