@@ -9,6 +9,11 @@ class Settings(BaseSettings):
     # Which LLM provider adapter the pipeline uses (see newsagent.llm.factory)
     llm_provider: str = "mock"
 
+    # Which email sender adapter the pipeline uses (see newsagent.mail.factory)
+    email_sender: str = "console"
+    # When set, the console sender also writes each email's HTML here
+    email_outbox_dir: str = ""
+
     # Google OAuth (set real values in .env — never commit them)
     google_client_id: str = ""
     google_client_secret: str = ""
