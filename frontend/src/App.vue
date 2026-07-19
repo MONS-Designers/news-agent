@@ -5,6 +5,7 @@
         <span class="text-lg font-semibold tracking-tight">NewsAgent</span>
         <nav class="flex gap-1">
           <router-link
+            v-if="me?.is_admin"
             to="/admin"
             class="rounded-lg px-3 py-1.5 text-sm font-medium text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
             active-class="bg-neutral-100 text-neutral-900"
@@ -55,9 +56,11 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import { getMe, loginUrl, logout, type Me } from "@/api/client";
+import { useRouter } from "vue-router";
+import { loginUrl } from "@/api/client";
+import { ensureMe, me, signOut as authSignOut } from "@/auth";
 
-const me = ref<Me | null>(null);
+const router = useRouter();
 const errorBanner = ref("");
 
 const ERROR_MESSAGES: Record<string, string> = {
@@ -70,11 +73,11 @@ onMounted(async () => {
   if (error) {
     errorBanner.value = ERROR_MESSAGES[error] ?? "Sign-in error.";
   }
-  me.value = await getMe();
+  await ensureMe();
 });
 
 async function signOut() {
-  await logout();
-  me.value = null;
+  await authSignOut();
+  router.push("/preferences");
 }
 </script>

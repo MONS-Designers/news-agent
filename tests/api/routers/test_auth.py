@@ -1,4 +1,7 @@
+import pytest
 from fastapi.testclient import TestClient
+
+from newsagent.config import settings
 
 
 def test_me_unauthenticated_gets_401(client: TestClient):
@@ -15,8 +18,9 @@ def test_me_returns_identity(as_admin: TestClient):
     assert body["user_id"] is None
 
 
-def test_login_without_config_returns_503(client: TestClient):
-    # No NEWSAGENT_GOOGLE_CLIENT_ID in the test environment — clear error, not a crash.
+def test_login_without_config_returns_503(client: TestClient, monkeypatch: pytest.MonkeyPatch):
+    # Force unconfigured OAuth regardless of the local .env — clear error, not a crash.
+    monkeypatch.setattr(settings, "google_client_id", "")
     response = client.get("/auth/login")
     assert response.status_code == 503
 

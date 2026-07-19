@@ -1,12 +1,14 @@
 import { createRouter, createWebHistory, RouteRecordRaw } from "vue-router";
 import AdminView from "@/views/AdminView.vue";
 import PreferencesView from "@/views/PreferencesView.vue";
+import { ensureMe } from "@/auth";
 
 const routes: RouteRecordRaw[] = [
   {
     path: "/admin",
     name: "Admin",
     component: AdminView,
+    meta: { requiresAdmin: true },
   },
   {
     path: "/preferences",
@@ -15,13 +17,22 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: "/",
-    redirect: "/admin",
+    redirect: "/preferences",
   },
 ];
 
 const router = createRouter({
   history: createWebHistory(),
   routes,
+});
+
+router.beforeEach(async (to) => {
+  if (to.meta.requiresAdmin) {
+    const identity = await ensureMe();
+    if (!identity?.is_admin) {
+      return { path: "/preferences" };
+    }
+  }
 });
 
 export default router;
