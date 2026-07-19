@@ -17,6 +17,13 @@
 
     <div v-if="loading" class="text-sm text-neutral-500">Loading…</div>
 
+    <div
+      v-else-if="errorMessage"
+      class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800"
+    >
+      {{ errorMessage }}
+    </div>
+
     <ul v-else-if="preferences.length > 0" class="space-y-3">
       <li
         v-for="pref in preferences"
@@ -44,17 +51,25 @@
 
 <script setup lang="ts">
 import { ref } from "vue";
-import { listMyPreferences, type TopicPreference } from "@/api/client";
+import { ApiError, listMyPreferences, type TopicPreference } from "@/api/client";
 
 const preferences = ref<TopicPreference[]>([]);
 const loading = ref(false);
+const errorMessage = ref("");
 
 async function loadPreferences() {
   loading.value = true;
+  errorMessage.value = "";
   try {
     preferences.value = await listMyPreferences();
   } catch (error) {
-    console.error("Failed to load preferences:", error);
+    if (error instanceof ApiError && error.status === 401) {
+      errorMessage.value = "Sign in with Google to view your preferences.";
+    } else if (error instanceof ApiError && error.status === 403) {
+      errorMessage.value = "This account has no user profile. Contact an admin.";
+    } else {
+      errorMessage.value = "Failed to load preferences.";
+    }
   } finally {
     loading.value = false;
   }

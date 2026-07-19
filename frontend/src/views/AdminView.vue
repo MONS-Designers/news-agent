@@ -17,6 +17,13 @@
 
     <div v-if="loading" class="text-sm text-neutral-500">Loading…</div>
 
+    <div
+      v-else-if="errorMessage"
+      class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800"
+    >
+      {{ errorMessage }}
+    </div>
+
     <ul v-else-if="sources.length > 0" class="space-y-3">
       <li
         v-for="source in sources"
@@ -48,17 +55,25 @@
 
 <script setup lang="ts">
 import { ref } from "vue";
-import { listPendingSources, type Source } from "@/api/client";
+import { ApiError, listPendingSources, type Source } from "@/api/client";
 
 const sources = ref<Source[]>([]);
 const loading = ref(false);
+const errorMessage = ref("");
 
 async function loadSources() {
   loading.value = true;
+  errorMessage.value = "";
   try {
     sources.value = await listPendingSources();
   } catch (error) {
-    console.error("Failed to load sources:", error);
+    if (error instanceof ApiError && error.status === 401) {
+      errorMessage.value = "Sign in with Google to view pending sources.";
+    } else if (error instanceof ApiError && error.status === 403) {
+      errorMessage.value = "Your account does not have admin access.";
+    } else {
+      errorMessage.value = "Failed to load sources.";
+    }
   } finally {
     loading.value = false;
   }

@@ -13,12 +13,46 @@ export interface TopicPreference {
   topic_id: number;
 }
 
-async function request<T>(path: string): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`);
+export interface Me {
+  email: string;
+  is_admin: boolean;
+  user_id: number | null;
+}
+
+export class ApiError extends Error {
+  constructor(
+    public status: number,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(`${API_BASE}${path}`, init);
   if (!response.ok) {
-    throw new Error(`API error: ${response.statusText}`);
+    throw new ApiError(response.status, `API error: ${response.statusText}`);
   }
   return response.json();
+}
+
+export function loginUrl(): string {
+  return `${API_BASE}/auth/login`;
+}
+
+export async function getMe(): Promise<Me | null> {
+  try {
+    return await request<Me>("/auth/me");
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 401) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+export async function logout(): Promise<void> {
+  await request("/auth/logout", { method: "POST" });
 }
 
 export async function listPendingSources(): Promise<Source[]> {

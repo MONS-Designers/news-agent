@@ -6,5 +6,13 @@ class Settings(BaseSettings):
 
     database_url: str = "sqlite:///./newsagent.db"
 
+    # Google OAuth (set real values in .env — never commit them)
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    # Secret for signing the session cookie; override in .env for anything non-local.
+    session_secret: str = ""
+    # Where the API redirects back to after login (the Vue dev server).
+    frontend_url: str = "http://127.0.0.1:5173"
+
 
 settings = Settings()
