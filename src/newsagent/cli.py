@@ -9,7 +9,8 @@ Usage:
 import argparse
 
 from newsagent.db import SessionLocal
-from newsagent.pipeline import fetcher
+from newsagent.llm import get_llm_provider
+from newsagent.pipeline import fetcher, relevance
 from newsagent.services import identity, sources
 
 
@@ -26,6 +27,7 @@ def main(argv: list[str] | None = None) -> int:
 
     subparsers.add_parser("seed-sources", help="Load the curated default topics + RSS sources")
     subparsers.add_parser("fetch", help="Fetch new articles from all approved sources")
+    subparsers.add_parser("filter", help="Score pending articles for relevance to their topic")
 
     args = parser.parse_args(argv)
 
@@ -47,6 +49,18 @@ def main(argv: list[str] | None = None) -> int:
                 )
                 print(f"  {result.source_name}: {status}")
             print(f"Total new articles: {fetch_report.total_new}")
+        elif args.command == "filter":
+            filter_report = relevance.filter_pending_articles(db, get_llm_provider())
+            print(
+                f"Scored {filter_report.scored}: {filter_report.relevant} relevant, "
+                f"{filter_report.irrelevant} irrelevant "
+                f"({filter_report.refused} refused, {filter_report.errors} errors, "
+                f"{filter_report.borderline} borderline)"
+            )
+            print(
+                f"Usage: {filter_report.usage_input_units} in / "
+                f"{filter_report.usage_output_units} out units"
+            )
     return 0
 
 

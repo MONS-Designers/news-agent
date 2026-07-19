@@ -46,6 +46,7 @@ ENTRY = {
     "link": "https://example.com/article-1",
     "title": "New AI model released",
     "published_parsed": time.struct_time((2026, 7, 19, 12, 0, 0, 0, 200, 0)),
+    "summary": "A short RSS description of the article.",
 }
 
 
@@ -65,6 +66,8 @@ def test_fetch_inserts_new_articles_with_fields(db: Session):
     assert article.url == "https://example.com/article-1"
     assert article.published_at is not None
     assert article.published_at.year == 2026
+    assert article.rss_summary == "A short RSS description of the article."
+    assert article.relevance_status == "pending"
 
 
 def test_fetch_dedupes_by_url(db: Session):

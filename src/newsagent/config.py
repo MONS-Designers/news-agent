@@ -9,6 +9,9 @@ class Settings(BaseSettings):
     # Which LLM provider adapter the pipeline uses (see newsagent.llm.factory)
     llm_provider: str = "mock"
 
+    # Relevance verdict threshold (0.7 = the contract's "clearly on-topic" anchor)
+    relevance_threshold: float = 0.7
+
     # Which email sender adapter the pipeline uses (see newsagent.mail.factory)
     email_sender: str = "console"
     # When set, the console sender also writes each email's HTML here

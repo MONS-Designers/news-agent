@@ -76,6 +76,7 @@ def fetch_source(db: Session, source: Source, parse: ParseFunc = feedparser.pars
                 title=title,
                 url=url,
                 published_at=_entry_published_at(entry),
+                rss_summary=entry.get("summary") or None,
             )
         )
         result.new_articles += 1
