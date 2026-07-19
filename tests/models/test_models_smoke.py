@@ -33,7 +33,7 @@ def test_create_and_query_one_row_per_table(session: Session):
     user = User(email="user@example.com", name="Test User")
     preference = UserTopicPreference(user=user, topic=topic)
     digest = Digest(user=user, date=date.today())
-    digest_article = DigestArticle(digest=digest, article=article, summary_he="תקציר")
+    digest_article = DigestArticle(digest=digest, article=article)
 
     session.add_all(
         [admin, topic, source, article, user, preference, digest, digest_article]

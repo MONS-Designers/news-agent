@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, ForeignKey, Text, func
+from sqlalchemy import DateTime, ForeignKey, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from newsagent.models.base import Base
@@ -17,7 +17,6 @@ class DigestArticle(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     digest_id: Mapped[int] = mapped_column(ForeignKey("digests.id"))
     article_id: Mapped[int] = mapped_column(ForeignKey("articles.id"))
-    summary_he: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     digest: Mapped["Digest"] = relationship(back_populates="articles")

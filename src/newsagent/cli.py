@@ -10,8 +10,8 @@ import argparse
 
 from newsagent.db import SessionLocal
 from newsagent.llm import get_llm_provider
-from newsagent.pipeline import fetcher, relevance, summarize
-from newsagent.services import identity, sources
+from newsagent.pipeline import digest, fetcher, relevance, summarize
+from newsagent.services import identity, preferences, sources
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -29,6 +29,12 @@ def main(argv: list[str] | None = None) -> int:
     subparsers.add_parser("fetch", help="Fetch new articles from all approved sources")
     subparsers.add_parser("filter", help="Score pending articles for relevance to their topic")
     subparsers.add_parser("summarize", help="Summarize + translate relevant articles to Hebrew")
+
+    subscribe_cmd = subparsers.add_parser("subscribe", help="Subscribe a user to a topic")
+    subscribe_cmd.add_argument("email")
+    subscribe_cmd.add_argument("topic")
+
+    subparsers.add_parser("build-digests", help="Build today's digests for all users")
 
     args = parser.parse_args(argv)
 
@@ -71,6 +77,20 @@ def main(argv: list[str] | None = None) -> int:
             print(
                 f"Usage: {summary_report.usage_input_units} in / "
                 f"{summary_report.usage_output_units} out units"
+            )
+        elif args.command == "subscribe":
+            try:
+                _, created = preferences.subscribe(db, args.email, args.topic)
+            except ValueError as error:
+                print(f"Error: {error}")
+                return 1
+            print(f"{'Subscribed' if created else 'Already subscribed'}: {args.email} -> {args.topic}")
+        elif args.command == "build-digests":
+            digest_report = digest.build_digests(db)
+            print(
+                f"Users: {digest_report.users_processed}, "
+                f"digests created: {digest_report.digests_created}, "
+                f"articles added: {digest_report.articles_added}"
             )
     return 0
 
