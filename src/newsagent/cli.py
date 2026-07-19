@@ -10,7 +10,7 @@ import argparse
 
 from newsagent.db import SessionLocal
 from newsagent.llm import get_llm_provider
-from newsagent.pipeline import fetcher, relevance
+from newsagent.pipeline import fetcher, relevance, summarize
 from newsagent.services import identity, sources
 
 
@@ -28,6 +28,7 @@ def main(argv: list[str] | None = None) -> int:
     subparsers.add_parser("seed-sources", help="Load the curated default topics + RSS sources")
     subparsers.add_parser("fetch", help="Fetch new articles from all approved sources")
     subparsers.add_parser("filter", help="Score pending articles for relevance to their topic")
+    subparsers.add_parser("summarize", help="Summarize + translate relevant articles to Hebrew")
 
     args = parser.parse_args(argv)
 
@@ -60,6 +61,16 @@ def main(argv: list[str] | None = None) -> int:
             print(
                 f"Usage: {filter_report.usage_input_units} in / "
                 f"{filter_report.usage_output_units} out units"
+            )
+        elif args.command == "summarize":
+            summary_report = summarize.summarize_relevant_articles(db, get_llm_provider())
+            print(
+                f"Summarized {summary_report.summarized} "
+                f"({summary_report.refused} refused, {summary_report.errors} errors)"
+            )
+            print(
+                f"Usage: {summary_report.usage_input_units} in / "
+                f"{summary_report.usage_output_units} out units"
             )
     return 0
 
