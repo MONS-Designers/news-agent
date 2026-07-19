@@ -6,6 +6,9 @@ class Settings(BaseSettings):
 
     database_url: str = "sqlite:///./newsagent.db"
 
+    # Which LLM provider adapter the pipeline uses (see newsagent.llm.factory)
+    llm_provider: str = "mock"
+
     # Google OAuth (set real values in .env — never commit them)
     google_client_id: str = ""
     google_client_secret: str = ""
