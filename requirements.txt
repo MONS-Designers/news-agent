@@ -6,3 +6,4 @@ uvicorn==0.51.0
 Authlib==1.7.2
 itsdangerous==2.2.0
 feedparser==6.0.12
+Jinja2==3.1.6

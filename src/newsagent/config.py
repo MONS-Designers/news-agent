@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     session_secret: str = ""
     # Where the API redirects back to after login (the Vue dev server).
     frontend_url: str = "http://127.0.0.1:5173"
+    # Publicly reachable base URL of this API — used to build the open-tracking
+    # pixel URL embedded in outgoing digest emails.
+    backend_base_url: str = "http://127.0.0.1:8000"
 
 
 settings = Settings()

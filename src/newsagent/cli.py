@@ -10,7 +10,8 @@ import argparse
 
 from newsagent.db import SessionLocal
 from newsagent.llm import get_llm_provider
-from newsagent.pipeline import digest, fetcher, relevance, summarize
+from newsagent.mail import get_email_sender
+from newsagent.pipeline import digest, fetcher, relevance, send, summarize
 from newsagent.services import identity, preferences, sources
 
 
@@ -35,6 +36,7 @@ def main(argv: list[str] | None = None) -> int:
     subscribe_cmd.add_argument("topic")
 
     subparsers.add_parser("build-digests", help="Build today's digests for all users")
+    subparsers.add_parser("send-digests", help="Render and send all digests not yet sent")
 
     args = parser.parse_args(argv)
 
@@ -86,12 +88,15 @@ def main(argv: list[str] | None = None) -> int:
                 return 1
             print(f"{'Subscribed' if created else 'Already subscribed'}: {args.email} -> {args.topic}")
         elif args.command == "build-digests":
-            digest_report = digest.build_digests(db)
+            digest_report = digest.build_digests(db, get_llm_provider())
             print(
                 f"Users: {digest_report.users_processed}, "
                 f"digests created: {digest_report.digests_created}, "
                 f"articles added: {digest_report.articles_added}"
             )
+        elif args.command == "send-digests":
+            send_report = send.send_pending_digests(db, get_email_sender())
+            print(f"Sent {send_report.sent}, failed {send_report.failed}")
     return 0
 
 

@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from starlette.middleware.sessions import SessionMiddleware
 
-from newsagent.api.routers import admin, auth, me
+from newsagent.api.routers import admin, auth, me, tracking
 from newsagent.config import settings
 
 
@@ -11,6 +11,7 @@ def create_app() -> FastAPI:
     app.include_router(auth.router)
     app.include_router(admin.router)
     app.include_router(me.router)
+    app.include_router(tracking.router)
 
     @app.get("/health")
     def health() -> dict[str, str]:
