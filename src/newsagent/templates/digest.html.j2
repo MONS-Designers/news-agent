@@ -47,6 +47,17 @@
 {% endif %}
 <tr><td style="padding:24px 32px 10px;">
   <span style="display:inline-block; font-family:'Rubik','Segoe UI',Arial,sans-serif; font-size:10px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:{{ article.topic_color }}; padding:5px 13px; border-radius:20px; border:1px solid {{ article.topic_color }};">{{ article.topic_label }}</span>
+  {% if article.image_url %}
+  <!-- Lead image: a blocked/broken image collapses to its padded grey alt-text
+       card (height:auto + styled alt) instead of leaving a white gap. #24 -->
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:14px 0 4px;">
+    <tr><td style="background-color:#141b32; border-radius:12px; padding:0;">
+      <a href="{{ article.url }}" style="text-decoration:none;">
+        <img src="{{ article.image_url }}" alt="{{ article.alt_text }}" width="536" style="display:block; width:100%; max-width:536px; height:auto; border-radius:12px; font-family:'Rubik','Segoe UI',Arial,sans-serif; font-size:15px; font-weight:700; color:#a3adc4; line-height:1.5; padding:22px; box-sizing:border-box;">
+      </a>
+    </td></tr>
+  </table>
+  {% endif %}
   <h2 style="font-family:'Rubik','Segoe UI',Arial,sans-serif; font-size:24px; font-weight:800; color:#ffffff; line-height:1.35; margin:14px 0 12px; letter-spacing:-.2px;">{{ article.title_he }}</h2>
   <ul style="list-style:none; margin:0; padding:0; font-family:'Rubik','Segoe UI',Arial,sans-serif;">
     {% for bullet in article.bullets %}

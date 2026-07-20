@@ -47,6 +47,45 @@ def _entry_published_at(entry: Any) -> datetime | None:
     return datetime(*parsed_time[:6])
 
 
+def _first_media_url(items: Any) -> str | None:
+    """Return the first non-empty ``url`` from a feedparser media list (a list of
+    dicts). Feedparser puts ``media:content`` under ``media_content`` and
+    ``media:thumbnail`` under ``media_thumbnail``, each as [{'url': ...}, ...]."""
+    if not isinstance(items, list):
+        return None
+    for item in items:
+        url = item.get("url") if isinstance(item, dict) else None
+        if url:
+            return url
+    return None
+
+
+def extract_image_url(entry: Any) -> str | None:
+    """Pick a lead image from an RSS entry, in priority order:
+    ``media:content`` -> ``media:thumbnail`` -> an image ``enclosure``.
+
+    Returns None when the feed carries no image — the article then renders as a
+    text-only card (issue #24). The article-page ``og:image`` fallback is left to
+    #9 (full-text extraction), which owns the page fetch; wiring it in here is a
+    one-line addition once that lands."""
+    media_url = _first_media_url(entry.get("media_content")) or _first_media_url(
+        entry.get("media_thumbnail")
+    )
+    if media_url:
+        return media_url
+    # Enclosures: RSS <enclosure>. feedparser exposes them as `enclosures` (list
+    # of dicts) and also folds them into `links` with rel="enclosure". Accept only
+    # image/* to avoid grabbing a podcast audio/PDF enclosure as a "lead image".
+    for enclosure in entry.get("enclosures") or []:
+        if not isinstance(enclosure, dict):
+            continue
+        mime = enclosure.get("type") or ""
+        href = enclosure.get("href") or enclosure.get("url")
+        if href and mime.startswith("image/"):
+            return href
+    return None
+
+
 def fetch_source(db: Session, source: Source, parse: ParseFunc = feedparser.parse) -> SourceResult:
     result = SourceResult(source_name=source.name)
     try:
@@ -77,6 +116,7 @@ def fetch_source(db: Session, source: Source, parse: ParseFunc = feedparser.pars
                 url=url,
                 published_at=_entry_published_at(entry),
                 rss_summary=entry.get("summary") or None,
+                image_url=extract_image_url(entry),
             )
         )
         result.new_articles += 1

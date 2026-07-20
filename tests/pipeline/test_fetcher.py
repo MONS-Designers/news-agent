@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from newsagent.models import Article, Source, Topic
 from newsagent.models.base import Base
-from newsagent.pipeline.fetcher import fetch_approved_sources, fetch_source
+from newsagent.pipeline.fetcher import extract_image_url, fetch_approved_sources, fetch_source
 
 
 @pytest.fixture
@@ -104,3 +104,56 @@ def test_entry_without_link_or_title_is_ignored(db: Session):
     result = fetch_source(db, approved(db), parse)
     assert result.new_articles == 0
     assert db.scalar(select(Article)) is None
+
+
+# --- Image extraction (issue #24) -----------------------------------------
+
+
+def test_extract_image_prefers_media_content():
+    entry = {
+        "media_content": [{"url": "https://img/content.jpg"}],
+        "media_thumbnail": [{"url": "https://img/thumb.jpg"}],
+    }
+    assert extract_image_url(entry) == "https://img/content.jpg"
+
+
+def test_extract_image_falls_back_to_thumbnail():
+    entry = {"media_thumbnail": [{"url": "https://img/thumb.jpg"}]}
+    assert extract_image_url(entry) == "https://img/thumb.jpg"
+
+
+def test_extract_image_falls_back_to_image_enclosure():
+    entry = {"enclosures": [{"href": "https://img/enc.png", "type": "image/png"}]}
+    assert extract_image_url(entry) == "https://img/enc.png"
+
+
+def test_extract_image_ignores_non_image_enclosure():
+    # A podcast audio / PDF enclosure must not be mistaken for a lead image.
+    entry = {"enclosures": [{"href": "https://cdn/ep.mp3", "type": "audio/mpeg"}]}
+    assert extract_image_url(entry) is None
+
+
+def test_extract_image_skips_media_entries_without_url():
+    entry = {"media_content": [{"medium": "image"}, {"url": "https://img/second.jpg"}]}
+    assert extract_image_url(entry) == "https://img/second.jpg"
+
+
+def test_extract_image_returns_none_when_absent():
+    assert extract_image_url({"title": "no media at all"}) is None
+
+
+def test_fetch_persists_extracted_image_url(db: Session):
+    entry = dict(ENTRY, media_content=[{"url": "https://img/lead.jpg"}])
+    parse = make_parse({"feed://ok": FakeFeed(entries=[entry])})
+    fetch_source(db, approved(db), parse)
+    article = db.scalar(select(Article))
+    assert article is not None
+    assert article.image_url == "https://img/lead.jpg"
+
+
+def test_fetch_leaves_image_url_null_when_feed_has_no_image(db: Session):
+    parse = make_parse({"feed://ok": FakeFeed(entries=[ENTRY])})
+    fetch_source(db, approved(db), parse)
+    article = db.scalar(select(Article))
+    assert article is not None
+    assert article.image_url is None

@@ -92,19 +92,27 @@ class ArticleView:
     source_name: str
     topic_label: str
     topic_color: str
+    image_url: str | None
+    # Plain-text title for the image alt attribute: what a reader with images
+    # blocked sees instead of the picture (issue #24). Kept separate from
+    # title_he, which carries <bdi>/<strong> markup that can't live in an attr.
+    alt_text: str
 
 
 def _to_view(article: Article) -> ArticleView:
     topic_name = article.source.topic.name
     bullets = article.bullets_he or ([article.summary_he] if article.summary_he else [])
+    title = article.title_he or article.title
     return ArticleView(
-        title_he=_emphasize(article.title_he or article.title),
+        title_he=_emphasize(title),
         bullets=[_emphasize(b) for b in bullets],
         reading_time_minutes=article.reading_time_minutes or 1,
         url=article.url,
         source_name=article.source.name,
         topic_label=_TOPIC_LABELS.get(topic_name, topic_name),
         topic_color=_TOPIC_COLORS.get(topic_name, _DEFAULT_TOPIC_COLOR),
+        image_url=article.image_url,
+        alt_text=title,
     )
 
 
