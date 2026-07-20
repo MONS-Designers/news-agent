@@ -38,6 +38,9 @@ class Article(Base):
     # General "worth-reading" signal (0-1), distinct from relevance; feeds ranking.
     interestingness: Mapped[float | None] = mapped_column(Float, nullable=True)
     summary_status: Mapped[str] = mapped_column(String, default="pending", server_default="pending")
+    # Lead image for email rendering; extracted from RSS media fields at fetch time (issue #24).
+    # og:image fallback populated later by #9 (full-text extraction).
+    image_url: Mapped[str | None] = mapped_column(String, nullable=True)
 
     source: Mapped["Source"] = relationship(back_populates="articles")
     digest_entries: Mapped[list["DigestArticle"]] = relationship(back_populates="article")

@@ -23,7 +23,14 @@ def db() -> Session:
         yield session
 
 
-def add_article(db: Session, *, url_suffix: str, bullets: list[str] | None = None, minutes: int = 3) -> Article:
+def add_article(
+    db: Session,
+    *,
+    url_suffix: str,
+    bullets: list[str] | None = None,
+    minutes: int = 3,
+    image_url: str | None = None,
+) -> Article:
     article = Article(
         source_id=1,
         title="Original title",
@@ -35,6 +42,7 @@ def add_article(db: Session, *, url_suffix: str, bullets: list[str] | None = Non
         interestingness=0.5,
         summary_status="summarized",
         relevance_status="relevant",
+        image_url=image_url,
     )
     db.add(article)
     db.flush()
@@ -126,6 +134,29 @@ def test_no_joke_corner_when_absent(db: Session):
     digest = build_digest(db, [add_article(db, url_suffix="a")])
     html = render_digest_html(digest)
     assert "קינוח" not in html
+
+
+def test_lead_image_rendered_when_present(db: Session):
+    digest = build_digest(db, [add_article(db, url_suffix="a", image_url="https://img/lead.jpg")])
+    html = render_digest_html(digest)
+    assert 'src="https://img/lead.jpg"' in html
+    assert "height:auto" in html  # resilient collapse for blocked images
+
+
+def test_lead_image_alt_is_plain_title_not_markup(db: Session):
+    # alt must be plain text — the <bdi>/<strong> markup that title_he carries
+    # cannot live inside an HTML attribute.
+    digest = build_digest(db, [add_article(db, url_suffix="a", image_url="https://img/x.jpg")])
+    html = render_digest_html(digest)
+    assert 'alt="כותרת בעברית"' in html
+
+
+def test_no_image_element_when_absent(db: Session):
+    digest = build_digest(db, [add_article(db, url_suffix="a")])  # image_url defaults to None
+    html = render_digest_html(digest)
+    # The lead image carries the title as its alt; the tracking pixel uses alt="".
+    # No title-alt image → the article degraded to a text-only card.
+    assert 'alt="כותרת בעברית"' not in html
 
 
 def test_selection_is_topic_diverse(db: Session):
