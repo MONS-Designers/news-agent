@@ -8,7 +8,7 @@ nothing here may depend on adapter internals.
 from abc import ABC, abstractmethod
 
 from newsagent.llm.base import LLMProvider
-from newsagent.llm.types import ArticleInput, Refusal, RelevanceScore, SummaryResult
+from newsagent.llm.types import ArticleInput, DigestVoice, Refusal, RelevanceScore, SummaryResult
 
 ON_TOPIC_ARTICLE = ArticleInput(
     title="Advances in artificial intelligence research",
@@ -63,6 +63,24 @@ class ProviderContractSuite(ABC):
         assert result.title_he
         assert result.source_language
         assert result.reading_time_minutes >= 1
+
+    def test_summarize_returns_bullets_and_interestingness(self):
+        result = self.make_provider().summarize(ON_TOPIC_ARTICLE)
+        assert isinstance(result, SummaryResult)
+        assert len(result.bullets_he) >= 1
+        assert all(b for b in result.bullets_he)
+        assert 0.0 <= result.interestingness <= 1.0
+
+    def test_compose_digest_voice_returns_intro_and_joke(self):
+        result = self.make_provider().compose_digest_voice(
+            ["AI model breaks record", "New space telescope launched"]
+        )
+        assert isinstance(result, DigestVoice)
+        assert result.intro_he
+        assert result.dad_joke_he
+
+    def test_compose_digest_voice_refuses_empty_headlines(self):
+        assert isinstance(self.make_provider().compose_digest_voice([]), Refusal)
 
     # -- CAP-6: explicit refusal, distinct from failure ---------------------
 

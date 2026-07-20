@@ -76,6 +76,8 @@ def summarize_relevant_articles(db: Session, provider: LLMProvider) -> Summarize
             article.title_he = result.title_he
             article.source_language = result.source_language
             article.reading_time_minutes = result.reading_time_minutes
+            article.bullets_he = list(result.bullets_he)
+            article.interestingness = result.interestingness
             article.summary_status = SUMMARY_DONE
             report.summarized += 1
             if result.usage is not None:

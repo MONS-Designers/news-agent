@@ -15,7 +15,7 @@ from collections.abc import Callable, Sequence
 from typing import TypeVar
 
 from newsagent.llm.errors import LLMError
-from newsagent.llm.types import ArticleInput, Refusal, RelevanceScore, SummaryResult
+from newsagent.llm.types import ArticleInput, DigestVoice, Refusal, RelevanceScore, SummaryResult
 
 T = TypeVar("T")
 
@@ -46,6 +46,9 @@ class LLMProvider(ABC):
     def summarize(self, article: ArticleInput) -> SummaryResult | Refusal:
         return self._run(lambda: self._summarize(article))
 
+    def compose_digest_voice(self, headlines: Sequence[str]) -> DigestVoice | Refusal:
+        return self._run(lambda: self._compose_digest_voice(headlines))
+
     def score_relevance_many(
         self,
         articles: Sequence[ArticleInput],
@@ -71,6 +74,9 @@ class LLMProvider(ABC):
 
     @abstractmethod
     def _summarize(self, article: ArticleInput) -> SummaryResult | Refusal: ...
+
+    @abstractmethod
+    def _compose_digest_voice(self, headlines: Sequence[str]) -> DigestVoice | Refusal: ...
 
     # -- shared retry mechanics ----------------------------------------------
 

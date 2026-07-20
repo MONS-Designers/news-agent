@@ -2,10 +2,18 @@ from newsagent.llm.base import LLMProvider
 from newsagent.llm.errors import LLMError, LLMInputError, LLMProviderError, LLMTransportError
 from newsagent.llm.factory import get_llm_provider
 from newsagent.llm.mock import MockLLMProvider
-from newsagent.llm.types import ArticleInput, Refusal, RelevanceScore, SummaryResult, Usage
+from newsagent.llm.types import (
+    ArticleInput,
+    DigestVoice,
+    Refusal,
+    RelevanceScore,
+    SummaryResult,
+    Usage,
+)
 
 __all__ = [
     "ArticleInput",
+    "DigestVoice",
     "LLMError",
     "LLMInputError",
     "LLMProvider",

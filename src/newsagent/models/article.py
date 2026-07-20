@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, func
+from sqlalchemy import JSON, DateTime, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from newsagent.models.base import Base
@@ -33,6 +33,10 @@ class Article(Base):
     title_he: Mapped[str | None] = mapped_column(String, nullable=True)
     source_language: Mapped[str | None] = mapped_column(String, nullable=True)
     reading_time_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Key points for the email body; each may carry **markdown** keyword emphasis.
+    bullets_he: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    # General "worth-reading" signal (0-1), distinct from relevance; feeds ranking.
+    interestingness: Mapped[float | None] = mapped_column(Float, nullable=True)
     summary_status: Mapped[str] = mapped_column(String, default="pending", server_default="pending")
 
     source: Mapped["Source"] = relationship(back_populates="articles")

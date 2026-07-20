@@ -6,12 +6,20 @@ only so the contract tests can exercise the shared retry mechanics — by defaul
 the mock never fails.
 """
 
+import hashlib
 import re
 from collections.abc import Sequence
 
 from newsagent.llm.base import LLMProvider
 from newsagent.llm.errors import LLMProviderError, LLMTransportError
-from newsagent.llm.types import ArticleInput, Refusal, RelevanceScore, SummaryResult, Usage
+from newsagent.llm.types import (
+    ArticleInput,
+    DigestVoice,
+    Refusal,
+    RelevanceScore,
+    SummaryResult,
+    Usage,
+)
 
 _MIN_TEXT_LENGTH = 40
 _WORDS_PER_MINUTE = 200
@@ -20,6 +28,30 @@ _HEBREW_CHARS = re.compile(r"[֐-׿]")
 
 def _tokens(text: str) -> list[str]:
     return re.findall(r"[\w']+", text.lower())
+
+
+def _split_sentences(text: str) -> list[str]:
+    parts = re.split(r"(?<=[.!?])\s+", text.strip())
+    return [p.strip() for p in parts if p.strip()]
+
+
+def _emphasize_longest(sentence: str) -> str:
+    """Wrap the single longest word in **markdown** emphasis (deterministic)."""
+    words = sentence.split()
+    if not words:
+        return sentence
+    target = max(words, key=len)
+    return sentence.replace(target, f"**{target}**", 1)
+
+
+# A small deterministic groaner pool — a real provider writes jokes tied to the
+# actual headlines; the mock just picks one stably so tests never flake.
+_DAD_JOKES = [
+    "קראתי ספר על אנטי-גרביטציה — אי אפשר להניח אותו מהיד.",
+    "למה האלגוריתם הלך לטיפול? היו לו יותר מדי בעיות לא פתורות.",
+    "אמרתי למחשב שאני צריך הפסקה — הוא ענה: 'אין בעיה, אני כבר קורס'.",
+    "איך קוראים לענן שמאחסן בדיחות? ענן גיבוי־חיוך.",
+]
 
 
 class MockLLMProvider(LLMProvider):
@@ -77,10 +109,43 @@ class MockLLMProvider(LLMProvider):
         snippet = " ".join(words[:40])
         summary_he = f"[תרגום דמה] {snippet}"
         source_language = "he" if _HEBREW_CHARS.search(article.text) else "en"
+
+        # Deterministic bullets: first 3 sentences (or word-chunks as fallback),
+        # each with its longest word emphasized via **markdown** markers.
+        sentences = _split_sentences(article.text)
+        if len(sentences) < 3:
+            sentences = [" ".join(words[i : i + 8]) for i in range(0, len(words), 8)]
+        bullets_he = tuple(
+            f"[תרגום דמה] {_emphasize_longest(sentence)}" for sentence in sentences[:3]
+        )
+
+        # Deterministic interestingness in [0, 1] from a stable hash of the title.
+        interestingness = (int(hashlib.sha1(article.title.encode()).hexdigest(), 16) % 1000) / 1000
+
         return SummaryResult(
             summary_he=summary_he,
             title_he=f"[תרגום דמה] {article.title}",
             source_language=source_language,
             reading_time_minutes=max(1, round(len(words) / _WORDS_PER_MINUTE)),
+            bullets_he=bullets_he,
+            interestingness=interestingness,
             usage=Usage(input_units=len(words), output_units=len(summary_he.split())),
+        )
+
+    def _compose_digest_voice(self, headlines: Sequence[str]) -> DigestVoice | Refusal:
+        self._maybe_fail()
+        if not headlines:
+            return Refusal(reason="no headlines to compose a voice from")
+
+        intro_he = (
+            f"[דמה] בוקר טוב! ליקטתי עבורך {len(headlines)} כתבות נבחרות להיום. "
+            "קריאה נעימה ☕"
+        )
+        # Stable joke pick from the day's headlines, so the same set → same joke.
+        index = int(hashlib.sha1(" ".join(headlines).encode()).hexdigest(), 16) % len(_DAD_JOKES)
+        dad_joke_he = f"[דמה] {_DAD_JOKES[index]}"
+        return DigestVoice(
+            intro_he=intro_he,
+            dad_joke_he=dad_joke_he,
+            usage=Usage(input_units=len(headlines), output_units=2),
         )

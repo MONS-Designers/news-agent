@@ -15,6 +15,9 @@ from datetime import date
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from newsagent.llm.base import LLMProvider
+from newsagent.llm.errors import LLMError
+from newsagent.llm.types import Refusal
 from newsagent.models import Article, Digest, DigestArticle, Source, User, UserTopicPreference
 from newsagent.pipeline.summarize import SUMMARY_DONE
 
@@ -48,7 +51,27 @@ def _undelivered_articles(db: Session, user: User) -> list[Article]:
     )
 
 
-def build_digests(db: Session, for_date: date | None = None) -> DigestReport:
+def _compose_voice(provider: LLMProvider, digest: Digest) -> None:
+    """Fill the digest's editorial voice from its article headlines. Best-effort:
+    a refusal or provider error leaves the voice empty (template renders without
+    it) rather than failing the build."""
+    headlines = [entry.article.title_he or entry.article.title for entry in digest.articles]
+    if not headlines:
+        return
+    try:
+        voice = provider.compose_digest_voice(headlines)
+    except LLMError as error:
+        logger.warning("Voice composition failed for digest %s: %s", digest.id, error)
+        return
+    if isinstance(voice, Refusal):
+        return
+    digest.intro_he = voice.intro_he
+    digest.dad_joke_he = voice.dad_joke_he
+
+
+def build_digests(
+    db: Session, provider: LLMProvider, for_date: date | None = None
+) -> DigestReport:
     if for_date is None:
         for_date = date.today()
     report = DigestReport()
@@ -71,6 +94,9 @@ def build_digests(db: Session, for_date: date | None = None) -> DigestReport:
         for article in articles:
             db.add(DigestArticle(digest_id=digest.id, article_id=article.id))
         report.articles_added += len(articles)
+        db.flush()
+        # Refresh the voice against the digest's now-final article set.
+        _compose_voice(provider, digest)
         db.commit()
         logger.info("Digest for %s (%s): +%d articles", user.email, for_date, len(articles))
 
