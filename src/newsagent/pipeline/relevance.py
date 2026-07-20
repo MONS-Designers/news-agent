@@ -18,6 +18,7 @@ from newsagent.llm.base import LLMProvider
 from newsagent.llm.errors import LLMError
 from newsagent.llm.types import ArticleInput, Refusal
 from newsagent.models import Article, Source
+from newsagent.models.source import STATUS_APPROVED
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +64,7 @@ def filter_pending_articles(
     articles = db.scalars(
         select(Article)
         .join(Source)
-        .where(Article.relevance_status.in_(_FILTERABLE), Source.status == "approved")
+        .where(Article.relevance_status.in_(_FILTERABLE), Source.status == STATUS_APPROVED)
     ).all()
 
     for article in articles:

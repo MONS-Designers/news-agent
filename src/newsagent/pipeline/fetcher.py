@@ -13,6 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from newsagent.models import Article, Source
+from newsagent.models.source import STATUS_APPROVED
 
 logger = logging.getLogger(__name__)
 
@@ -126,7 +127,7 @@ def fetch_source(db: Session, source: Source, parse: ParseFunc = feedparser.pars
 
 def fetch_approved_sources(db: Session, parse: ParseFunc = feedparser.parse) -> FetchReport:
     report = FetchReport()
-    sources = db.scalars(select(Source).where(Source.status == "approved")).all()
+    sources = db.scalars(select(Source).where(Source.status == STATUS_APPROVED)).all()
     for source in sources:
         report.results.append(fetch_source(db, source, parse))
     return report

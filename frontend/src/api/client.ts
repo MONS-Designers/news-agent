@@ -59,6 +59,17 @@ export async function listPendingSources(): Promise<Source[]> {
   return request("/admin/sources");
 }
 
+export async function setSourceStatus(
+  id: number,
+  status: "approved" | "rejected",
+): Promise<Source> {
+  return request(`/admin/sources/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status }),
+  });
+}
+
 export async function listMyPreferences(): Promise<TopicPreference[]> {
   return request("/me/preferences");
 }

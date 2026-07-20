@@ -4,7 +4,13 @@ from sqlalchemy.orm import Session
 
 from newsagent.models import Source, Topic
 from newsagent.models.base import Base
-from newsagent.services.sources import DEFAULT_SOURCES, add_source, add_topic, seed_default_sources
+from newsagent.services.sources import (
+    DEFAULT_SOURCES,
+    add_source,
+    add_topic,
+    seed_default_sources,
+    set_source_status,
+)
 
 
 @pytest.fixture
@@ -41,3 +47,18 @@ def test_seed_is_idempotent(db: Session):
     report = seed_default_sources(db)
     assert report.topics_created == 0
     assert report.sources_created == 0
+
+
+def test_set_source_status_updates_existing_source(db: Session):
+    topic, _ = add_topic(db, "AI")
+    source, _ = add_source(db, topic, "Feed", "https://example.com/feed")
+    assert source.status == "pending"
+
+    updated = set_source_status(db, source.id, "approved")
+    assert updated is not None
+    assert updated.id == source.id
+    assert updated.status == "approved"
+
+
+def test_set_source_status_returns_none_for_missing_id(db: Session):
+    assert set_source_status(db, 999, "approved") is None

@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from newsagent.models import Source, Topic
+from newsagent.models.source import STATUS_APPROVED, STATUS_PENDING
 
 # Curated starter feeds per topic — all seeded as approved (admin-curated).
 DEFAULT_SOURCES: dict[str, list[tuple[str, str]]] = {
@@ -40,7 +41,7 @@ def add_topic(db: Session, name: str) -> tuple[Topic, bool]:
 
 
 def add_source(
-    db: Session, topic: Topic, name: str, url: str, status: str = "pending"
+    db: Session, topic: Topic, name: str, url: str, status: str = STATUS_PENDING
 ) -> tuple[Source, bool]:
     """Get-or-create a Source by feed URL. Returns (source, created)."""
     existing = db.scalar(select(Source).where(Source.url == url))
@@ -65,6 +66,17 @@ def seed_default_sources(db: Session) -> SeedReport:
         topic, created = add_topic(db, topic_name)
         report.topics_created += int(created)
         for source_name, url in feeds:
-            _, created = add_source(db, topic, source_name, url, status="approved")
+            _, created = add_source(db, topic, source_name, url, status=STATUS_APPROVED)
             report.sources_created += int(created)
     return report
+
+
+def set_source_status(db: Session, source_id: int, status: str) -> Source | None:
+    """Set a Source's status by id. Returns the updated Source, or None if the id
+    doesn't exist."""
+    source = db.get(Source, source_id)
+    if source is None:
+        return None
+    source.status = status
+    db.commit()
+    return source

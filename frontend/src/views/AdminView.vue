@@ -15,6 +15,13 @@
       </button>
     </div>
 
+    <div
+      v-if="actionError"
+      class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800"
+    >
+      {{ actionError }}
+    </div>
+
     <div v-if="loading" class="text-sm text-neutral-500">Loading…</div>
 
     <div
@@ -35,11 +42,27 @@
             <p class="truncate font-medium">{{ source.name }}</p>
             <p class="truncate text-sm text-neutral-500">{{ source.url }}</p>
           </div>
-          <span
-            class="shrink-0 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700"
-          >
-            {{ source.status }}
-          </span>
+          <div class="flex shrink-0 items-center gap-2">
+            <span
+              class="rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700"
+            >
+              {{ source.status }}
+            </span>
+            <button
+              @click="updateStatus(source, 'approved')"
+              :disabled="pendingId === source.id"
+              class="inline-flex items-center justify-center rounded-lg bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-700 disabled:opacity-50"
+            >
+              Approve
+            </button>
+            <button
+              @click="updateStatus(source, 'rejected')"
+              :disabled="pendingId === source.id"
+              class="inline-flex items-center justify-center rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-red-500 disabled:opacity-50"
+            >
+              Reject
+            </button>
+          </div>
         </div>
       </li>
     </ul>
@@ -54,12 +77,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
-import { ApiError, listPendingSources, type Source } from "@/api/client";
+import { onMounted, ref } from "vue";
+import { ApiError, listPendingSources, setSourceStatus, type Source } from "@/api/client";
 
 const sources = ref<Source[]>([]);
 const loading = ref(false);
 const errorMessage = ref("");
+const actionError = ref("");
+const pendingId = ref<number | null>(null);
 
 async function loadSources() {
   loading.value = true;
@@ -78,4 +103,19 @@ async function loadSources() {
     loading.value = false;
   }
 }
+
+async function updateStatus(source: Source, status: "approved" | "rejected") {
+  pendingId.value = source.id;
+  actionError.value = "";
+  try {
+    await setSourceStatus(source.id, status);
+    sources.value = sources.value.filter((s) => s.id !== source.id);
+  } catch {
+    actionError.value = `Failed to ${status === "approved" ? "approve" : "reject"} source.`;
+  } finally {
+    pendingId.value = null;
+  }
+}
+
+onMounted(loadSources);
 </script>

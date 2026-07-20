@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict
 
 
@@ -9,3 +11,7 @@ class SourceOut(BaseModel):
     url: str
     name: str
     status: str
+
+
+class SourceStatusUpdate(BaseModel):
+    status: Literal["approved", "rejected"]
