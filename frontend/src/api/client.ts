@@ -9,8 +9,9 @@ export interface Source {
 }
 
 export interface TopicPreference {
-  id: number;
   topic_id: number;
+  name: string;
+  subscribed: boolean;
 }
 
 export interface Me {
@@ -59,17 +60,22 @@ export async function listPendingSources(): Promise<Source[]> {
   return request("/admin/sources");
 }
 
-export async function setSourceStatus(
-  id: number,
-  status: "approved" | "rejected",
-): Promise<Source> {
-  return request(`/admin/sources/${id}`, {
+export async function listMyPreferences(): Promise<TopicPreference[]> {
+  return request("/me/preferences");
+}
+
+export async function updateMyPreferences(topicIds: number[]): Promise<TopicPreference[]> {
+  return request("/me/preferences", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ topic_ids: topicIds }),
+  });
+}
+
+export async function setSourceStatus(sourceId: number, status: "approved" | "rejected"): Promise<Source> {
+  return request(`/admin/sources/${sourceId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ status }),
   });
-}
-
-export async function listMyPreferences(): Promise<TopicPreference[]> {
-  return request("/me/preferences");
 }
