@@ -12,7 +12,7 @@ from newsagent.db import SessionLocal
 from newsagent.llm import get_llm_provider
 from newsagent.mail import get_email_sender
 from newsagent.pipeline import digest, fetcher, relevance, send, summarize
-from newsagent.services import identity, preferences, sources
+from newsagent.services import identity, preferences, sources, taxonomy
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -27,6 +27,7 @@ def main(argv: list[str] | None = None) -> int:
     add_user.add_argument("--name", default=None, help="Display name (optional)")
 
     subparsers.add_parser("seed-sources", help="Load the curated default topics + RSS sources")
+    subparsers.add_parser("seed-fields", help="Load the curated default profile Fields")
     subparsers.add_parser("fetch", help="Fetch new articles from all approved sources")
     subparsers.add_parser("filter", help="Score pending articles for relevance to their topic")
     subparsers.add_parser("summarize", help="Summarize + translate relevant articles to Hebrew")
@@ -50,6 +51,9 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "seed-sources":
             report = sources.seed_default_sources(db)
             print(f"Seeded: {report.topics_created} new topics, {report.sources_created} new sources")
+        elif args.command == "seed-fields":
+            field_report = taxonomy.seed_default_fields(db)
+            print(f"Seeded: {field_report.fields_created} new fields")
         elif args.command == "fetch":
             fetch_report = fetcher.fetch_approved_sources(db)
             for result in fetch_report.results:

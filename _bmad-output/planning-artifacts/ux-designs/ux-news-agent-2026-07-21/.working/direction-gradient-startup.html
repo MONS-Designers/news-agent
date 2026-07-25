@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>NewsAgent — Direction: Gradient Startup</title>
+<style>
+/*
+  DIRECTION: Bold Gradient-Heavy Modern Startup
+  Register: glossy AI-product marketing energy (Notion AI / Linear launch page lineage)
+  Density: airy, big rounded glass cards floating over a mesh gradient
+  Shape language: 20-28px radii, glassmorphism (blur + translucency), soft glow shadows
+  Motion (CSS-only): hover lift + brighten, gradient border reveal on selection
+
+  Hex palette (gradient stops + solids):
+  --grad-1:        #6D28D9   mesh gradient — violet
+  --grad-2:        #DB2777   mesh gradient — pink/magenta
+  --grad-3:        #F59E0B   mesh gradient — amber
+  --grad-4:        #0EA5E9   mesh gradient — sky blue
+  --bg-base:        #12081F  base canvas behind mesh
+  --glass-fill:      rgba(255,255,255,0.08)   card glass fill
+  --glass-fill-2:    rgba(255,255,255,0.14)   elevated glass fill
+  --glass-border:    rgba(255,255,255,0.18)   glass border
+  --text-primary:   #FFFFFF  headings
+  --text-secondary: rgba(255,255,255,0.72)  body
+  --text-tertiary:  rgba(255,255,255,0.48)  placeholder/meta
+  --accent-solid:   #A855F7  button / selected accent solid
+*/
+html,body{margin:0;padding:0;}
+*{box-sizing:border-box;}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  background:#0B0614;
+  padding:40px 16px;
+  color:#fff;
+}
+.browser-frame{
+  max-width:960px;
+  margin:0 auto;
+  border-radius:20px;
+  overflow:hidden;
+  box-shadow:0 40px 80px -30px rgba(109,40,217,0.6);
+  border:1px solid rgba(255,255,255,0.1);
+}
+.chrome-bar{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:11px 14px;
+  background:rgba(18,8,31,0.9);
+  border-bottom:1px solid rgba(255,255,255,0.08);
+}
+.dot{width:10px;height:10px;border-radius:50%;}
+.dot.r{background:#FF5F57;} .dot.y{background:#FEBC2E;} .dot.g{background:#28C840;}
+.url{
+  margin-left:8px;
+  font-size:12px;
+  color:rgba(255,255,255,0.5);
+  background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.1);
+  border-radius:6px;
+  padding:4px 10px;
+  flex:1;
+  max-width:340px;
+}
+.page{
+  padding:40px 40px 52px;
+  background:
+    radial-gradient(circle at 8% -10%, #6D28D9 0%, transparent 45%),
+    radial-gradient(circle at 95% 10%, #DB2777 0%, transparent 40%),
+    radial-gradient(circle at 30% 110%, #0EA5E9 0%, transparent 45%),
+    radial-gradient(circle at 100% 100%, #F59E0B 0%, transparent 35%),
+    #12081F;
+}
+.eyebrow{
+  display:inline-block;
+  font-size:11px;
+  font-weight:700;
+  letter-spacing:0.08em;
+  text-transform:uppercase;
+  color:#fff;
+  background:linear-gradient(90deg,#A855F7,#EC4899);
+  padding:5px 12px;
+  border-radius:20px;
+  margin:0 0 14px;
+}
+h1{
+  font-size:32px;
+  font-weight:800;
+  letter-spacing:-0.02em;
+  margin:0 0 8px;
+}
+.sub{
+  font-size:15px;
+  color:rgba(255,255,255,0.7);
+  margin:0 0 28px;
+  max-width:520px;
+}
+.glass{
+  background:rgba(255,255,255,0.07);
+  backdrop-filter:blur(18px);
+  -webkit-backdrop-filter:blur(18px);
+  border:1px solid rgba(255,255,255,0.14);
+  border-radius:22px;
+  padding:24px 26px;
+  margin-bottom:18px;
+}
+.step-label{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  font-size:12px;
+  font-weight:700;
+  letter-spacing:0.05em;
+  text-transform:uppercase;
+  color:rgba(255,255,255,0.85);
+  margin-bottom:16px;
+}
+.step-num{
+  width:22px;height:22px;
+  border-radius:50%;
+  background:linear-gradient(135deg,#A855F7,#0EA5E9);
+  font-size:11px;
+  display:flex;align-items:center;justify-content:center;
+  font-weight:800;
+}
+
+.grid-fields{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;}
+.field-card{
+  border:1px solid rgba(255,255,255,0.14);
+  border-radius:18px;
+  padding:16px 6px;
+  text-align:center;
+  cursor:pointer;
+  background:rgba(255,255,255,0.05);
+  transition:all .16s ease;
+}
+.field-card:hover{
+  background:rgba(255,255,255,0.12);
+  transform:translateY(-3px);
+  border-color:rgba(255,255,255,0.3);
+}
+.field-card .ic{font-size:22px;display:block;margin-bottom:8px;}
+.field-card .lbl{font-size:12px;font-weight:600;color:rgba(255,255,255,0.8);}
+.field-card.selected{
+  background:linear-gradient(160deg,rgba(168,85,247,0.35),rgba(219,39,119,0.25));
+  border:1px solid transparent;
+  background-clip:padding-box;
+  box-shadow:0 0 0 1.5px #A855F7, 0 10px 26px -8px rgba(168,85,247,0.7);
+}
+.field-card.selected .lbl{color:#fff;}
+
+.role-row{display:flex;flex-wrap:wrap;gap:10px;}
+.chip{
+  border:1px solid rgba(255,255,255,0.16);
+  background:rgba(255,255,255,0.05);
+  border-radius:24px;
+  padding:10px 18px;
+  font-size:13px;
+  font-weight:600;
+  color:rgba(255,255,255,0.75);
+  cursor:pointer;
+  transition:all .16s ease;
+}
+.chip:hover{background:rgba(255,255,255,0.12);color:#fff;}
+.chip.selected{
+  background:linear-gradient(90deg,#A855F7,#EC4899);
+  color:#fff;
+  border-color:transparent;
+  box-shadow:0 6px 18px -4px rgba(168,85,247,0.6);
+}
+.chip.other-active{
+  background:linear-gradient(90deg,rgba(14,165,233,0.25),rgba(168,85,247,0.25));
+  border-color:#0EA5E9;
+  color:#fff;
+}
+.other-input-wrap{margin-top:14px;}
+.other-input{
+  width:100%;
+  border:1px solid #0EA5E9;
+  border-radius:14px;
+  background:rgba(255,255,255,0.08);
+  backdrop-filter:blur(10px);
+  padding:12px 16px;
+  font-size:13px;
+  font-family:inherit;
+  outline:none;
+  color:#fff;
+  box-shadow:0 0 0 4px rgba(14,165,233,0.18);
+}
+.other-input::placeholder{color:rgba(255,255,255,0.45);}
+
+.seg-control{
+  display:flex;
+  background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.14);
+  border-radius:18px;
+  padding:5px;
+  gap:5px;
+  max-width:520px;
+}
+.seg{
+  flex:1;
+  text-align:center;
+  padding:11px 8px;
+  font-size:13px;
+  font-weight:700;
+  color:rgba(255,255,255,0.55);
+  border-radius:14px;
+  cursor:pointer;
+  transition:all .16s ease;
+}
+.seg:hover{color:#fff;}
+.seg.active{
+  background:linear-gradient(90deg,#A855F7,#0EA5E9);
+  color:#fff;
+  box-shadow:0 6px 16px -4px rgba(168,85,247,0.6);
+}
+
+.prompt-chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;}
+.prompt-chip{
+  font-size:12px;
+  font-weight:600;
+  color:#fff;
+  background:rgba(255,255,255,0.08);
+  border:1px solid rgba(255,255,255,0.18);
+  border-radius:20px;
+  padding:7px 14px;
+  cursor:pointer;
+  transition:all .16s ease;
+}
+.prompt-chip:hover{background:rgba(255,255,255,0.18);}
+textarea{
+  width:100%;
+  min-height:76px;
+  border:1px solid rgba(255,255,255,0.16);
+  border-radius:16px;
+  background:rgba(255,255,255,0.05);
+  padding:13px 16px;
+  font-size:13px;
+  font-family:inherit;
+  color:#fff;
+  resize:none;
+  outline:none;
+  transition:all .16s ease;
+}
+textarea:focus{border-color:#A855F7;background:rgba(255,255,255,0.09);}
+textarea::placeholder{color:rgba(255,255,255,0.4);}
+
+.topics-header{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:16px;}
+.topics-header .cnt{
+  font-size:11px;font-weight:700;
+  color:#fff;
+  background:linear-gradient(90deg,#A855F7,#EC4899);
+  border-radius:20px;padding:5px 12px;
+}
+.topic-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:20px;}
+.topic-card{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  border:1px solid rgba(255,255,255,0.2);
+  background:linear-gradient(160deg,rgba(168,85,247,0.3),rgba(14,165,233,0.18));
+  border-radius:18px;
+  padding:15px 17px;
+}
+.topic-card .t-name{font-size:13px;font-weight:700;color:#fff;}
+.topic-card .t-swap{
+  font-size:11px;font-weight:700;
+  color:#12081F;
+  background:#fff;
+  border:none;
+  border-radius:20px;
+  padding:5px 12px;
+  cursor:pointer;
+  transition:transform .14s ease;
+}
+.topic-card .t-swap:hover{transform:scale(1.08);}
+
+.pool-label{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:rgba(255,255,255,0.5);margin:4px 0 12px;}
+.pool-grid{display:flex;flex-wrap:wrap;gap:9px;}
+.pool-chip{
+  font-size:12px;font-weight:500;
+  color:rgba(255,255,255,0.7);
+  border:1px dashed rgba(255,255,255,0.25);
+  border-radius:20px;
+  padding:7px 13px;
+  cursor:pointer;
+  transition:all .16s ease;
+}
+.pool-chip:hover{border-style:solid;border-color:#0EA5E9;color:#fff;background:rgba(14,165,233,0.15);}
+
+.footer-row{display:flex;align-items:center;justify-content:space-between;margin-top:26px;}
+.hint{font-size:12px;color:rgba(255,255,255,0.5);}
+.btn-primary{
+  background:linear-gradient(90deg,#A855F7,#EC4899,#F59E0B);
+  background-size:200% 100%;
+  color:#fff;
+  border:none;
+  border-radius:16px;
+  padding:14px 28px;
+  font-size:14px;
+  font-weight:800;
+  cursor:pointer;
+  box-shadow:0 10px 26px -6px rgba(168,85,247,0.7);
+  transition:all .2s ease;
+}
+.btn-primary:hover{background-position:100% 0;transform:translateY(-2px);}
+</style>
+</head>
+<body>
+<div class="browser-frame">
+  <div class="chrome-bar">
+    <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+    <span class="url">app.newsagent.io/preferences</span>
+  </div>
+  <div class="page">
+    <span class="eyebrow">✦ Smart onboarding</span>
+    <h1>Let's shape your feed</h1>
+    <p class="sub">A few quick picks and we'll tailor your daily digest to exactly what you care about.</p>
+
+    <div class="glass">
+      <div class="step-label"><span class="step-num">1</span> Field</div>
+      <div class="grid-fields">
+        <div class="field-card"><span class="ic">💻</span><span class="lbl">Tech</span></div>
+        <div class="field-card selected"><span class="ic">💰</span><span class="lbl">Finance</span></div>
+        <div class="field-card"><span class="ic">🩺</span><span class="lbl">Healthcare</span></div>
+        <div class="field-card"><span class="ic">🎓</span><span class="lbl">Education</span></div>
+        <div class="field-card"><span class="ic">🎨</span><span class="lbl">Design</span></div>
+        <div class="field-card"><span class="ic">✨</span><span class="lbl">Other</span></div>
+      </div>
+    </div>
+
+    <div class="glass">
+      <div class="step-label"><span class="step-num">2</span> Role</div>
+      <div class="role-row">
+        <div class="chip">Analyst</div>
+        <div class="chip">Portfolio Manager</div>
+        <div class="chip selected">Founder / Exec</div>
+        <div class="chip">Accountant</div>
+        <div class="chip">Student</div>
+        <div class="chip other-active">Other</div>
+      </div>
+      <div class="other-input-wrap">
+        <input class="other-input" type="text" placeholder="e.g. VC Associate, Risk Lead" value="">
+      </div>
+    </div>
+
+    <div class="glass">
+      <div class="step-label"><span class="step-num">3</span> Experience</div>
+      <div class="seg-control">
+        <div class="seg">0–2 yrs</div>
+        <div class="seg">3–5 yrs</div>
+        <div class="seg">6–10 yrs</div>
+        <div class="seg active">10+ yrs</div>
+      </div>
+    </div>
+
+    <div class="glass">
+      <div class="step-label"><span class="step-num">4</span> Anything else <span style="text-transform:none;font-weight:500;color:rgba(255,255,255,0.4);">(optional)</span></div>
+      <div class="prompt-chips">
+        <div class="prompt-chip">I love data storytelling</div>
+        <div class="prompt-chip">Excited about AI agents</div>
+        <div class="prompt-chip">Interested in sustainability</div>
+      </div>
+      <textarea placeholder="Anything else you're into? A niche, a company, a format...">Following the venture funding scene and macro trends closely.</textarea>
+    </div>
+
+    <div class="glass">
+      <div class="topics-header">
+        <div class="step-label" style="margin-bottom:0;"><span class="step-num">5</span> Suggested topics</div>
+        <span class="cnt">4 of 4 selected</span>
+      </div>
+      <div class="topic-grid">
+        <div class="topic-card"><span class="t-name">Startup Funding</span><span class="t-swap">Swap</span></div>
+        <div class="topic-card"><span class="t-name">Markets &amp; Macro</span><span class="t-swap">Swap</span></div>
+        <div class="topic-card"><span class="t-name">AI &amp; Machine Learning</span><span class="t-swap">Swap</span></div>
+        <div class="topic-card"><span class="t-name">Product Strategy</span><span class="t-swap">Swap</span></div>
+      </div>
+      <p class="pool-label">More candidates</p>
+      <div class="pool-grid">
+        <div class="pool-chip">Crypto &amp; Web3</div>
+        <div class="pool-chip">M&amp;A</div>
+        <div class="pool-chip">Wealth Tech</div>
+        <div class="pool-chip">Regulation</div>
+        <div class="pool-chip">Remote Work</div>
+        <div class="pool-chip">Cybersecurity</div>
+      </div>
+    </div>
+
+    <div class="footer-row">
+      <span class="hint">You can change these anytime.</span>
+      <button class="btn-primary">Save preferences</button>
+    </div>
+  </div>
+</div>
+</body>
+</html>

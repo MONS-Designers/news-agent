@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>NewsAgent — Direction: RPG Class Select</title>
+<style>
+/*
+  DIRECTION: RPG Class-Select / Playful Game-Like
+  Register: quiz/game "choose your class" screen — bold, high-contrast, celebratory
+  Density: spacious cards, big glanceable icons, thick borders, glow on selection
+  Shape language: large 16-20px radii, chunky 2px borders, drop "pop" shadows
+  Motion (CSS-only): hover lift + glow ring, selected state pulses via box-shadow layering
+
+  Hex palette:
+  --bg-page:       #150E2B   deep space-purple background
+  --bg-panel:      #1E1640   panel / card base
+  --bg-panel-2:    #241A4D   nested inset panel
+  --border:        #3A2E70   default card border
+  --border-glow:   #8B5CF6   selected / focus border glow (violet)
+  --text-primary:  #F5F3FF   headings
+  --text-secondary:#B4A9E0   body / helper text
+  --text-muted:    #7A6FB0   placeholder / meta
+  --accent-violet: #8B5CF6   primary accent
+  --accent-pink:   #EC4899   secondary accent / XP
+  --accent-cyan:   #22D3EE   tertiary accent / highlight
+  --accent-amber:  #FBBF24   badge / star accent
+  --success-green: #34D399   confirmed selection check
+*/
+html,body{margin:0;padding:0;}
+*{box-sizing:border-box;}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  background:#0A0718;
+  padding:40px 16px;
+  color:#F5F3FF;
+}
+.browser-frame{
+  max-width:960px;
+  margin:0 auto;
+  background:#150E2B;
+  border-radius:18px;
+  overflow:hidden;
+  box-shadow:0 0 0 1px #3A2E70, 0 30px 60px -20px rgba(139,92,246,0.35);
+}
+.chrome-bar{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:11px 14px;
+  background:#1E1640;
+  border-bottom:1px solid #3A2E70;
+}
+.dot{width:10px;height:10px;border-radius:50%;}
+.dot.r{background:#FF5F57;} .dot.y{background:#FEBC2E;} .dot.g{background:#28C840;}
+.url{
+  margin-left:8px;
+  font-size:12px;
+  color:#7A6FB0;
+  background:#150E2B;
+  border:1px solid #3A2E70;
+  border-radius:6px;
+  padding:4px 10px;
+  flex:1;
+  max-width:340px;
+}
+.page{
+  padding:34px 40px 48px;
+  background:
+    radial-gradient(circle at 15% 0%, rgba(139,92,246,0.18), transparent 45%),
+    radial-gradient(circle at 90% 20%, rgba(236,72,153,0.14), transparent 40%),
+    #150E2B;
+}
+.eyebrow{
+  font-size:12px;
+  font-weight:800;
+  letter-spacing:0.14em;
+  text-transform:uppercase;
+  color:#EC4899;
+  margin:0 0 8px;
+}
+h1{
+  font-size:28px;
+  font-weight:800;
+  letter-spacing:-0.01em;
+  margin:0 0 6px;
+  background:linear-gradient(90deg,#F5F3FF,#C4B5FD);
+  -webkit-background-clip:text;
+  background-clip:text;
+  -webkit-text-fill-color:transparent;
+}
+.sub{
+  font-size:14px;
+  color:#B4A9E0;
+  margin:0 0 26px;
+}
+.panel{
+  background:#1E1640;
+  border:2px solid #3A2E70;
+  border-radius:18px;
+  padding:22px 24px;
+  margin-bottom:18px;
+  position:relative;
+}
+.step-label{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  font-size:12px;
+  font-weight:800;
+  letter-spacing:0.06em;
+  text-transform:uppercase;
+  color:#C4B5FD;
+  margin-bottom:16px;
+}
+.step-num{
+  width:24px;height:24px;
+  border-radius:7px;
+  background:linear-gradient(135deg,#8B5CF6,#EC4899);
+  color:#fff;
+  font-size:12px;
+  display:flex;align-items:center;justify-content:center;
+  font-weight:800;
+  box-shadow:0 2px 8px rgba(139,92,246,0.5);
+}
+
+.grid-fields{
+  display:grid;
+  grid-template-columns:repeat(6,1fr);
+  gap:12px;
+}
+.field-card{
+  border:2px solid #3A2E70;
+  border-radius:16px;
+  padding:16px 6px;
+  text-align:center;
+  cursor:pointer;
+  background:#241A4D;
+  transition:transform .14s ease, border-color .14s ease, box-shadow .14s ease;
+}
+.field-card:hover{
+  transform:translateY(-3px) scale(1.02);
+  border-color:#8B5CF6;
+  box-shadow:0 8px 20px -6px rgba(139,92,246,0.5);
+}
+.field-card .ic{font-size:24px;display:block;margin-bottom:8px;filter:drop-shadow(0 0 6px rgba(139,92,246,0.4));}
+.field-card .lbl{font-size:12px;font-weight:700;color:#B4A9E0;}
+.field-card.selected{
+  border-color:#8B5CF6;
+  background:linear-gradient(160deg,#3A2A7A,#2A1F5C);
+  box-shadow:0 0 0 3px rgba(139,92,246,0.35), 0 10px 24px -6px rgba(139,92,246,0.6);
+}
+.field-card.selected .lbl{color:#F5F3FF;}
+.field-card.selected::after{
+  content:"★ CLASS SELECTED";
+  position:absolute;
+  margin-top:8px;
+  display:block;
+  font-size:8px;
+  letter-spacing:0.08em;
+  color:#FBBF24;
+  font-weight:800;
+}
+
+.role-row{display:flex;flex-wrap:wrap;gap:10px;}
+.chip{
+  border:2px solid #3A2E70;
+  background:#241A4D;
+  border-radius:12px;
+  padding:10px 16px;
+  font-size:13px;
+  font-weight:700;
+  color:#B4A9E0;
+  cursor:pointer;
+  transition:all .14s ease;
+}
+.chip:hover{border-color:#8B5CF6;color:#F5F3FF;transform:translateY(-2px);}
+.chip.selected{
+  background:linear-gradient(135deg,#8B5CF6,#EC4899);
+  border-color:transparent;
+  color:#fff;
+  box-shadow:0 0 0 4px rgba(139,92,246,0.25), 0 6px 16px -4px rgba(236,72,153,0.6);
+  animation:pop .25s ease;
+}
+@keyframes pop{0%{transform:scale(0.9);}60%{transform:scale(1.05);}100%{transform:scale(1);}}
+.chip.selected::before{content:"⚡ ";}
+.chip.other-active{border-color:#22D3EE;color:#22D3EE;}
+.other-input-wrap{margin-top:14px;}
+.other-input{
+  width:100%;
+  border:2px solid #22D3EE;
+  border-radius:12px;
+  background:#150E2B;
+  padding:11px 14px;
+  font-size:13px;
+  font-family:inherit;
+  outline:none;
+  color:#F5F3FF;
+  box-shadow:0 0 0 3px rgba(34,211,238,0.18);
+}
+.other-input::placeholder{color:#7A6FB0;}
+
+.seg-control{
+  display:flex;
+  background:#150E2B;
+  border:2px solid #3A2E70;
+  border-radius:14px;
+  padding:5px;
+  gap:5px;
+  max-width:520px;
+}
+.seg{
+  flex:1;
+  text-align:center;
+  padding:11px 8px;
+  font-size:13px;
+  font-weight:700;
+  color:#7A6FB0;
+  border-radius:10px;
+  cursor:pointer;
+  transition:all .14s ease;
+}
+.seg:hover{color:#F5F3FF;}
+.seg.active{
+  background:linear-gradient(135deg,#8B5CF6,#EC4899);
+  color:#fff;
+  box-shadow:0 4px 14px -3px rgba(139,92,246,0.6);
+}
+.xp-note{margin-top:10px;font-size:11px;color:#7A6FB0;font-weight:600;letter-spacing:.02em;}
+
+.prompt-chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;}
+.prompt-chip{
+  font-size:12px;
+  font-weight:700;
+  color:#22D3EE;
+  background:rgba(34,211,238,0.1);
+  border:1.5px solid rgba(34,211,238,0.4);
+  border-radius:20px;
+  padding:7px 14px;
+  cursor:pointer;
+  transition:all .14s ease;
+}
+.prompt-chip:hover{background:rgba(34,211,238,0.2);transform:translateY(-1px);}
+textarea{
+  width:100%;
+  min-height:76px;
+  border:2px solid #3A2E70;
+  border-radius:14px;
+  background:#150E2B;
+  padding:13px 15px;
+  font-size:13px;
+  font-family:inherit;
+  color:#F5F3FF;
+  resize:none;
+  outline:none;
+  transition:border-color .14s ease;
+}
+textarea:focus{border-color:#8B5CF6;}
+textarea::placeholder{color:#7A6FB0;}
+
+.topics-header{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:16px;}
+.topics-header .cnt{
+  font-size:11px;font-weight:800;color:#FBBF24;
+  background:rgba(251,191,36,0.12);
+  border:1px solid rgba(251,191,36,0.4);
+  border-radius:20px;padding:4px 10px;
+}
+.topic-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:20px;}
+.topic-card{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  border:2px solid #8B5CF6;
+  background:linear-gradient(160deg,#3A2A7A,#2A1F5C);
+  border-radius:14px;
+  padding:14px 16px;
+  box-shadow:0 0 0 3px rgba(139,92,246,0.18);
+}
+.topic-card .t-name{font-size:13px;font-weight:800;color:#F5F3FF;}
+.topic-card .t-name::before{content:"🏆 ";}
+.topic-card .t-swap{
+  font-size:11px;font-weight:700;
+  color:#150E2B;
+  background:#FBBF24;
+  border:none;
+  border-radius:8px;
+  padding:5px 10px;
+  cursor:pointer;
+  transition:transform .14s ease;
+}
+.topic-card .t-swap:hover{transform:scale(1.08);}
+
+.pool-label{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#7A6FB0;margin:4px 0 12px;}
+.pool-grid{display:flex;flex-wrap:wrap;gap:9px;}
+.pool-chip{
+  font-size:12px;font-weight:600;
+  color:#B4A9E0;
+  border:1.5px dashed #3A2E70;
+  border-radius:20px;
+  padding:7px 13px;
+  cursor:pointer;
+  transition:all .14s ease;
+}
+.pool-chip:hover{border-color:#22D3EE;border-style:solid;color:#22D3EE;background:rgba(34,211,238,0.08);}
+
+.footer-row{display:flex;align-items:center;justify-content:space-between;margin-top:26px;}
+.hint{font-size:12px;color:#7A6FB0;font-weight:600;}
+.btn-primary{
+  background:linear-gradient(135deg,#8B5CF6,#EC4899);
+  color:#fff;
+  border:none;
+  border-radius:12px;
+  padding:13px 26px;
+  font-size:14px;
+  font-weight:800;
+  letter-spacing:.02em;
+  cursor:pointer;
+  box-shadow:0 8px 20px -4px rgba(139,92,246,0.6);
+  transition:transform .14s ease, box-shadow .14s ease;
+}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 12px 28px -4px rgba(236,72,153,0.7);}
+</style>
+</head>
+<body>
+<div class="browser-frame">
+  <div class="chrome-bar">
+    <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+    <span class="url">app.newsagent.io/preferences</span>
+  </div>
+  <div class="page">
+    <p class="eyebrow">⚡ Build your profile</p>
+    <h1>Choose your class</h1>
+    <p class="sub">Pick a field, a role, and your XP level — we'll suggest your starting quests (topics).</p>
+
+    <div class="panel">
+      <div class="step-label"><span class="step-num">1</span> Field</div>
+      <div class="grid-fields">
+        <div class="field-card selected"><span class="ic">💻</span><span class="lbl">Tech</span></div>
+        <div class="field-card"><span class="ic">💰</span><span class="lbl">Finance</span></div>
+        <div class="field-card"><span class="ic">🩺</span><span class="lbl">Healthcare</span></div>
+        <div class="field-card"><span class="ic">🎓</span><span class="lbl">Education</span></div>
+        <div class="field-card"><span class="ic">🎨</span><span class="lbl">Design</span></div>
+        <div class="field-card"><span class="ic">✨</span><span class="lbl">Other</span></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="step-label"><span class="step-num">2</span> Role</div>
+      <div class="role-row">
+        <div class="chip selected">Software Engineer</div>
+        <div class="chip">Product Manager</div>
+        <div class="chip">Data Scientist</div>
+        <div class="chip">Founder / Exec</div>
+        <div class="chip">Student</div>
+        <div class="chip other-active">Other</div>
+      </div>
+      <div class="other-input-wrap">
+        <input class="other-input" type="text" placeholder="e.g. DevRel, Solutions Architect" value="Game Developer">
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="step-label"><span class="step-num">3</span> Experience Level</div>
+      <div class="seg-control">
+        <div class="seg">0–2 yrs</div>
+        <div class="seg">3–5 yrs</div>
+        <div class="seg active">6–10 yrs</div>
+        <div class="seg">10+ yrs</div>
+      </div>
+      <p class="xp-note">⭐ Veteran tier — you'll get deeper, more technical picks.</p>
+    </div>
+
+    <div class="panel">
+      <div class="step-label"><span class="step-num">4</span> Side Quest <span style="text-transform:none;font-weight:600;color:#5E5591;">(optional)</span></div>
+      <div class="prompt-chips">
+        <div class="prompt-chip">I love data storytelling</div>
+        <div class="prompt-chip">Excited about AI agents</div>
+        <div class="prompt-chip">Interested in sustainability</div>
+      </div>
+      <textarea placeholder="Anything else you're into? A niche, a company, a format...">Obsessed with game engines and shader tricks lately.</textarea>
+    </div>
+
+    <div class="panel">
+      <div class="topics-header">
+        <div class="step-label" style="margin-bottom:0;"><span class="step-num">5</span> Your loadout</div>
+        <span class="cnt">4 / 4 EQUIPPED</span>
+      </div>
+      <div class="topic-grid">
+        <div class="topic-card"><span class="t-name">AI &amp; Machine Learning</span><span class="t-swap">SWAP</span></div>
+        <div class="topic-card"><span class="t-name">Gaming Tech</span><span class="t-swap">SWAP</span></div>
+        <div class="topic-card"><span class="t-name">Developer Tools</span><span class="t-swap">SWAP</span></div>
+        <div class="topic-card"><span class="t-name">Cloud Infrastructure</span><span class="t-swap">SWAP</span></div>
+      </div>
+      <p class="pool-label">More in the pool</p>
+      <div class="pool-grid">
+        <div class="pool-chip">Cybersecurity</div>
+        <div class="pool-chip">Open Source</div>
+        <div class="pool-chip">Startup Funding</div>
+        <div class="pool-chip">Design Systems</div>
+        <div class="pool-chip">Robotics</div>
+        <div class="pool-chip">Product Strategy</div>
+      </div>
+    </div>
+
+    <div class="footer-row">
+      <span class="hint">🔁 Respec anytime from settings.</span>
+      <button class="btn-primary">Confirm build →</button>
+    </div>
+  </div>
+</div>
+</body>
+</html>

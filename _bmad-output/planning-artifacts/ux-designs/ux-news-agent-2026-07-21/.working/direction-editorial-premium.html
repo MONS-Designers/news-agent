@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>NewsAgent — Direction: Editorial Premium</title>
+<style>
+/*
+  DIRECTION: Clean Editorial / Premium
+  Register: refined publishing product — quiet confidence, serif headlines, hairlines
+  Density: generous whitespace, restrained ornament, one accent color used sparingly
+  Shape language: near-zero radius (2-4px), 1px hairline rules, no drop shadows
+  Motion (CSS-only): understated — underline sweep, color shift, no bounce/scale
+
+  Hex palette:
+  --bg-page:       #FAF8F5   warm paper background
+  --bg-surface:    #FFFFFF   card surface
+  --rule:          #E4DFD6   hairline border / divider
+  --rule-strong:   #C9C1B2   emphasised divider
+  --text-primary:  #201E1B   headings (near-black warm)
+  --text-secondary:#5B564C   body text
+  --text-tertiary: #8C8677   meta / placeholder
+  --accent-ink:    #2F4F3E   deep forest accent (selected state, links)
+  --accent-tint:   #EAF0EC   accent tint background
+  --accent-clay:   #A9714A   secondary accent (badges, swap action)
+  Fonts: serif headings via Georgia (system-available), sans body via system-ui
+*/
+html,body{margin:0;padding:0;}
+*{box-sizing:border-box;}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  background:#EFEBE3;
+  padding:40px 16px;
+  color:#201E1B;
+}
+.browser-frame{
+  max-width:920px;
+  margin:0 auto;
+  background:#FAF8F5;
+  border-radius:6px;
+  overflow:hidden;
+  border:1px solid #E4DFD6;
+  box-shadow:0 24px 50px -30px rgba(32,30,27,0.35);
+}
+.chrome-bar{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:11px 16px;
+  background:#FFFFFF;
+  border-bottom:1px solid #E4DFD6;
+}
+.dot{width:9px;height:9px;border-radius:50%;opacity:0.7;}
+.dot.r{background:#C97064;} .dot.y{background:#D8B25C;} .dot.g{background:#7EA07A;}
+.url{
+  margin-left:8px;
+  font-size:12px;
+  color:#8C8677;
+  background:#FAF8F5;
+  border:1px solid #E4DFD6;
+  border-radius:3px;
+  padding:4px 10px;
+  flex:1;
+  max-width:340px;
+}
+.page{
+  padding:46px 54px 56px;
+}
+.eyebrow{
+  font-size:11px;
+  font-weight:600;
+  letter-spacing:0.16em;
+  text-transform:uppercase;
+  color:#A9714A;
+  margin:0 0 10px;
+}
+h1{
+  font-family:Georgia,"Times New Roman",serif;
+  font-size:34px;
+  font-weight:400;
+  letter-spacing:-0.01em;
+  margin:0 0 8px;
+  color:#201E1B;
+}
+.sub{
+  font-size:14.5px;
+  color:#5B564C;
+  margin:0 0 34px;
+  max-width:520px;
+  line-height:1.5;
+}
+.section{
+  padding:26px 0;
+  border-top:1px solid #E4DFD6;
+}
+.section:first-of-type{border-top:1px solid #E4DFD6;}
+.step-label{
+  display:flex;
+  align-items:baseline;
+  gap:10px;
+  font-family:Georgia,serif;
+  font-size:17px;
+  color:#201E1B;
+  margin-bottom:18px;
+}
+.step-num{
+  font-family:Georgia,serif;
+  font-size:12px;
+  color:#A9714A;
+  border:1px solid #A9714A;
+  border-radius:50%;
+  width:20px;height:20px;
+  display:flex;align-items:center;justify-content:center;
+}
+
+.grid-fields{display:grid;grid-template-columns:repeat(6,1fr);gap:1px;background:#E4DFD6;border:1px solid #E4DFD6;}
+.field-card{
+  background:#FFFFFF;
+  padding:18px 8px;
+  text-align:center;
+  cursor:pointer;
+  transition:background .15s ease;
+}
+.field-card:hover{background:#F3F0EA;}
+.field-card .ic{font-size:18px;display:block;margin-bottom:8px;opacity:0.85;}
+.field-card .lbl{font-size:12px;font-weight:500;color:#5B564C;letter-spacing:0.01em;}
+.field-card.selected{background:#EAF0EC;}
+.field-card.selected .lbl{color:#2F4F3E;font-weight:700;}
+.field-card.selected .ic{opacity:1;}
+
+.role-row{display:flex;flex-wrap:wrap;gap:0;border-top:1px solid #E4DFD6;border-left:1px solid #E4DFD6;}
+.chip{
+  border-right:1px solid #E4DFD6;
+  border-bottom:1px solid #E4DFD6;
+  background:#fff;
+  padding:11px 18px;
+  font-size:13px;
+  font-weight:500;
+  color:#5B564C;
+  cursor:pointer;
+  transition:all .15s ease;
+}
+.chip:hover{background:#F3F0EA;color:#201E1B;}
+.chip.selected{
+  background:#2F4F3E;
+  color:#FAF8F5;
+  font-weight:600;
+}
+.chip.other-active{
+  background:#EAF0EC;
+  color:#2F4F3E;
+  font-weight:600;
+}
+.other-input-wrap{margin-top:16px;}
+.other-input{
+  width:100%;
+  border:none;
+  border-bottom:1.5px solid #2F4F3E;
+  background:transparent;
+  padding:8px 2px;
+  font-size:14px;
+  font-family:inherit;
+  outline:none;
+  color:#201E1B;
+}
+.other-input::placeholder{color:#8C8677;font-style:italic;}
+
+.seg-control{
+  display:flex;
+  border:1px solid #C9C1B2;
+  max-width:480px;
+  border-radius:3px;
+  overflow:hidden;
+}
+.seg{
+  flex:1;
+  text-align:center;
+  padding:12px 8px;
+  font-size:13px;
+  font-weight:500;
+  color:#5B564C;
+  cursor:pointer;
+  border-right:1px solid #C9C1B2;
+  transition:all .15s ease;
+}
+.seg:last-child{border-right:none;}
+.seg:hover{background:#F3F0EA;}
+.seg.active{
+  background:#2F4F3E;
+  color:#FAF8F5;
+  font-weight:700;
+}
+
+.prompt-chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;}
+.prompt-chip{
+  font-size:12px;
+  font-style:italic;
+  color:#A9714A;
+  background:transparent;
+  border:1px solid #D8CBB8;
+  border-radius:2px;
+  padding:6px 12px;
+  cursor:pointer;
+  transition:all .15s ease;
+}
+.prompt-chip:hover{background:#F6EFE4;border-color:#A9714A;}
+textarea{
+  width:100%;
+  min-height:80px;
+  border:1px solid #C9C1B2;
+  border-radius:3px;
+  padding:13px 15px;
+  font-size:13.5px;
+  font-family:inherit;
+  color:#201E1B;
+  resize:none;
+  outline:none;
+  background:#fff;
+  transition:border-color .15s ease;
+}
+textarea:focus{border-color:#2F4F3E;}
+textarea::placeholder{color:#8C8677;}
+
+.topics-header{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:18px;}
+.topics-header .cnt{font-size:11px;color:#8C8677;letter-spacing:0.04em;text-transform:uppercase;}
+.topic-list{border-top:1px solid #E4DFD6;margin-bottom:22px;}
+.topic-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:14px 4px;
+  border-bottom:1px solid #E4DFD6;
+}
+.topic-row .t-left{display:flex;align-items:center;gap:12px;}
+.topic-row .t-num{font-family:Georgia,serif;font-size:12px;color:#A9714A;}
+.topic-row .t-name{font-size:14px;font-weight:500;color:#201E1B;}
+.topic-row .t-swap{
+  font-size:11px;
+  letter-spacing:0.04em;
+  text-transform:uppercase;
+  color:#A9714A;
+  background:none;
+  border:none;
+  border-bottom:1px solid transparent;
+  cursor:pointer;
+  padding:2px 0;
+  transition:border-color .15s ease;
+}
+.topic-row .t-swap:hover{border-bottom-color:#A9714A;}
+
+.pool-label{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#8C8677;margin:0 0 12px;}
+.pool-grid{display:flex;flex-wrap:wrap;gap:8px;}
+.pool-chip{
+  font-size:12px;
+  color:#5B564C;
+  border:1px solid #E4DFD6;
+  border-radius:2px;
+  padding:6px 12px;
+  cursor:pointer;
+  transition:all .15s ease;
+}
+.pool-chip:hover{border-color:#2F4F3E;color:#2F4F3E;}
+
+.footer-row{display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding-top:26px;border-top:1px solid #E4DFD6;}
+.hint{font-size:12px;color:#8C8677;font-style:italic;}
+.btn-primary{
+  background:#201E1B;
+  color:#FAF8F5;
+  border:none;
+  border-radius:2px;
+  padding:12px 26px;
+  font-size:13px;
+  font-weight:600;
+  letter-spacing:0.03em;
+  cursor:pointer;
+  transition:background .15s ease;
+}
+.btn-primary:hover{background:#2F4F3E;}
+</style>
+</head>
+<body>
+<div class="browser-frame">
+  <div class="chrome-bar">
+    <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+    <span class="url">app.newsagent.io/preferences</span>
+  </div>
+  <div class="page">
+    <p class="eyebrow">Preferences</p>
+    <h1>Tell us about yourself</h1>
+    <p class="sub">A brief profile helps us curate a digest worth reading — five short steps, revise anytime.</p>
+
+    <div class="section">
+      <div class="step-label"><span class="step-num">1</span> Field</div>
+      <div class="grid-fields">
+        <div class="field-card"><span class="ic">💻</span><span class="lbl">Tech</span></div>
+        <div class="field-card"><span class="ic">💰</span><span class="lbl">Finance</span></div>
+        <div class="field-card selected"><span class="ic">🩺</span><span class="lbl">Healthcare</span></div>
+        <div class="field-card"><span class="ic">🎓</span><span class="lbl">Education</span></div>
+        <div class="field-card"><span class="ic">🎨</span><span class="lbl">Design</span></div>
+        <div class="field-card"><span class="ic">✨</span><span class="lbl">Other</span></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="step-label"><span class="step-num">2</span> Role</div>
+      <div class="role-row">
+        <div class="chip">Physician</div>
+        <div class="chip selected">Researcher</div>
+        <div class="chip">Nurse</div>
+        <div class="chip">Administrator</div>
+        <div class="chip">Student</div>
+        <div class="chip other-active">Other</div>
+      </div>
+      <div class="other-input-wrap">
+        <input class="other-input" type="text" placeholder="e.g. Biomedical Engineer, Policy Analyst" value="">
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="step-label"><span class="step-num">3</span> Experience</div>
+      <div class="seg-control">
+        <div class="seg">0–2 yrs</div>
+        <div class="seg">3–5 yrs</div>
+        <div class="seg">6–10 yrs</div>
+        <div class="seg active">10+ yrs</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="step-label"><span class="step-num">4</span> Interests <span style="font-family:-apple-system,sans-serif;font-size:12px;color:#8C8677;">(optional)</span></div>
+      <div class="prompt-chips">
+        <div class="prompt-chip">I love data storytelling</div>
+        <div class="prompt-chip">Excited about AI agents</div>
+        <div class="prompt-chip">Interested in sustainability</div>
+      </div>
+      <textarea placeholder="Anything else you're into? A niche, a journal, a format you prefer...">Following longevity research and public health policy closely.</textarea>
+    </div>
+
+    <div class="section">
+      <div class="topics-header">
+        <div class="step-label" style="margin-bottom:0;"><span class="step-num">5</span> Suggested topics</div>
+        <span class="cnt">4 of 4 selected</span>
+      </div>
+      <div class="topic-list">
+        <div class="topic-row"><div class="t-left"><span class="t-num">01</span><span class="t-name">Clinical Research</span></div><button class="t-swap">Swap</button></div>
+        <div class="topic-row"><div class="t-left"><span class="t-num">02</span><span class="t-name">Public Health Policy</span></div><button class="t-swap">Swap</button></div>
+        <div class="topic-row"><div class="t-left"><span class="t-num">03</span><span class="t-name">AI &amp; Machine Learning</span></div><button class="t-swap">Swap</button></div>
+        <div class="topic-row"><div class="t-left"><span class="t-num">04</span><span class="t-name">Biotech</span></div><button class="t-swap">Swap</button></div>
+      </div>
+      <p class="pool-label">More candidates</p>
+      <div class="pool-grid">
+        <div class="pool-chip">Mental Health</div>
+        <div class="pool-chip">Medical Devices</div>
+        <div class="pool-chip">Longevity Science</div>
+        <div class="pool-chip">Health Insurance</div>
+        <div class="pool-chip">Genomics</div>
+        <div class="pool-chip">Hospital Systems</div>
+      </div>
+    </div>
+
+    <div class="footer-row">
+      <span class="hint">You can change these anytime.</span>
+      <button class="btn-primary">Save preferences</button>
+    </div>
+  </div>
+</div>
+</body>
+</html>

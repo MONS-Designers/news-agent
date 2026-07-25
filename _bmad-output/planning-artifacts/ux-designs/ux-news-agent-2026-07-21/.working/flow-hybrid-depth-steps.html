@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>NewsAgent — Hybrid Depth, Stepped Flow</title>
+<style>
+/*
+  Refines the approved "Hybrid Depth" direction into the real interaction
+  model: 3 steps, one visible at a time, staggered entrance animation per
+  element when a step mounts, explicit Continue/Back, and a soft Skip link
+  on every step (keeps the PRD's "everything optional" guarantee even
+  though the primary path encourages filling each step in before advancing).
+
+  Steps: (1) Field + Role + Experience  (2) Interests  (3) Topics
+*/
+html, body { height: 100%; }
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Arial, sans-serif;
+  background: #0a0d16;
+  color: #eef1f8;
+  overflow-x: hidden;
+  min-height: 100vh;
+}
+
+.depth-field { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+.orb { position: absolute; border-radius: 50%; filter: blur(70px); opacity: 0.35; will-change: transform; }
+.orb-a { width: 460px; height: 460px; top: -120px; left: -80px; background: radial-gradient(circle, #4b3fae, transparent 70%); }
+.orb-b { width: 380px; height: 380px; top: 40%; right: -100px; background: radial-gradient(circle, #1f6f78, transparent 70%); }
+.orb-c { width: 340px; height: 340px; bottom: -140px; left: 30%; background: radial-gradient(circle, #7a3b6e, transparent 70%); }
+.grain {
+  position: fixed; inset: 0; z-index: 1; pointer-events: none; opacity: 0.35;
+  background-image: radial-gradient(rgba(255,255,255,0.045) 1px, transparent 1px);
+  background-size: 26px 26px;
+}
+
+.chrome { position: relative; z-index: 2; max-width: 640px; margin: 40px auto 80px; padding: 0 24px; }
+.browserbar {
+  display: flex; align-items: center; gap: 8px; padding: 12px 16px; margin-bottom: 28px;
+  background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 10px 10px 0 0;
+}
+.dot { width: 10px; height: 10px; border-radius: 50%; background: #3a3f52; }
+.urlbar { margin-left: 10px; font-size: 12px; color: #6b7288; }
+
+.kicker { font-size: 11px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: #6d7bff; margin: 0 0 10px; }
+h1 { font-size: 30px; font-weight: 650; letter-spacing: -0.5px; margin: 0 0 10px; color: #f4f6fb; }
+.sub { font-size: 14px; color: #8b93a7; line-height: 1.55; margin: 0 0 28px; max-width: 52ch; }
+
+/* progress indicator */
+.progress { display: flex; align-items: center; gap: 8px; margin-bottom: 28px; }
+.pstep { display: flex; align-items: center; gap: 8px; flex: 1; }
+.pdot {
+  width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700;
+  border: 1px solid rgba(255,255,255,0.15); color: #565f74;
+  background: rgba(255,255,255,0.02);
+  transition: all 0.35s ease;
+}
+.pline { height: 1px; flex: 1; background: rgba(255,255,255,0.1); position: relative; overflow: hidden; }
+.pline::after {
+  content: ''; position: absolute; inset: 0; background: #6d7bff;
+  transform: scaleX(0); transform-origin: left; transition: transform 0.5s ease;
+}
+.plabel { font-size: 11px; color: #565f74; white-space: nowrap; transition: color 0.35s ease; }
+.pstep.active .pdot { border-color: #6d7bff; color: #fff; background: rgba(109,123,255,0.25); box-shadow: 0 0 0 4px rgba(109,123,255,0.12); }
+.pstep.active .plabel { color: #c4cadb; }
+.pstep.done .pdot { border-color: #6d7bff; background: #6d7bff; color: #fff; }
+.pstep.done .plabel { color: #8b93a7; }
+.pstep.done .pline::after { transform: scaleX(1); }
+
+/* step panel */
+.panel {
+  background: rgba(255,255,255,0.035);
+  border: 1px solid rgba(255,255,255,0.09);
+  border-radius: 16px; padding: 30px;
+  backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+  display: none;
+}
+.panel.current { display: block; }
+
+/* staggered entrance for elements inside the current step */
+.stagger { opacity: 0; transform: translateY(14px); animation: fadeUp 0.5s ease forwards; }
+@keyframes fadeUp { to { opacity: 1; transform: translateY(0); } }
+
+.blockhead { display: flex; align-items: center; gap: 10px; margin: 22px 0 16px; }
+.blockhead:first-child { margin-top: 0; }
+.stepnum { width: 22px; height: 22px; border-radius: 6px; background: rgba(109,123,255,0.16); color: #a9b1ff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.steplabel { font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: #6b7288; }
+
+.chiprow { display: flex; flex-wrap: wrap; gap: 10px; }
+.chip {
+  padding: 11px 16px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.09);
+  background: rgba(255,255,255,0.02); color: #c4cadb; font-size: 13.5px; cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+}
+.chip:hover { border-color: rgba(255,255,255,0.22); background: rgba(255,255,255,0.05); transform: translateY(-1px); }
+.chip.selected {
+  background: linear-gradient(180deg, rgba(109,123,255,0.22), rgba(109,123,255,0.10));
+  border-color: rgba(109,123,255,0.55); color: #fff;
+  box-shadow: 0 0 0 1px rgba(109,123,255,0.25), 0 8px 24px -8px rgba(109,123,255,0.45);
+}
+.chip.other { border-style: dashed; color: #8b93a7; }
+
+.segrow { display: flex; gap: 2px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 3px; }
+.seg { flex: 1; text-align: center; padding: 9px 0; border-radius: 8px; font-size: 13px; color: #8b93a7; cursor: pointer; transition: all 0.18s ease; }
+.seg.selected { background: rgba(109,123,255,0.18); color: #fff; }
+
+.prompts { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.prompt { font-size: 12px; color: #8b93a7; padding: 6px 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.02); cursor: pointer; }
+.prompt:hover { color: #c4cadb; border-color: rgba(255,255,255,0.18); }
+textarea {
+  width: 100%; min-height: 96px; resize: vertical; background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.09); border-radius: 12px; padding: 14px;
+  color: #eef1f8; font-size: 13.5px; font-family: inherit; line-height: 1.5; outline: none;
+}
+textarea:focus { border-color: rgba(109,123,255,0.5); }
+textarea::placeholder { color: #565f74; }
+
+.suggestbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.cap { font-size: 12px; color: #565f74; }
+.cap b { color: #a9b1ff; }
+.topicgrid { display: flex; flex-wrap: wrap; gap: 10px; }
+.topic {
+  padding: 10px 15px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.09);
+  background: rgba(255,255,255,0.02); color: #8b93a7; font-size: 13px; cursor: pointer;
+  display: flex; align-items: center; gap: 7px; transition: all 0.18s ease;
+}
+.topic:hover { border-color: rgba(255,255,255,0.2); }
+.topic.picked { background: linear-gradient(180deg, rgba(109,123,255,0.22), rgba(109,123,255,0.09)); border-color: rgba(109,123,255,0.5); color: #fff; }
+.topic .x { opacity: 0.6; font-size: 11px; }
+.topic.faint { opacity: 0.45; border-style: dashed; }
+
+/* footer nav */
+.navrow { display: flex; align-items: center; justify-content: space-between; margin-top: 28px; }
+.btn {
+  padding: 11px 22px; border-radius: 10px; font-size: 13.5px; font-weight: 600; cursor: pointer;
+  border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.03); color: #c4cadb;
+  transition: all 0.18s ease;
+}
+.btn:hover { border-color: rgba(255,255,255,0.24); }
+.btn.primary {
+  background: linear-gradient(180deg, #7b86ff, #5c68e8); border-color: transparent; color: #fff;
+  box-shadow: 0 10px 24px -10px rgba(109,123,255,0.6);
+}
+.btn.primary.disabled { opacity: 0.35; cursor: not-allowed; box-shadow: none; pointer-events: none; }
+.btn.ghost { background: transparent; border-color: transparent; color: #6b7288; padding: 11px 8px; }
+.btn.ghost:hover { color: #9aa2b8; }
+.navleft { display: flex; align-items: center; gap: 14px; }
+</style>
+</head>
+<body>
+
+<div class="depth-field">
+  <div class="orb orb-a" id="orb-a"></div>
+  <div class="orb orb-b" id="orb-b"></div>
+  <div class="orb orb-c" id="orb-c"></div>
+</div>
+<div class="grain"></div>
+
+<div class="chrome">
+  <div class="browserbar">
+    <div class="dot" style="background:#e5555f"></div>
+    <div class="dot" style="background:#e0a63e"></div>
+    <div class="dot" style="background:#4bb26b"></div>
+    <div class="urlbar">app.newsagent.io/preferences</div>
+  </div>
+
+  <p class="kicker">Preferences</p>
+  <h1>Set up your profile</h1>
+  <p class="sub">Three quick steps. Change any of it later — this never locks in.</p>
+
+  <div class="progress" id="progress">
+    <div class="pstep active" data-step="1"><div class="pdot">1</div><div class="plabel">About you</div></div>
+    <div class="pline"></div>
+    <div class="pstep" data-step="2"><div class="pdot">2</div><div class="plabel">Interests</div></div>
+    <div class="pline"></div>
+    <div class="pstep" data-step="3"><div class="pdot">3</div><div class="plabel">Topics</div></div>
+  </div>
+
+  <!-- STEP 1 -->
+  <div class="panel current" data-panel="1">
+    <div class="blockhead stagger" style="animation-delay:.02s"><span class="stepnum">1</span><span class="steplabel">Field</span></div>
+    <div class="chiprow stagger" style="animation-delay:.06s">
+      <div class="chip" data-field>Tech</div>
+      <div class="chip" data-field>Finance</div>
+      <div class="chip" data-field>Healthcare</div>
+      <div class="chip" data-field>Education</div>
+      <div class="chip" data-field>Design</div>
+      <div class="chip other" data-field>Other</div>
+    </div>
+
+    <div class="blockhead stagger" style="animation-delay:.1s"><span class="stepnum">2</span><span class="steplabel">Role</span></div>
+    <div class="chiprow stagger" id="role-row" style="animation-delay:.14s">
+      <div class="chip" style="opacity:.35">Pick a field first</div>
+    </div>
+
+    <div class="blockhead stagger" style="animation-delay:.18s"><span class="stepnum">3</span><span class="steplabel">Experience</span></div>
+    <div class="segrow stagger" style="animation-delay:.22s">
+      <div class="seg" data-exp>0–2 yrs</div>
+      <div class="seg" data-exp>3–5 yrs</div>
+      <div class="seg" data-exp>6–10 yrs</div>
+      <div class="seg" data-exp>10+ yrs</div>
+    </div>
+
+    <div class="navrow stagger" style="animation-delay:.26s">
+      <div class="navleft"><span></span></div>
+      <div style="display:flex; gap:10px; align-items:center;">
+        <div class="btn primary disabled" id="continue1" onclick="if (!this.classList.contains('disabled')) goStep(2)">Continue</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 2 -->
+  <div class="panel" data-panel="2">
+    <div class="blockhead stagger" style="animation-delay:.02s"><span class="stepnum">2</span><span class="steplabel">Interests (optional)</span></div>
+    <div class="prompts stagger" style="animation-delay:.06s">
+      <div class="prompt">✦ What are you building right now?</div>
+      <div class="prompt">✦ What do you wish you understood better?</div>
+    </div>
+    <div class="stagger" style="animation-delay:.1s">
+      <textarea placeholder="Type freely — we'll use this to sharpen your suggestions..."></textarea>
+    </div>
+    <div class="navrow stagger" style="animation-delay:.14s">
+      <div class="navleft"><div class="btn ghost" onclick="goStep(1)">← Back</div></div>
+      <div style="display:flex; gap:10px; align-items:center;">
+        <div class="btn ghost" onclick="goStep(3)">Skip for now →</div>
+        <div class="btn primary" onclick="goStep(3)">Continue</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 3 -->
+  <div class="panel" data-panel="3">
+    <div class="suggestbar stagger" style="animation-delay:.02s">
+      <div class="blockhead" style="margin:0"><span class="stepnum">3</span><span class="steplabel">Suggested topics</span></div>
+      <div class="cap">Selected <b>4</b> / 4</div>
+    </div>
+    <div class="topicgrid stagger" style="animation-delay:.08s">
+      <div class="topic picked">AI &amp; Machine Learning <span class="x">✕</span></div>
+      <div class="topic picked">Developer Tools <span class="x">✕</span></div>
+      <div class="topic picked">Startups <span class="x">✕</span></div>
+      <div class="topic picked">Open Source <span class="x">✕</span></div>
+      <div class="topic faint">Cloud &amp; Infra</div>
+      <div class="topic faint">Cybersecurity</div>
+      <div class="topic faint">Product Design</div>
+    </div>
+    <p class="sub stagger" style="animation-delay:.12s; margin:14px 0 0;">Tap a faint topic to swap it in for one of your 4.</p>
+    <div class="navrow stagger" style="animation-delay:.16s">
+      <div class="navleft"><div class="btn ghost" onclick="goStep(2)">← Back</div></div>
+      <div class="btn primary">Save preferences</div>
+    </div>
+  </div>
+</div>
+
+<script>
+  /* ---- background parallax (mouse + scroll, safe: always recomputed, never appended) ---- */
+  var orbs = [
+    { el: document.getElementById('orb-a'), depthX: 26, scrollFactor: 0.04 },
+    { el: document.getElementById('orb-b'), depthX: 40, scrollFactor: -0.06 },
+    { el: document.getElementById('orb-c'), depthX: 18, scrollFactor: 0.03 }
+  ];
+  var mouseX = 0, mouseY = 0, scrollY = 0;
+  function applyOrbTransforms() {
+    orbs.forEach(function (o) {
+      var x = mouseX * o.depthX;
+      var y = mouseY * o.depthX + scrollY * o.scrollFactor;
+      o.el.style.transform = 'translate(' + x + 'px, ' + y + 'px)';
+    });
+  }
+  window.addEventListener('mousemove', function (e) {
+    mouseX = (e.clientX / window.innerWidth) - 0.5;
+    mouseY = (e.clientY / window.innerHeight) - 0.5;
+    applyOrbTransforms();
+  });
+  window.addEventListener('scroll', function () { scrollY = window.scrollY; applyOrbTransforms(); }, { passive: true });
+
+  /* ---- field -> role ---- */
+  var roles = {
+    Tech: ['Software Engineer', 'Product Manager', 'Data Scientist', 'Founder / Exec'],
+    Finance: ['Analyst', 'Portfolio Manager', 'Accountant', 'Founder / Exec'],
+    Healthcare: ['Physician', 'Nurse', 'Researcher', 'Administrator'],
+    Education: ['Teacher', 'Researcher', 'Administrator', 'Student'],
+    Design: ['Product Designer', 'Researcher', 'Art Director', 'Student'],
+    Other: []
+  };
+  // Step 1 requires Field + Role + Experience all filled before Continue unlocks.
+  var step1 = { field: false, role: false, exp: false };
+  function checkStep1() {
+    var ok = step1.field && step1.role && step1.exp;
+    document.getElementById('continue1').classList.toggle('disabled', !ok);
+  }
+
+  document.querySelectorAll('[data-field]').forEach(function (chip) {
+    chip.addEventListener('click', function () {
+      document.querySelectorAll('[data-field]').forEach(function (c) { c.classList.remove('selected'); });
+      chip.classList.add('selected');
+      renderRoles(chip.textContent.trim());
+      step1.field = true;
+      step1.role = false; // changing field resets role
+      checkStep1();
+    });
+  });
+  function renderRoles(field) {
+    var row = document.getElementById('role-row');
+    row.innerHTML = '';
+    var list = roles[field] || [];
+    list.forEach(function (r, i) {
+      var c = document.createElement('div');
+      c.className = 'chip stagger';
+      c.style.animationDelay = (i * 0.04) + 's';
+      c.textContent = r;
+      c.onclick = function () {
+        row.querySelectorAll('.chip').forEach(function (x) { x.classList.remove('selected'); });
+        c.classList.add('selected');
+        step1.role = true;
+        checkStep1();
+      };
+      row.appendChild(c);
+    });
+    var other = document.createElement('div');
+    other.className = 'chip other stagger';
+    other.style.animationDelay = (list.length * 0.04) + 's';
+    other.textContent = 'Other';
+    other.onclick = function () {
+      row.querySelectorAll('.chip').forEach(function (x) { x.classList.remove('selected'); });
+      other.classList.add('selected');
+      step1.role = true;
+      checkStep1();
+    };
+    row.appendChild(other);
+  }
+
+  document.querySelectorAll('[data-exp]').forEach(function (seg) {
+    seg.addEventListener('click', function () {
+      document.querySelectorAll('[data-exp]').forEach(function (s) { s.classList.remove('selected'); });
+      seg.classList.add('selected');
+      step1.exp = true;
+      checkStep1();
+    });
+  });
+
+  /* ---- step navigation ---- */
+  function goStep(n) {
+    document.querySelectorAll('.panel').forEach(function (p) {
+      p.classList.toggle('current', p.dataset.panel == n);
+    });
+    document.querySelectorAll('.pstep').forEach(function (p) {
+      var step = parseInt(p.dataset.step, 10);
+      p.classList.toggle('active', step === n);
+      p.classList.toggle('done', step < n);
+    });
+    // restart entrance animation for the newly shown step
+    var current = document.querySelector('.panel[data-panel="' + n + '"]');
+    current.querySelectorAll('.stagger').forEach(function (el) {
+      el.style.animation = 'none';
+      void el.offsetWidth; // force reflow so the animation restarts
+      el.style.animation = '';
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+</script>
+</body>
+</html>

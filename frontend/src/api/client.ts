@@ -20,6 +20,15 @@ export interface Me {
   user_id: number | null;
 }
 
+export interface FieldOption {
+  id: number;
+  name: string;
+}
+
+export interface Profile {
+  field_name: string | null;
+}
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -77,5 +86,17 @@ export async function setSourceStatus(sourceId: number, status: "approved" | "re
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ status }),
+  });
+}
+
+export async function listFields(): Promise<FieldOption[]> {
+  return request("/me/fields");
+}
+
+export async function updateMyProfile(fieldName: string, isOther: boolean): Promise<Profile> {
+  return request("/me/profile", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ field_name: fieldName, is_other: isOther }),
   });
 }
