@@ -38,10 +38,7 @@
           <AboutYouStep @continue="currentStep = 2" />
         </div>
         <div ref="step2El" v-show="currentStep === 2" class="stagger">
-          <p class="placeholder">Interests step — coming in a later story.</p>
-          <div class="nav-row">
-            <button type="button" class="btn-back" @click="currentStep = 1">← Back</button>
-          </div>
+          <InterestsStep @continue="currentStep = 3" @back="currentStep = 1" />
         </div>
         <div ref="step3El" v-show="currentStep === 3" class="stagger">
           <p class="placeholder">Topics step — coming in a later story.</p>
@@ -57,6 +54,7 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import AboutYouStep from "./AboutYouStep.vue";
+import InterestsStep from "./InterestsStep.vue";
 
 const steps = [
   { n: 1, label: "About you" },

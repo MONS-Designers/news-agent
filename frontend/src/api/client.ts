@@ -34,14 +34,16 @@ export interface Profile {
   field_name: string | null;
   role_name: string | null;
   experience_bucket: string | null;
+  interest_free_text: string | null;
 }
 
 export interface ProfileUpdate {
-  fieldName: string;
-  fieldIsOther: boolean;
-  roleName: string;
-  roleIsOther: boolean;
-  experienceBucket: string | null;
+  fieldName?: string;
+  fieldIsOther?: boolean;
+  roleName?: string;
+  roleIsOther?: boolean;
+  experienceBucket?: string | null;
+  interestFreeText?: string;
 }
 
 export class ApiError extends Error {
@@ -113,15 +115,20 @@ export async function listRoles(fieldId: number): Promise<RoleOption[]> {
 }
 
 export async function updateMyProfile(update: ProfileUpdate): Promise<Profile> {
+  // Only include keys the caller actually set — e.g. InterestsStep saves
+  // interest_free_text alone; sending undefined Field/Role keys would falsely
+  // resubmit "not provided" as an explicit part of the request.
+  const body: Record<string, unknown> = {};
+  if (update.fieldName !== undefined) body.field_name = update.fieldName;
+  if (update.fieldIsOther !== undefined) body.field_is_other = update.fieldIsOther;
+  if (update.roleName !== undefined) body.role_name = update.roleName;
+  if (update.roleIsOther !== undefined) body.role_is_other = update.roleIsOther;
+  if (update.experienceBucket !== undefined) body.experience_bucket = update.experienceBucket;
+  if (update.interestFreeText !== undefined) body.interest_free_text = update.interestFreeText;
+
   return request("/me/profile", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      field_name: update.fieldName,
-      field_is_other: update.fieldIsOther,
-      role_name: update.roleName,
-      role_is_other: update.roleIsOther,
-      experience_bucket: update.experienceBucket,
-    }),
+    body: JSON.stringify(body),
   });
 }

@@ -4,7 +4,13 @@ from sqlalchemy.orm import Session
 
 from newsagent.models import PendingTaxonomySuggestion, User
 from newsagent.models.base import Base
-from newsagent.services.profile import EXPERIENCE_BUCKETS, INVALID_PROFILE, MAX_NAME_LENGTH, save_profile
+from newsagent.services.profile import (
+    EXPERIENCE_BUCKETS,
+    INVALID_PROFILE,
+    MAX_INTEREST_LENGTH,
+    MAX_NAME_LENGTH,
+    save_profile,
+)
 from newsagent.services.taxonomy import add_field, add_role, normalize_taxonomy_text
 
 
@@ -29,6 +35,7 @@ def _save(db: Session, user: User, **overrides) -> User:
         "role_name": None,
         "role_is_other": False,
         "experience_bucket": None,
+        "interest_free_text": None,
     }
     kwargs.update(overrides)
     return save_profile(db, user, **kwargs)
@@ -228,6 +235,75 @@ def test_experience_bucket_never_creates_a_suggestion(db: Session):
     assert db.scalar(select(PendingTaxonomySuggestion)) is None
 
 
+# --- Interest Free-Text ---------------------------------------------------
+
+
+def test_interest_free_text_saves_trimmed(db: Session):
+    add_field(db, "Tech")
+    user = _user(db)
+    _save(db, user, interest_free_text="  building a side project  ")
+    assert user.interest_free_text == "building a side project"
+
+
+@pytest.mark.parametrize("blank", ["", "   "])
+def test_blank_interest_free_text_stores_none(db: Session, blank: str):
+    """A submitted-but-blank string clears the field to NULL, not ''."""
+    add_field(db, "Tech")
+    user = _user(db)
+    _save(db, user, interest_free_text="something")
+    assert user.interest_free_text == "something"
+
+    _save(db, user, field_name=None, interest_free_text=blank)
+    assert user.interest_free_text is None
+
+
+def test_interest_free_text_none_leaves_existing_value_untouched(db: Session):
+    """None means 'not submitted' — distinct from submitting blank text."""
+    add_field(db, "Tech")
+    user = _user(db)
+    _save(db, user, interest_free_text="something")
+
+    _save(db, user, field_name=None, interest_free_text=None)
+
+    assert user.interest_free_text == "something"
+
+
+def test_over_long_interest_free_text_is_rejected(db: Session):
+    with pytest.raises(ValueError):
+        _save(db, _user(db), interest_free_text="x" * (MAX_INTEREST_LENGTH + 1))
+
+
+def test_interest_free_text_never_creates_a_suggestion(db: Session):
+    add_field(db, "Tech")
+    user = _user(db)
+    _save(db, user, interest_free_text="something")
+    assert db.scalar(select(PendingTaxonomySuggestion)) is None
+
+
+# --- field_name=None (Step 2's call shape) ---------------------------------
+
+
+def test_field_name_none_leaves_field_and_role_untouched(db: Session):
+    """The call shape InterestsStep.vue actually uses: interest text alone,
+    with Field/Role already saved by an earlier Step 1 call."""
+    field, _ = add_field(db, "Tech")
+    add_role(db, field, "Software Engineer")
+    user = _user(db)
+    _save(db, user, field_name="Tech", role_name="Software Engineer")
+
+    result = _save(db, user, field_name=None, interest_free_text="curious about ML")
+
+    assert result.field_name == "Tech"
+    assert result.role_name == "Software Engineer"
+    assert result.interest_free_text == "curious about ML"
+
+
+def test_role_name_without_field_name_is_rejected(db: Session):
+    add_field(db, "Tech")
+    with pytest.raises(ValueError):
+        _save(db, _user(db), field_name=None, role_name="Software Engineer")
+
+
 # --- Validation ----------------------------------------------------------
 
 
@@ -283,6 +359,8 @@ def test_every_rejection_uses_the_same_message(db: Session):
         {"field_name": "Totally Made Up"},
         {"field_name": "Tech", "role_name": "Totally Made Up"},
         {"experience_bucket": "not-a-real-bucket"},
+        {"interest_free_text": "x" * (MAX_INTEREST_LENGTH + 1)},
+        {"field_name": None, "role_name": "Software Engineer"},
     ):
         with pytest.raises(ValueError) as caught:
             _save(db, _user(db), **kwargs)

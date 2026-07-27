@@ -28,5 +28,8 @@ class User(Base):
     # "Other" concept here, so unlike field_name/role_name AD-6 doesn't apply.
     experience_bucket: Mapped[str | None] = mapped_column(String, nullable=True)
 
+    # Optional, no "Other" concept — same plain-string shape as experience_bucket.
+    interest_free_text: Mapped[str | None] = mapped_column(String, nullable=True)
+
     topic_preferences: Mapped[list["UserTopicPreference"]] = relationship(back_populates="user")
     digests: Mapped[list["Digest"]] = relationship(back_populates="user")

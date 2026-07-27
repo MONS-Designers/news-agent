@@ -64,7 +64,12 @@ def test_put_profile_curated_field_saves_field_name(as_user_with_db: TestClient,
         "/me/profile", json={"field_name": "Tech", "field_is_other": False}
     )
     assert response.status_code == 200
-    assert response.json() == {"field_name": "Tech", "role_name": None, "experience_bucket": None}
+    assert response.json() == {
+        "field_name": "Tech",
+        "role_name": None,
+        "experience_bucket": None,
+        "interest_free_text": None,
+    }
     assert seeded_db.query(PendingTaxonomySuggestion).count() == 0
 
 
@@ -75,7 +80,12 @@ def test_put_profile_other_field_creates_pending_suggestion(
         "/me/profile", json={"field_name": "Marine Biology", "field_is_other": True}
     )
     assert response.status_code == 200
-    assert response.json() == {"field_name": "Marine Biology", "role_name": None, "experience_bucket": None}
+    assert response.json() == {
+        "field_name": "Marine Biology",
+        "role_name": None,
+        "experience_bucket": None,
+        "interest_free_text": None,
+    }
 
     suggestion = seeded_db.scalar(select(PendingTaxonomySuggestion))
     assert suggestion is not None
@@ -125,7 +135,12 @@ def test_put_profile_curated_role_saves_role_name(as_user_with_db: TestClient, s
         json={"field_name": "Tech", "field_is_other": False, "role_name": "Software Engineer"},
     )
     assert response.status_code == 200
-    assert response.json() == {"field_name": "Tech", "role_name": "Software Engineer", "experience_bucket": None}
+    assert response.json() == {
+        "field_name": "Tech",
+        "role_name": "Software Engineer",
+        "experience_bucket": None,
+        "interest_free_text": None,
+    }
     assert seeded_db.query(PendingTaxonomySuggestion).count() == 0
 
 
@@ -146,7 +161,12 @@ def test_put_profile_other_role_creates_field_scoped_suggestion(
         },
     )
     assert response.status_code == 200
-    assert response.json() == {"field_name": "Tech", "role_name": "Developer Relations", "experience_bucket": None}
+    assert response.json() == {
+        "field_name": "Tech",
+        "role_name": "Developer Relations",
+        "experience_bucket": None,
+        "interest_free_text": None,
+    }
 
     suggestion = seeded_db.scalar(select(PendingTaxonomySuggestion))
     assert suggestion is not None
@@ -204,7 +224,12 @@ def test_put_profile_valid_experience_bucket_saves(as_user_with_db: TestClient, 
         json={"field_name": "Tech", "field_is_other": False, "experience_bucket": "6-10"},
     )
     assert response.status_code == 200
-    assert response.json() == {"field_name": "Tech", "role_name": None, "experience_bucket": "6-10"}
+    assert response.json() == {
+        "field_name": "Tech",
+        "role_name": None,
+        "experience_bucket": "6-10",
+        "interest_free_text": None,
+    }
 
 
 def test_put_profile_invalid_experience_bucket_gets_400(
@@ -216,5 +241,31 @@ def test_put_profile_invalid_experience_bucket_gets_400(
     response = as_user_with_db.put(
         "/me/profile",
         json={"field_name": "Tech", "field_is_other": False, "experience_bucket": "not-a-bucket"},
+    )
+    assert response.status_code == 400
+
+
+def test_put_profile_interest_free_text_alone_saves(
+    as_user_with_db: TestClient, seeded_db: Session
+):
+    """The call shape InterestsStep.vue actually uses: no field_name key in the
+    body at all, on top of a profile already saved by a prior Step 1 call."""
+    seeded_db.add(Field(name="Tech"))
+    seeded_db.commit()
+    as_user_with_db.put("/me/profile", json={"field_name": "Tech", "field_is_other": False})
+
+    response = as_user_with_db.put("/me/profile", json={"interest_free_text": "curious about ML"})
+    assert response.status_code == 200
+    assert response.json() == {
+        "field_name": "Tech",
+        "role_name": None,
+        "experience_bucket": None,
+        "interest_free_text": "curious about ML",
+    }
+
+
+def test_put_profile_over_long_interest_free_text_gets_400(as_user_with_db: TestClient):
+    response = as_user_with_db.put(
+        "/me/profile", json={"interest_free_text": "x" * 2001}
     )
     assert response.status_code == 400
