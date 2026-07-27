@@ -9,6 +9,10 @@ class Settings(BaseSettings):
     # Which LLM provider adapter the pipeline uses (see newsagent.llm.factory)
     llm_provider: str = "mock"
 
+    # Which Suggestion Source adapter the profile picker uses (see
+    # newsagent.suggestions.factory) — independent of llm_provider (AD-3).
+    suggestion_provider: str = "popularity"
+
     # Relevance verdict threshold (0.7 = the contract's "clearly on-topic" anchor)
     relevance_threshold: float = 0.7
 
