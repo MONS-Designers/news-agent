@@ -12,6 +12,7 @@ from newsagent.services.taxonomy import (
     add_role,
     find_field_by_name,
     list_fields,
+    list_pending_suggestions,
     list_roles,
     normalize_taxonomy_text,
     record_pending_suggestion,
@@ -215,3 +216,89 @@ def test_seed_default_fields_is_idempotent(db: Session):
     seed_default_fields(db)
     report = seed_default_fields(db)
     assert report.fields_created == 0
+
+
+def test_list_pending_suggestions_is_empty_by_default(db: Session):
+    assert list_pending_suggestions(db) == []
+
+
+def test_list_pending_suggestions_resolves_field_name_per_kind(db: Session):
+    tech, _ = add_field(db, "Tech")
+    record_pending_suggestion(db, kind="field", field_id=None, text="Marine Biology")
+    record_pending_suggestion(db, kind="role", field_id=tech.id, text="DevRel")
+    db.commit()
+
+    by_text = {view.text: view for view in list_pending_suggestions(db)}
+
+    assert by_text["Marine Biology"].kind == "field"
+    assert by_text["Marine Biology"].field_name is None
+    assert by_text["DevRel"].kind == "role"
+    assert by_text["DevRel"].field_name == "Tech"
+
+
+def test_list_pending_suggestions_excludes_decided_rows(db: Session):
+    record_pending_suggestion(db, kind="field", field_id=None, text="Still open")
+    db.add(
+        PendingTaxonomySuggestion(
+            kind="field",
+            field_id=None,
+            normalized_text="promoted",
+            raw_text="Promoted",
+            submission_count=1,
+            status="approved",
+        )
+    )
+    db.add(
+        PendingTaxonomySuggestion(
+            kind="field",
+            field_id=None,
+            normalized_text="dismissed",
+            raw_text="Dismissed",
+            submission_count=1,
+            status="rejected",
+        )
+    )
+    db.commit()
+
+    assert [view.text for view in list_pending_suggestions(db)] == ["Still open"]
+
+
+def test_list_pending_suggestions_groups_normalized_variants_with_a_count(db: Session):
+    """AC #2 — the queue must never show the same normalized text twice; the
+    write side already merged them (AD-8), so the read side just reports."""
+    record_pending_suggestion(db, kind="field", field_id=None, text="Marine Biology")
+    record_pending_suggestion(db, kind="field", field_id=None, text="  marine   biology ")
+    db.commit()
+
+    views = list_pending_suggestions(db)
+
+    assert len(views) == 1
+    assert views[0].submission_count == 2
+    # The first submitter's spelling is what the admin reads, not the casefolded key.
+    assert views[0].text == "Marine Biology"
+
+
+def test_list_pending_suggestions_ranks_most_requested_first(db: Session):
+    record_pending_suggestion(db, kind="field", field_id=None, text="Rare")
+    record_pending_suggestion(db, kind="field", field_id=None, text="Popular")
+    record_pending_suggestion(db, kind="field", field_id=None, text="Popular")
+    db.commit()
+
+    assert [view.text for view in list_pending_suggestions(db)] == ["Popular", "Rare"]
+
+
+def test_list_pending_suggestions_falls_back_to_normalized_text(db: Session):
+    """raw_text is nullable — rows written before that column existed have none,
+    and an admin still needs something readable to decide on."""
+    db.add(
+        PendingTaxonomySuggestion(
+            kind="field",
+            field_id=None,
+            normalized_text="legacy row",
+            raw_text=None,
+            submission_count=1,
+        )
+    )
+    db.commit()
+
+    assert [view.text for view in list_pending_suggestions(db)] == ["legacy row"]

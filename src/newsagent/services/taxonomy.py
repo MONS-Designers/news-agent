@@ -7,7 +7,7 @@ import unicodedata
 from dataclasses import dataclass
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from newsagent.models import Field, PendingTaxonomySuggestion, Role
 from newsagent.models.pending_taxonomy_suggestion import STATUS_PENDING
@@ -170,5 +170,53 @@ def record_pending_suggestion(db: Session, *, kind: str, field_id: int | None, t
             status=STATUS_PENDING,
         )
     )
+
+
+@dataclass(frozen=True)
+class PendingSuggestionView:
+    """One row of the admin Taxonomy Curation Queue — the plain-data unit the
+    router renders, so no model instance crosses the router boundary (AD-1).
+    Same role TopicChoice plays for the preferences page."""
+
+    id: int
+    kind: str
+    field_name: str | None
+    text: str
+    submission_count: int
+
+
+def list_pending_suggestions(db: Session) -> list[PendingSuggestionView]:
+    """Every open "Other" submission awaiting an admin decision (FR-6).
+
+    No GROUP BY: record_pending_suggestion and the partial unique index already
+    guarantee one row per (kind, field_id, normalized_text) among pending rows
+    (AD-8), so re-aggregating here would be a second, divergent definition of
+    "the same submission".
+
+    Ordered most-requested first — submission_count is the demand signal the
+    admin is here to read — with the oldest as a stable tiebreak.
+    """
+    rows = db.scalars(
+        select(PendingTaxonomySuggestion)
+        .where(PendingTaxonomySuggestion.status == STATUS_PENDING)
+        .options(selectinload(PendingTaxonomySuggestion.field))
+        .order_by(
+            PendingTaxonomySuggestion.submission_count.desc(),
+            PendingTaxonomySuggestion.created_at,
+        )
+    )
+    return [
+        PendingSuggestionView(
+            id=row.id,
+            kind=row.kind,
+            field_name=row.field.name if row.field is not None else None,
+            # normalized_text is casefolded, so it is the dedupe key, not a
+            # display form; raw_text is nullable only for rows written before
+            # that column existed.
+            text=row.raw_text or row.normalized_text,
+            submission_count=row.submission_count,
+        )
+        for row in rows
+    ]
 
 

@@ -8,6 +8,14 @@ export interface Source {
   status: string;
 }
 
+export interface PendingTaxonomySuggestion {
+  id: number;
+  kind: string;
+  field_name: string | null;
+  text: string;
+  submission_count: number;
+}
+
 export interface TopicPreference {
   topic_id: number;
   name: string;
@@ -89,6 +97,10 @@ export async function logout(): Promise<void> {
 
 export async function listPendingSources(): Promise<Source[]> {
   return request("/admin/sources");
+}
+
+export async function listPendingTaxonomySuggestions(): Promise<PendingTaxonomySuggestion[]> {
+  return request("/admin/taxonomy");
 }
 
 export async function listMyPreferences(): Promise<TopicPreference[]> {

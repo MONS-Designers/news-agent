@@ -8,9 +8,17 @@
             v-if="me?.is_admin"
             to="/admin"
             class="rounded-lg px-3 py-1.5 text-sm font-medium text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
-            active-class="bg-neutral-100 text-neutral-900"
+            exact-active-class="bg-neutral-100 text-neutral-900"
           >
             Admin
+          </router-link>
+          <router-link
+            v-if="me?.is_admin"
+            to="/admin/taxonomy"
+            class="rounded-lg px-3 py-1.5 text-sm font-medium text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
+            active-class="bg-neutral-100 text-neutral-900"
+          >
+            Taxonomy
           </router-link>
           <router-link
             to="/preferences"
