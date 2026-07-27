@@ -64,7 +64,7 @@ def test_put_profile_curated_field_saves_field_name(as_user_with_db: TestClient,
         "/me/profile", json={"field_name": "Tech", "field_is_other": False}
     )
     assert response.status_code == 200
-    assert response.json() == {"field_name": "Tech", "role_name": None}
+    assert response.json() == {"field_name": "Tech", "role_name": None, "experience_bucket": None}
     assert seeded_db.query(PendingTaxonomySuggestion).count() == 0
 
 
@@ -75,7 +75,7 @@ def test_put_profile_other_field_creates_pending_suggestion(
         "/me/profile", json={"field_name": "Marine Biology", "field_is_other": True}
     )
     assert response.status_code == 200
-    assert response.json() == {"field_name": "Marine Biology", "role_name": None}
+    assert response.json() == {"field_name": "Marine Biology", "role_name": None, "experience_bucket": None}
 
     suggestion = seeded_db.scalar(select(PendingTaxonomySuggestion))
     assert suggestion is not None
@@ -125,7 +125,7 @@ def test_put_profile_curated_role_saves_role_name(as_user_with_db: TestClient, s
         json={"field_name": "Tech", "field_is_other": False, "role_name": "Software Engineer"},
     )
     assert response.status_code == 200
-    assert response.json() == {"field_name": "Tech", "role_name": "Software Engineer"}
+    assert response.json() == {"field_name": "Tech", "role_name": "Software Engineer", "experience_bucket": None}
     assert seeded_db.query(PendingTaxonomySuggestion).count() == 0
 
 
@@ -146,7 +146,7 @@ def test_put_profile_other_role_creates_field_scoped_suggestion(
         },
     )
     assert response.status_code == 200
-    assert response.json() == {"field_name": "Tech", "role_name": "Developer Relations"}
+    assert response.json() == {"field_name": "Tech", "role_name": "Developer Relations", "experience_bucket": None}
 
     suggestion = seeded_db.scalar(select(PendingTaxonomySuggestion))
     assert suggestion is not None
@@ -193,3 +193,28 @@ def test_put_profile_rejections_do_not_disclose_the_cause(
 
     assert blank.status_code == uncurated.status_code == 400
     assert blank.json()["detail"] == uncurated.json()["detail"]
+
+
+def test_put_profile_valid_experience_bucket_saves(as_user_with_db: TestClient, seeded_db: Session):
+    seeded_db.add(Field(name="Tech"))
+    seeded_db.commit()
+
+    response = as_user_with_db.put(
+        "/me/profile",
+        json={"field_name": "Tech", "field_is_other": False, "experience_bucket": "6-10"},
+    )
+    assert response.status_code == 200
+    assert response.json() == {"field_name": "Tech", "role_name": None, "experience_bucket": "6-10"}
+
+
+def test_put_profile_invalid_experience_bucket_gets_400(
+    as_user_with_db: TestClient, seeded_db: Session
+):
+    seeded_db.add(Field(name="Tech"))
+    seeded_db.commit()
+
+    response = as_user_with_db.put(
+        "/me/profile",
+        json={"field_name": "Tech", "field_is_other": False, "experience_bucket": "not-a-bucket"},
+    )
+    assert response.status_code == 400

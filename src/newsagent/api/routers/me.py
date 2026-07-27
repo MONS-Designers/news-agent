@@ -62,6 +62,7 @@ def update_my_profile(
             field_is_other=body.field_is_other,
             role_name=body.role_name,
             role_is_other=body.role_is_other,
+            experience_bucket=body.experience_bucket,
         )
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error

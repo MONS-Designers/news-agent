@@ -33,6 +33,7 @@ export interface RoleOption {
 export interface Profile {
   field_name: string | null;
   role_name: string | null;
+  experience_bucket: string | null;
 }
 
 export interface ProfileUpdate {
@@ -40,6 +41,7 @@ export interface ProfileUpdate {
   fieldIsOther: boolean;
   roleName: string;
   roleIsOther: boolean;
+  experienceBucket: string | null;
 }
 
 export class ApiError extends Error {
@@ -119,6 +121,7 @@ export async function updateMyProfile(update: ProfileUpdate): Promise<Profile> {
       field_is_other: update.fieldIsOther,
       role_name: update.roleName,
       role_is_other: update.roleIsOther,
+      experience_bucket: update.experienceBucket,
     }),
   });
 }

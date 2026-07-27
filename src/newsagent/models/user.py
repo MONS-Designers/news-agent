@@ -24,5 +24,9 @@ class User(Base):
     field_name: Mapped[str | None] = mapped_column(String, nullable=True)
     role_name: Mapped[str | None] = mapped_column(String, nullable=True)
 
+    # Stats-only, fixed illustrative set validated in services/profile.py — no
+    # "Other" concept here, so unlike field_name/role_name AD-6 doesn't apply.
+    experience_bucket: Mapped[str | None] = mapped_column(String, nullable=True)
+
     topic_preferences: Mapped[list["UserTopicPreference"]] = relationship(back_populates="user")
     digests: Mapped[list["Digest"]] = relationship(back_populates="user")

@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from newsagent.models import PendingTaxonomySuggestion, User
 from newsagent.models.base import Base
-from newsagent.services.profile import INVALID_PROFILE, MAX_NAME_LENGTH, save_profile
+from newsagent.services.profile import EXPERIENCE_BUCKETS, INVALID_PROFILE, MAX_NAME_LENGTH, save_profile
 from newsagent.services.taxonomy import add_field, add_role, normalize_taxonomy_text
 
 
@@ -28,6 +28,7 @@ def _save(db: Session, user: User, **overrides) -> User:
         "field_is_other": False,
         "role_name": None,
         "role_is_other": False,
+        "experience_bucket": None,
     }
     kwargs.update(overrides)
     return save_profile(db, user, **kwargs)
@@ -190,6 +191,43 @@ def test_role_name_none_leaves_existing_role_untouched(db: Session):
     assert user.role_name == "Software Engineer"
 
 
+# --- Experience Bucket ----------------------------------------------------
+
+
+@pytest.mark.parametrize("bucket", EXPERIENCE_BUCKETS)
+def test_each_valid_bucket_saves(db: Session, bucket: str):
+    add_field(db, "Tech")
+    user = _user(db)
+    _save(db, user, experience_bucket=bucket)
+    assert user.experience_bucket == bucket
+
+
+def test_invalid_bucket_is_rejected(db: Session):
+    add_field(db, "Tech")
+    with pytest.raises(ValueError):
+        _save(db, _user(db), experience_bucket="not-a-real-bucket")
+
+
+def test_experience_bucket_none_leaves_existing_value_untouched(db: Session):
+    add_field(db, "Tech")
+    add_field(db, "Finance")
+    user = _user(db)
+    _save(db, user, experience_bucket="6-10")
+
+    _save(db, user, field_name="Finance", experience_bucket=None)
+
+    assert user.field_name == "Finance"
+    assert user.experience_bucket == "6-10"
+
+
+def test_experience_bucket_never_creates_a_suggestion(db: Session):
+    """No 'Other' concept for buckets — a fixed set has nothing to queue."""
+    add_field(db, "Tech")
+    user = _user(db)
+    _save(db, user, experience_bucket="10+")
+    assert db.scalar(select(PendingTaxonomySuggestion)) is None
+
+
 # --- Validation ----------------------------------------------------------
 
 
@@ -244,6 +282,7 @@ def test_every_rejection_uses_the_same_message(db: Session):
         {"field_name": "x" * (MAX_NAME_LENGTH + 1), "field_is_other": True},
         {"field_name": "Totally Made Up"},
         {"field_name": "Tech", "role_name": "Totally Made Up"},
+        {"experience_bucket": "not-a-real-bucket"},
     ):
         with pytest.raises(ValueError) as caught:
             _save(db, _user(db), **kwargs)

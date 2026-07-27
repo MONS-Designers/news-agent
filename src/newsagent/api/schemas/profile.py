@@ -6,6 +6,7 @@ class ProfileUpdateIn(BaseModel):
     field_is_other: bool = False
     role_name: str | None = None
     role_is_other: bool = False
+    experience_bucket: str | None = None
 
 
 class ProfileOut(BaseModel):
@@ -13,3 +14,4 @@ class ProfileOut(BaseModel):
 
     field_name: str | None
     role_name: str | None
+    experience_bucket: str | None

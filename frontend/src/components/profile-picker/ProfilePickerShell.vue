@@ -24,15 +24,30 @@
         </li>
       </ol>
 
-      <div class="panel" :key="currentStep">
-        <div v-if="currentStep === 1" class="stagger">
+      <div class="panel">
+        <!--
+          v-show, not v-if/v-else: these panels must never be unmounted, or
+          AboutYouStep's Field/Role/Experience selections would be destroyed
+          the moment the user leaves Step 1 (this was the actual cause of the
+          old "state dies on unmount" gap — an accidental side effect of
+          destroy/recreate, not an intentional design). Entrance-animation
+          replay is handled separately, below, so it no longer depends on
+          destroying the DOM to work.
+        -->
+        <div ref="step1El" v-show="currentStep === 1" class="stagger">
           <AboutYouStep @continue="currentStep = 2" />
         </div>
-        <div v-else-if="currentStep === 2" class="stagger">
+        <div ref="step2El" v-show="currentStep === 2" class="stagger">
           <p class="placeholder">Interests step — coming in a later story.</p>
+          <div class="nav-row">
+            <button type="button" class="btn-back" @click="currentStep = 1">← Back</button>
+          </div>
         </div>
-        <div v-else class="stagger">
+        <div ref="step3El" v-show="currentStep === 3" class="stagger">
           <p class="placeholder">Topics step — coming in a later story.</p>
+          <div class="nav-row">
+            <button type="button" class="btn-back" @click="currentStep = 2">← Back</button>
+          </div>
         </div>
       </div>
     </div>
@@ -40,7 +55,7 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from "vue";
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import AboutYouStep from "./AboutYouStep.vue";
 
 const steps = [
@@ -50,6 +65,11 @@ const steps = [
 ];
 
 const currentStep = ref(1);
+
+const step1El = ref<HTMLElement | null>(null);
+const step2El = ref<HTMLElement | null>(null);
+const step3El = ref<HTMLElement | null>(null);
+const stepElements = [step1El, step2El, step3El];
 
 const orbA = ref<HTMLElement | null>(null);
 const orbB = ref<HTMLElement | null>(null);
@@ -101,6 +121,23 @@ function handleMotionChange(event: MediaQueryListEvent | MediaQueryList) {
     });
   }
 }
+
+// Panels are kept mounted via v-show (never destroyed — see the template
+// comment), so the entrance animation no longer replays "for free" as a side
+// effect of recreation. Restart it explicitly, the same way the approved
+// mockup's own goStep() does: force a reflow between clearing and restoring
+// the animation property.
+function replayEntrance(el: HTMLElement | null) {
+  if (!el || reducedMotion) return;
+  el.style.animation = "none";
+  void el.offsetWidth; // reflow — must be read, not optimized away
+  el.style.animation = "";
+}
+
+watch(currentStep, async (step) => {
+  await nextTick();
+  replayEntrance(stepElements[step - 1]?.value ?? null);
+});
 
 onMounted(() => {
   motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -279,6 +316,29 @@ onBeforeUnmount(() => {
   color: #565f74;
   font-size: 13px;
   margin: 0;
+}
+
+.nav-row {
+  display: flex;
+  margin-top: 28px;
+}
+.btn-back {
+  padding: 11px 8px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  color: #6b7288;
+  font-family: inherit;
+}
+.btn-back:hover {
+  color: #c4cadb;
+}
+.btn-back:focus-visible {
+  outline: 2px solid #6d7bff;
+  outline-offset: 2px;
 }
 
 .stagger {

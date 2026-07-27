@@ -11,6 +11,12 @@ from newsagent.services import taxonomy
 
 MAX_NAME_LENGTH = 100
 
+# Fixed illustrative set (PRD FR-3) — no "Other" path, unlike Field/Role, so
+# these are validated as a closed set rather than resolved against a curated
+# DB table. Values are storage keys; display labels ("0–2 yrs" etc.) are a
+# frontend-only concern.
+EXPERIENCE_BUCKETS: list[str] = ["0-2", "3-5", "6-10", "10+"]
+
 # One fixed message for every rejection cause. Which check failed (blank, too
 # long, not actually curated) is deliberately not disclosed — the frontend
 # validates before submitting, so a user only reaches this via a hand-built
@@ -33,26 +39,33 @@ def save_profile(
     field_is_other: bool,
     role_name: str | None,
     role_is_other: bool,
+    experience_bucket: str | None,
 ) -> User:
-    """Save the user's chosen Field and Role in a single transaction.
+    """Save the user's chosen Field, Role and Experience Bucket in a single
+    transaction.
 
-    Both are stored as plain strings on User whether they came from the curated
-    list or were typed via "Other" (AD-6). Each "Other" value also stages a
-    Pending Taxonomy Suggestion for admin review.
+    Field and Role are stored as plain strings on User whether they came from
+    the curated list or were typed via "Other" (AD-6). Each "Other" value also
+    stages a Pending Taxonomy Suggestion for admin review. Experience Bucket has
+    no "Other" path — it is validated against a fixed set and never queues a
+    suggestion.
 
     The `*_is_other` flags are claims, not instructions: a request asserting a
     curated pick is rejected unless the name actually resolves against the
     curated list, so a hand-built request cannot store arbitrary text as
     "curated" and skip the review queue.
 
-    `role_name=None` means "not submitted in this request" and leaves any
-    existing role untouched; blank or over-long input is rejected.
+    `role_name`/`experience_bucket` of `None` mean "not submitted in this
+    request" and leave the existing value untouched; blank or over-long name
+    input, and any experience_bucket outside the fixed set, are rejected.
 
     All writes share one commit, so a rejected input persists nothing.
     """
     field_name = _clean(field_name)
     if role_name is not None:
         role_name = _clean(role_name)
+    if experience_bucket is not None and experience_bucket not in EXPERIENCE_BUCKETS:
+        raise ValueError(INVALID_PROFILE)
 
     # A concurrent submission of the same "Other" text can win the race between
     # our lookup and our insert; the partial unique index turns that into an
@@ -67,6 +80,7 @@ def save_profile(
                 field_is_other=field_is_other,
                 role_name=role_name,
                 role_is_other=role_is_other,
+                experience_bucket=experience_bucket,
             )
         except IntegrityError:
             db.rollback()
@@ -84,6 +98,7 @@ def _apply(
     field_is_other: bool,
     role_name: str | None,
     role_is_other: bool,
+    experience_bucket: str | None,
 ) -> User:
     field = taxonomy.find_field_by_name(db, field_name)
     if not field_is_other and field is None:
@@ -117,6 +132,9 @@ def _apply(
                 field_id=field.id if field is not None else None,
                 text=role_name,
             )
+
+    if experience_bucket is not None:
+        user.experience_bucket = experience_bucket
 
     db.commit()
     db.refresh(user)
