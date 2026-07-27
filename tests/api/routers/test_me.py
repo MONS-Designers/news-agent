@@ -269,3 +269,47 @@ def test_put_profile_over_long_interest_free_text_gets_400(as_user_with_db: Test
         "/me/profile", json={"interest_free_text": "x" * 2001}
     )
     assert response.status_code == 400
+
+
+# --- Topic suggestions (Story 1.6) ------------------------------------------
+
+
+def test_topic_suggestions_unauthenticated_gets_401(client: TestClient):
+    response = client.get("/me/topic-suggestions")
+    assert response.status_code == 401
+
+
+def test_topic_suggestions_before_any_save_is_none(as_user_with_db: TestClient):
+    response = as_user_with_db.get("/me/topic-suggestions")
+    assert response.status_code == 200
+    assert response.json() == {"suggestion_status": "none", "suggested_topic_ids": None}
+
+
+def test_profile_save_triggers_background_computation_visible_via_get(
+    as_user_with_db: TestClient, seeded_db: Session
+):
+    """End-to-end proof the BackgroundTask's engine hand-off (db.get_bind())
+    resolves to the *same* database as this test's in-memory seeded_db — not
+    the production default. TestClient runs BackgroundTasks synchronously as
+    part of the request it's already completed, so by the time this PUT
+    returns, the computation has already run."""
+    seeded_db.add(Field(name="Tech"))
+    seeded_db.commit()
+
+    put_response = as_user_with_db.put(
+        "/me/profile", json={"field_name": "Tech", "field_is_other": False}
+    )
+    assert put_response.status_code == 200
+
+    # The BackgroundTask commits through a second, independent Session bound
+    # to the same StaticPool engine — real writes at the DB level, but this
+    # fixture's seeded_db is reused across the whole test (unlike production,
+    # where every request gets a fresh Session/empty identity map), so its
+    # already-loaded User object needs an explicit expire to see them.
+    seeded_db.expire_all()
+
+    get_response = as_user_with_db.get("/me/topic-suggestions")
+    assert get_response.status_code == 200
+    body = get_response.json()
+    assert body["suggestion_status"] == "ready"
+    assert body["suggested_topic_ids"]  # non-empty — the 3 seeded topics

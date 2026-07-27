@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, String, func
+from sqlalchemy import JSON, DateTime, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from newsagent.models.base import Base
@@ -9,6 +9,13 @@ from newsagent.models.base import Base
 if TYPE_CHECKING:
     from newsagent.models.digest import Digest
     from newsagent.models.user_topic_preference import UserTopicPreference
+
+# Suggestion polling status (AD-7) — plain string, same shape as Source.status
+# and PendingTaxonomySuggestion.status (AD-2's convention).
+SUGGESTION_STATUS_NONE = "none"
+SUGGESTION_STATUS_PENDING = "pending"
+SUGGESTION_STATUS_READY = "ready"
+SUGGESTION_STATUS_FAILED = "failed"
 
 
 class User(Base):
@@ -30,6 +37,14 @@ class User(Base):
 
     # Optional, no "Other" concept — same plain-string shape as experience_bucket.
     interest_free_text: Mapped[str | None] = mapped_column(String, nullable=True)
+
+    # Suggestion polling (AD-5, AD-7). NOT NULL, unlike the profile fields
+    # above — a user who has never saved a profile reads "none"/0, not null.
+    suggestion_status: Mapped[str] = mapped_column(
+        String, default=SUGGESTION_STATUS_NONE, server_default=SUGGESTION_STATUS_NONE
+    )
+    suggested_topic_ids: Mapped[list[int] | None] = mapped_column(JSON, nullable=True)
+    suggestion_request_seq: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
     topic_preferences: Mapped[list["UserTopicPreference"]] = relationship(back_populates="user")
     digests: Mapped[list["Digest"]] = relationship(back_populates="user")

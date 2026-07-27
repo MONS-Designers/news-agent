@@ -1,13 +1,24 @@
 """Domain service for writing a user's profile (issue: Profile-Based Topic
 Suggestions). Owns the profile-save transaction; delegates every taxonomy
-lookup and review-queue write to services/taxonomy.py."""
+lookup and review-queue write to services/taxonomy.py. Also owns the async
+suggestion-computation BackgroundTask this triggers (AD-5) — the only file
+that imports from newsagent.suggestions (AD-3's profile -> suggestions
+dependency direction)."""
 
+from sqlalchemy import func, select
+from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from newsagent.models import User
+from newsagent.models import Topic, User, UserTopicPreference
 from newsagent.models.pending_taxonomy_suggestion import KIND_FIELD, KIND_ROLE
+from newsagent.models.user import (
+    SUGGESTION_STATUS_FAILED,
+    SUGGESTION_STATUS_PENDING,
+    SUGGESTION_STATUS_READY,
+)
 from newsagent.services import taxonomy
+from newsagent.suggestions import SuggestionError, TopicPopularity, get_suggestion_source
 
 MAX_NAME_LENGTH = 100
 
@@ -179,6 +190,83 @@ def _apply(
     if experience_bucket is not None:
         user.experience_bucket = experience_bucket
 
+    # Unconditional on every successful save, regardless of which fields this
+    # particular request touched (AD-5) — the seq race-guard in
+    # _compute_and_store_suggestions makes a premature/redundant trigger from
+    # an earlier step harmless, so there is no need to distinguish "which
+    # step" called this.
+    user.suggestion_status = SUGGESTION_STATUS_PENDING
+    user.suggestion_request_seq = (user.suggestion_request_seq or 0) + 1
+
     db.commit()
     db.refresh(user)
     return user
+
+
+# -- Async suggestion computation (AD-5, AD-7) -------------------------------
+
+
+def _topic_popularity(db: Session) -> list[TopicPopularity]:
+    """Every Topic's cross-user selection count, including zero — a topic
+    nobody has picked yet is still a valid fallback candidate, and dropping it
+    would risk an empty popularity list (breaking FR-9's non-empty guarantee)
+    the moment no topic has ever been selected system-wide. Starting the query
+    from Topic with an outer join (not from UserTopicPreference) is what keeps
+    zero-selection topics in the result."""
+    rows = db.execute(
+        select(Topic.id, func.count(UserTopicPreference.id))
+        .select_from(Topic)
+        .outerjoin(UserTopicPreference, UserTopicPreference.topic_id == Topic.id)
+        .group_by(Topic.id)
+        .order_by(Topic.id)
+    ).all()
+    return [TopicPopularity(topic_id=topic_id, selection_count=count) for topic_id, count in rows]
+
+
+def _compute_and_store_suggestions(db: Session, user_id: int, expected_seq: int) -> None:
+    """BackgroundTask body (session-agnostic — the caller owns the session's
+    lifecycle). Computes suggestions for `user_id` and writes the result only
+    if `expected_seq` still matches the current `User.suggestion_request_seq`
+    at write time — a superseded (re-saved-over) computation discards its
+    result instead of overwriting a newer one.
+    """
+    user = db.get(User, user_id)
+    if user is None:
+        return  # user deleted mid-flight
+
+    try:
+        popularity = _topic_popularity(db)
+        source = get_suggestion_source()
+        suggestions = source.suggest_topics(
+            field_name=user.field_name,
+            role_name=user.role_name,
+            interest_free_text=user.interest_free_text,
+            popularity=popularity,
+        )
+        topic_ids: list[int] | None = [s.topic_id for s in suggestions]
+        status = SUGGESTION_STATUS_READY
+    except SuggestionError:
+        topic_ids = None
+        status = SUGGESTION_STATUS_FAILED
+
+    # Race guard, checked immediately before the write, not at function entry:
+    # a concurrent save may have advanced suggestion_request_seq while
+    # suggest_topics (above) was running, so the check must happen after that
+    # work, on freshly-read state, not on the `user` object as it looked when
+    # this function started.
+    db.refresh(user)
+    if user.suggestion_request_seq != expected_seq:
+        return
+
+    user.suggestion_status = status
+    if topic_ids is not None:
+        user.suggested_topic_ids = topic_ids
+    db.commit()
+
+
+def run_suggestion_computation(engine: Engine | Connection, user_id: int, expected_seq: int) -> None:
+    """The actual FastAPI BackgroundTask target. Opens its own session bound
+    to `engine` — the request-scoped session from Depends(get_db) is already
+    closed by the time a BackgroundTask runs, so it cannot be reused here."""
+    with Session(engine) as db:
+        _compute_and_store_suggestions(db, user_id, expected_seq)

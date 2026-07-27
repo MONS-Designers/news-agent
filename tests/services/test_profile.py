@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from newsagent.models import PendingTaxonomySuggestion, User
 from newsagent.models.base import Base
+from newsagent.models.user import SUGGESTION_STATUS_NONE, SUGGESTION_STATUS_PENDING
 from newsagent.services.profile import (
     EXPERIENCE_BUCKETS,
     INVALID_PROFILE,
@@ -426,3 +427,32 @@ def test_rejected_save_persists_nothing(db: Session):
     db.rollback()
     assert user.field_name is None
     assert db.scalar(select(PendingTaxonomySuggestion)) is None
+    assert user.suggestion_request_seq == 0
+    assert user.suggestion_status == SUGGESTION_STATUS_NONE
+
+
+# --- Suggestion polling: pending + seq bump (Story 1.6) --------------------
+
+
+def test_successful_save_sets_pending_and_bumps_seq(db: Session):
+    add_field(db, "Tech")
+    user = _user(db)
+    assert user.suggestion_status == SUGGESTION_STATUS_NONE
+    assert user.suggestion_request_seq == 0
+
+    _save(db, user)
+
+    assert user.suggestion_status == SUGGESTION_STATUS_PENDING
+    assert user.suggestion_request_seq == 1
+
+
+def test_second_successful_save_bumps_seq_again(db: Session):
+    add_field(db, "Tech")
+    user = _user(db)
+    _save(db, user)
+    assert user.suggestion_request_seq == 1
+
+    _save(db, user, field_name=None, interest_free_text="curious about ML")
+
+    assert user.suggestion_status == SUGGESTION_STATUS_PENDING
+    assert user.suggestion_request_seq == 2

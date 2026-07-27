@@ -17,3 +17,13 @@ class ProfileOut(BaseModel):
     role_name: str | None
     experience_bucket: str | None
     interest_free_text: str | None
+
+
+class TopicSuggestionsOut(BaseModel):
+    """GET /me/topic-suggestions — the only read path for suggestion state
+    (AD-7). Deliberately not merged into ProfileOut."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    suggestion_status: str
+    suggested_topic_ids: list[int] | None

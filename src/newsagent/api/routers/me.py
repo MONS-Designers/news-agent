@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from newsagent.api.auth import require_user
@@ -10,6 +10,7 @@ from newsagent.api.schemas import (
     ProfileUpdateIn,
     RoleOut,
     TopicPreferenceOut,
+    TopicSuggestionsOut,
 )
 from newsagent.models import Field, Role, User
 from newsagent.services import preferences, profile, taxonomy
@@ -51,11 +52,12 @@ def list_my_roles(
 @router.put("/profile", response_model=ProfileOut)
 def update_my_profile(
     body: ProfileUpdateIn,
+    background_tasks: BackgroundTasks,
     user: User = Depends(require_user),
     db: Session = Depends(get_db),
 ) -> User:
     try:
-        return profile.save_profile(
+        updated = profile.save_profile(
             db,
             user,
             field_name=body.field_name,
@@ -67,3 +69,15 @@ def update_my_profile(
         )
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
+
+    # db.get_bind(), not db itself — the request-scoped session is already
+    # closed by the time this BackgroundTask runs (AD-5).
+    background_tasks.add_task(
+        profile.run_suggestion_computation, db.get_bind(), updated.id, updated.suggestion_request_seq
+    )
+    return updated
+
+
+@router.get("/topic-suggestions", response_model=TopicSuggestionsOut)
+def get_my_topic_suggestions(user: User = Depends(require_user)) -> User:
+    return user
