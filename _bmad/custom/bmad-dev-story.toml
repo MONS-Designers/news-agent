@@ -1,0 +1,22 @@
+# Team overrides for bmad-dev-story.
+# Committed to the repo — applies to every developer on the project.
+# Source: Epic 2 retrospective, 2026-07-27
+# (_bmad-output/implementation-artifacts/epic-2-retro-2026-07-27.md)
+
+[workflow]
+
+# Retro action item 5. CI was red from Story 1.4 through Story 1.7 and nobody
+# noticed for four stories, because each story checked its own tests locally and
+# then committed without ever looking at the previous commit's build. The cause
+# was an unpinned `ruff` whose new release widened the default rule set — no
+# code change was involved, so nothing local could have caught it.
+activation_steps_append = [
+  "CI PRE-FLIGHT (before starting the first task). Run `gh run list --limit 3`. If the most recent run on this branch failed, stop and report it to the user before writing any code — including when the failure predates this story. A red build inherited from an earlier story is a finding, not background noise, and diagnosing it costs far less now than four stories later.",
+]
+
+persistent_facts = [
+  "Live browser verification is the release gate for user-facing behaviour in this project; there is no frontend test runner, by explicit decision (Epic 2 retrospective). Never mark a story complete on a green test suite alone when it changes anything a user can see. Type-checkers and the backend suite have passed cleanly on every frontend defect found so far in Epics 1 and 2.",
+  "Verify against the real dev DB, and treat writes to it as requiring explicit user approval each time. Record the affected rows before any destructive verification and restore them afterwards — several flows (taxonomy promote/dismiss) are one-way with no undo path.",
+  "Run backend commands with the venv interpreter at .venv/Scripts/python.exe. Both it and the global interpreter now resolve `newsagent` to C:/project/news-agent/src, so PYTHONPATH=src is no longer needed; if an import resolves anywhere else, the editable install has drifted again — report it rather than working around it.",
+  "The backend dev server runs with --reload --reload-dir src, so a backend code change needs no restart. If a change genuinely is not being picked up, check for a second uvicorn process competing for port 8000 before restarting anything, and ask the user before stopping any process.",
+]

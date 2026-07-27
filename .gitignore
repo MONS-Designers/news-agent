@@ -12,5 +12,9 @@ dist/
 build/
 .claude/settings.local.json
 .vscode/
-_bmad/
+_bmad/*
+!_bmad/custom/
+_bmad/custom/*
+!_bmad/custom/*.toml
+_bmad/custom/*.user.toml
 .claude/
