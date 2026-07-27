@@ -25,7 +25,7 @@
     </div>
 
     <template v-else>
-      <ProfilePickerShell />
+      <ProfilePickerShell @topics-saved="refreshPreferencesQuietly" />
 
       <template v-if="preferences.length > 0">
         <ul class="space-y-3">
@@ -95,6 +95,20 @@ async function loadPreferences() {
     }
   } finally {
     loading.value = false;
+  }
+}
+
+async function refreshPreferencesQuietly() {
+  // Unlike loadPreferences, does not touch `loading` — that flag gates
+  // ProfilePickerShell behind v-if, so toggling it here would destroy and
+  // recreate the whole guided flow (resetting it to Step 1) right after the
+  // user just finished it. This just re-syncs the raw grid below.
+  try {
+    preferences.value = await listMyPreferences();
+  } catch {
+    // Best-effort background refresh — the guided flow's own save already
+    // succeeded and showed its own feedback; a failed refresh here shouldn't
+    // interrupt anything.
   }
 }
 

@@ -33,6 +33,8 @@ def update_my_preferences(
 ) -> list[preferences.TopicChoice]:
     try:
         return preferences.set_preferences(db, user, body.topic_ids)
+    except preferences.TopicCapExceededError as error:
+        raise HTTPException(status_code=400, detail=error.detail) from error
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
 

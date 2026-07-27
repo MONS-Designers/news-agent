@@ -46,6 +46,11 @@ export interface ProfileUpdate {
   interestFreeText?: string;
 }
 
+export interface TopicSuggestions {
+  suggestion_status: "none" | "pending" | "ready" | "failed";
+  suggested_topic_ids: number[] | null;
+}
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -112,6 +117,10 @@ export async function listFields(): Promise<FieldOption[]> {
 
 export async function listRoles(fieldId: number): Promise<RoleOption[]> {
   return request(`/me/fields/${fieldId}/roles`);
+}
+
+export async function getTopicSuggestions(): Promise<TopicSuggestions> {
+  return request("/me/topic-suggestions");
 }
 
 export async function updateMyProfile(update: ProfileUpdate): Promise<Profile> {

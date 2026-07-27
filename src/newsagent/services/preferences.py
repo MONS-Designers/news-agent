@@ -7,6 +7,23 @@ from sqlalchemy.orm import Session
 
 from newsagent.models import Topic, User, UserTopicPreference
 
+# Platform-wide hard cap (FR-10), enforced here — the single mutation point
+# for UserTopicPreference — so every save path (old raw toggle grid, new
+# guided flow) shares one rule (AD-9).
+MAX_TOPICS = 4
+
+
+class TopicCapExceededError(ValueError):
+    """Raised when a save would leave more than MAX_TOPICS topics selected.
+
+    Carries a stable, identifiable `detail` dict so every caller surfaces the
+    same failure shape, rather than a bare string a caller would have to
+    sniff (AD-9)."""
+
+    def __init__(self) -> None:
+        self.detail = {"error": "topic_cap_exceeded", "max_topics": MAX_TOPICS}
+        super().__init__(f"Cannot select more than {MAX_TOPICS} topics.")
+
 
 @dataclass(frozen=True)
 class TopicChoice:
@@ -36,6 +53,9 @@ def set_preferences(db: Session, user: User, topic_ids: list[int]) -> list[Topic
     id is not a real topic.
     """
     desired = set(topic_ids)
+    if len(desired) > MAX_TOPICS:
+        raise TopicCapExceededError()
+
     known_ids = {topic_id for (topic_id,) in db.execute(select(Topic.id))}
     unknown = desired - known_ids
     if unknown:

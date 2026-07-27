@@ -5,6 +5,8 @@ from sqlalchemy.orm import Session
 from newsagent.models import Topic, User
 from newsagent.models.base import Base
 from newsagent.services.preferences import (
+    MAX_TOPICS,
+    TopicCapExceededError,
     list_topic_choices,
     set_preferences,
     subscribe,
@@ -99,6 +101,56 @@ def test_set_preferences_unknown_id_raises(multi_topic_db: Session):
     user = _user(multi_topic_db)
     with pytest.raises(ValueError, match="Unknown topic id"):
         set_preferences(multi_topic_db, user, [999])
+
+
+# --- 4-Topic cap (AD-9) -----------------------------------------------------
+
+
+@pytest.fixture
+def five_topic_db(multi_topic_db: Session) -> Session:
+    """multi_topic_db (AI, Cybersecurity, Space) plus two more, for cap tests
+    that need more than MAX_TOPICS candidates."""
+    multi_topic_db.add_all([Topic(name="Finance"), Topic(name="Health")])
+    multi_topic_db.commit()
+    return multi_topic_db
+
+
+def test_set_preferences_exactly_at_cap_succeeds(five_topic_db: Session):
+    user = _user(five_topic_db)
+    ids = [t for (t,) in five_topic_db.execute(select(Topic.id))][:MAX_TOPICS]
+
+    choices = set_preferences(five_topic_db, user, ids)
+
+    assert sum(c.subscribed for c in choices) == MAX_TOPICS
+
+
+def test_set_preferences_over_cap_raises(five_topic_db: Session):
+    user = _user(five_topic_db)
+    ids = [t for (t,) in five_topic_db.execute(select(Topic.id))]
+    assert len(ids) == MAX_TOPICS + 1
+
+    with pytest.raises(TopicCapExceededError) as caught:
+        set_preferences(five_topic_db, user, ids)
+
+    assert caught.value.detail == {"error": "topic_cap_exceeded", "max_topics": MAX_TOPICS}
+
+
+def test_set_preferences_cap_checked_before_unknown_id(five_topic_db: Session):
+    """A request with both an over-cap count and an unknown id reports the cap
+    violation, not the unknown-id one — the two checks' order is deterministic."""
+    user = _user(five_topic_db)
+    ids = [t for (t,) in five_topic_db.execute(select(Topic.id))][: MAX_TOPICS + 1]
+    ids[-1] = 999999  # swap in an unknown id, keeping the count over the cap
+
+    with pytest.raises(TopicCapExceededError):
+        set_preferences(five_topic_db, user, ids)
+
+
+def test_set_preferences_zero_ids_still_succeeds(five_topic_db: Session):
+    """The cap is a maximum, not a minimum — saving nothing stays allowed."""
+    user = _user(five_topic_db)
+    choices = set_preferences(five_topic_db, user, [])
+    assert all(not c.subscribed for c in choices)
 
 
 def test_set_preferences_updates_user_topic_preferences_for_digest(multi_topic_db: Session):

@@ -2,7 +2,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from newsagent.models import Field, PendingTaxonomySuggestion, Role
+from newsagent.models import Field, PendingTaxonomySuggestion, Role, Topic
 
 
 def test_unauthenticated_gets_401(client: TestClient):
@@ -35,6 +35,20 @@ def test_put_then_get_reflects_new_subscriptions(as_user_with_db: TestClient):
 def test_put_unknown_topic_id_returns_400(as_user_with_db: TestClient):
     response = as_user_with_db.put("/me/preferences", json={"topic_ids": [999]})
     assert response.status_code == 400
+
+
+def test_put_over_cap_topic_ids_returns_structured_detail(
+    as_user_with_db: TestClient, seeded_db: Session
+):
+    seeded_db.add_all([Topic(name="Finance"), Topic(name="Health")])
+    seeded_db.commit()
+    ids = [t for (t,) in seeded_db.execute(select(Topic.id))]
+    assert len(ids) == 5
+
+    response = as_user_with_db.put("/me/preferences", json={"topic_ids": ids})
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == {"error": "topic_cap_exceeded", "max_topics": 4}
 
 
 def test_fields_unauthenticated_gets_401(client: TestClient):

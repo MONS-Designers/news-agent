@@ -41,10 +41,11 @@
           <InterestsStep @continue="currentStep = 3" @back="currentStep = 1" />
         </div>
         <div ref="step3El" v-show="currentStep === 3" class="stagger">
-          <p class="placeholder">Topics step — coming in a later story.</p>
-          <div class="nav-row">
-            <button type="button" class="btn-back" @click="currentStep = 2">← Back</button>
-          </div>
+          <TopicsStep
+            :active="currentStep === 3"
+            @back="currentStep = 2"
+            @saved="emit('topics-saved')"
+          />
         </div>
       </div>
     </div>
@@ -55,6 +56,9 @@
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import AboutYouStep from "./AboutYouStep.vue";
 import InterestsStep from "./InterestsStep.vue";
+import TopicsStep from "./TopicsStep.vue";
+
+const emit = defineEmits<{ "topics-saved": [] }>();
 
 const steps = [
   { n: 1, label: "About you" },
@@ -308,35 +312,6 @@ onBeforeUnmount(() => {
   border-radius: 16px;
   padding: 30px;
   backdrop-filter: blur(18px);
-}
-
-.placeholder {
-  color: #565f74;
-  font-size: 13px;
-  margin: 0;
-}
-
-.nav-row {
-  display: flex;
-  margin-top: 28px;
-}
-.btn-back {
-  padding: 11px 8px;
-  border-radius: 10px;
-  font-size: 13.5px;
-  font-weight: 600;
-  cursor: pointer;
-  border: none;
-  background: transparent;
-  color: #6b7288;
-  font-family: inherit;
-}
-.btn-back:hover {
-  color: #c4cadb;
-}
-.btn-back:focus-visible {
-  outline: 2px solid #6d7bff;
-  outline-offset: 2px;
 }
 
 .stagger {
