@@ -103,6 +103,18 @@ export async function listPendingTaxonomySuggestions(): Promise<PendingTaxonomyS
   return request("/admin/taxonomy");
 }
 
+export async function decideTaxonomySuggestion(
+  suggestionId: number,
+  status: "approved" | "rejected",
+  name?: string,
+): Promise<PendingTaxonomySuggestion> {
+  return request(`/admin/taxonomy/${suggestionId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(name === undefined ? { status } : { status, name }),
+  });
+}
+
 export async function listMyPreferences(): Promise<TopicPreference[]> {
   return request("/me/preferences");
 }

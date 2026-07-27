@@ -3,13 +3,16 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from newsagent.models import PendingTaxonomySuggestion
+from newsagent.models import Field, PendingTaxonomySuggestion, Role, User
 from newsagent.models.base import Base
 from newsagent.services.taxonomy import (
     DEFAULT_FIELDS,
     DEFAULT_ROLES,
+    RoleHasNoFieldError,
+    SuggestionNotPendingError,
     add_field,
     add_role,
+    decide_pending_suggestion,
     find_field_by_name,
     list_fields,
     list_pending_suggestions,
@@ -302,3 +305,160 @@ def test_list_pending_suggestions_falls_back_to_normalized_text(db: Session):
     db.commit()
 
     assert [view.text for view in list_pending_suggestions(db)] == ["legacy row"]
+
+
+def _pending_id(db: Session, text: str) -> int:
+    """The id of the one open suggestion matching `text`."""
+    return next(v.id for v in list_pending_suggestions(db) if v.text == text)
+
+
+def test_promoting_a_field_creates_it_and_marks_the_row_approved(db: Session):
+    record_pending_suggestion(db, kind="field", field_id=None, text="Marine Biology")
+    db.commit()
+
+    view = decide_pending_suggestion(
+        db, _pending_id(db, "Marine Biology"), status="approved"
+    )
+
+    assert view is not None
+    assert [f.name for f in list_fields(db)] == ["Marine Biology"]
+    assert db.get(PendingTaxonomySuggestion, view.id).status == "approved"
+    assert list_pending_suggestions(db) == []
+
+
+def test_promoting_a_field_that_already_exists_reuses_it(db: Session):
+    add_field(db, "Marine Biology")
+    record_pending_suggestion(db, kind="field", field_id=None, text="Marine Biology")
+    db.commit()
+
+    decide_pending_suggestion(db, _pending_id(db, "Marine Biology"), status="approved")
+
+    assert len(list_fields(db)) == 1
+
+
+def test_promoting_a_role_scopes_it_to_its_own_field(db: Session):
+    tech, _ = add_field(db, "Tech")
+    finance, _ = add_field(db, "Finance")
+    record_pending_suggestion(db, kind="role", field_id=tech.id, text="DevRel")
+    db.commit()
+
+    decide_pending_suggestion(db, _pending_id(db, "DevRel"), status="approved")
+
+    assert [r.name for r in list_roles(db, tech.id)] == ["DevRel"]
+    assert list_roles(db, finance.id) == []
+
+
+def test_promoting_a_role_without_a_field_is_refused_and_writes_nothing(db: Session):
+    """Role.field_id is a non-nullable FK, so there is no correct row to write.
+    A Role typed under an "Other" Field legitimately reaches this state."""
+    record_pending_suggestion(db, kind="role", field_id=None, text="Reef Survey Lead")
+    db.commit()
+    suggestion_id = _pending_id(db, "Reef Survey Lead")
+
+    with pytest.raises(RoleHasNoFieldError) as raised:
+        decide_pending_suggestion(db, suggestion_id, status="approved")
+
+    assert raised.value.detail == {"error": "role_has_no_field"}
+    assert db.query(Role).count() == 0
+    assert db.get(PendingTaxonomySuggestion, suggestion_id).status == "pending"
+
+
+def test_dismissing_creates_no_curated_row(db: Session):
+    tech, _ = add_field(db, "Tech")
+    record_pending_suggestion(db, kind="role", field_id=tech.id, text="DevRel")
+    db.commit()
+    suggestion_id = _pending_id(db, "DevRel")
+
+    decide_pending_suggestion(db, suggestion_id, status="rejected")
+
+    assert db.get(PendingTaxonomySuggestion, suggestion_id).status == "rejected"
+    assert db.query(Role).count() == 0
+    assert list_pending_suggestions(db) == []
+
+
+def test_a_decided_suggestion_cannot_be_decided_again(db: Session):
+    record_pending_suggestion(db, kind="field", field_id=None, text="Marine Biology")
+    db.commit()
+    suggestion_id = _pending_id(db, "Marine Biology")
+    decide_pending_suggestion(db, suggestion_id, status="rejected")
+
+    with pytest.raises(SuggestionNotPendingError) as raised:
+        decide_pending_suggestion(db, suggestion_id, status="approved")
+
+    assert raised.value.detail == {"error": "suggestion_not_pending"}
+    assert db.query(Field).count() == 0
+    assert db.get(PendingTaxonomySuggestion, suggestion_id).status == "rejected"
+
+
+def test_deciding_an_unknown_suggestion_returns_none(db: Session):
+    assert decide_pending_suggestion(db, 999, status="approved") is None
+
+
+def test_promoting_with_a_name_override_curates_the_edited_name(db: Session):
+    """Rows written before raw_text existed carry only casefolded text, so the
+    admin edits the name rather than minting a lowercase Field."""
+    db.add(
+        PendingTaxonomySuggestion(
+            kind="field", field_id=None, normalized_text="marine biology", raw_text=None
+        )
+    )
+    db.commit()
+    suggestion_id = _pending_id(db, "marine biology")
+
+    decide_pending_suggestion(db, suggestion_id, status="approved", name="Marine Biology")
+
+    assert [f.name for f in list_fields(db)] == ["Marine Biology"]
+    # The queue row itself is a record of what the user typed — never rewritten.
+    assert db.get(PendingTaxonomySuggestion, suggestion_id).normalized_text == "marine biology"
+
+
+def test_promoting_without_an_override_falls_back_to_normalized_text(db: Session):
+    db.add(
+        PendingTaxonomySuggestion(
+            kind="field", field_id=None, normalized_text="marine biology", raw_text=None
+        )
+    )
+    db.commit()
+
+    decide_pending_suggestion(db, _pending_id(db, "marine biology"), status="approved")
+
+    assert [f.name for f in list_fields(db)] == ["marine biology"]
+
+
+def test_promoting_with_a_blank_name_is_rejected(db: Session):
+    record_pending_suggestion(db, kind="field", field_id=None, text="Marine Biology")
+    db.commit()
+
+    with pytest.raises(ValueError):
+        decide_pending_suggestion(
+            db, _pending_id(db, "Marine Biology"), status="approved", name="   "
+        )
+
+
+def test_promotion_does_not_migrate_earlier_submitters(db: Session):
+    """PRD FR-7's explicit consequence: the user who typed the free text keeps
+    it verbatim. This test exists to stop a future backfill being added."""
+    db.add(User(email="submitter@example.com", field_name="Marine Biology"))
+    record_pending_suggestion(db, kind="field", field_id=None, text="Marine Biology")
+    db.commit()
+
+    decide_pending_suggestion(db, _pending_id(db, "Marine Biology"), status="approved")
+
+    user = db.scalar(select(User).where(User.email == "submitter@example.com"))
+    assert user.field_name == "Marine Biology"
+
+
+def test_resubmitting_decided_text_opens_a_fresh_row(db: Session):
+    """AD-8: a decision is terminal. The admin's pending list must never miss a
+    resubmission behind an invisible approved/rejected row."""
+    record_pending_suggestion(db, kind="field", field_id=None, text="Marine Biology")
+    db.commit()
+    decide_pending_suggestion(db, _pending_id(db, "Marine Biology"), status="rejected")
+
+    record_pending_suggestion(db, kind="field", field_id=None, text="Marine Biology")
+    db.commit()
+
+    views = list_pending_suggestions(db)
+    assert len(views) == 1
+    assert views[0].submission_count == 1
+    assert db.query(PendingTaxonomySuggestion).count() == 2

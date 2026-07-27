@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict
 
 
@@ -24,3 +26,15 @@ class PendingTaxonomySuggestionOut(BaseModel):
     field_name: str | None
     text: str
     submission_count: int
+
+
+class TaxonomySuggestionDecision(BaseModel):
+    """Promote (`approved`) or dismiss (`rejected`) one queued suggestion.
+
+    `name` overrides the curated Field/Role name that gets written — rows
+    predating the `raw_text` column carry only casefolded text, so the admin
+    corrects the spelling before it becomes a user-visible option.
+    """
+
+    status: Literal["approved", "rejected"]
+    name: str | None = None

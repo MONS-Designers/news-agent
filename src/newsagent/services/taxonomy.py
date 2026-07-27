@@ -10,7 +10,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from newsagent.models import Field, PendingTaxonomySuggestion, Role
-from newsagent.models.pending_taxonomy_suggestion import STATUS_PENDING
+from newsagent.models.pending_taxonomy_suggestion import (
+    KIND_ROLE,
+    STATUS_APPROVED,
+    STATUS_PENDING,
+)
+
 
 # Generic starter Field content (PRD: PM authors initial seed, no real
 # dogfood-user data available yet) — mirrors DEFAULT_SOURCES's role in sources.py.
@@ -220,3 +225,79 @@ def list_pending_suggestions(db: Session) -> list[PendingSuggestionView]:
     ]
 
 
+
+
+class SuggestionNotPendingError(ValueError):
+    """Raised when a decision targets an already-approved/rejected suggestion.
+
+    Decided rows are terminal (AD-8) — a resubmission opens a fresh pending row
+    rather than reopening this one. Carries a stable `detail` dict so callers
+    identify the failure by code, not by string (same shape as
+    preferences.TopicCapExceededError)."""
+
+    def __init__(self) -> None:
+        self.detail = {"error": "suggestion_not_pending"}
+        super().__init__("Only a pending suggestion can be promoted or dismissed.")
+
+
+class RoleHasNoFieldError(ValueError):
+    """Raised when promoting a Role suggestion that has no Field to live under.
+
+    A Role typed as "Other" underneath a Field that was itself uncurated "Other"
+    text carries no field_id, and Role.field_id is a non-nullable FK — there is
+    no correct row to write. The admin promotes the parent Field first."""
+
+    def __init__(self) -> None:
+        self.detail = {"error": "role_has_no_field"}
+        super().__init__("Cannot promote a role suggestion that has no curated field.")
+
+
+def decide_pending_suggestion(
+    db: Session, suggestion_id: int, *, status: str, name: str | None = None
+) -> PendingSuggestionView | None:
+    """Promote a pending suggestion into the curated list, or dismiss it (FR-7).
+
+    Promoting does two separate things (AD-2): it upserts the real Field/Role
+    row, and it transitions the suggestion to `approved`. Dismissing only does
+    the latter, with `rejected`.
+
+    `name` lets the admin correct the curated spelling before it is written —
+    rows predating the `raw_text` column carry only casefolded text, which would
+    otherwise mint a lowercase Field. The suggestion row itself is never
+    rewritten; it stays a record of what the user actually typed.
+
+    Deliberately does NOT touch User.field_name/role_name: promotion does not
+    migrate earlier free-text submitters (PRD FR-7, AD-6).
+
+    Returns the updated view, or None if the id doesn't exist — same contract as
+    sources.set_source_status, which the router already 404s on.
+    """
+    row = db.get(PendingTaxonomySuggestion, suggestion_id)
+    if row is None:
+        return None
+    if row.status != STATUS_PENDING:
+        raise SuggestionNotPendingError()
+
+    if status == STATUS_APPROVED:
+        curated_name = (name or row.raw_text or row.normalized_text).strip()
+        if not curated_name:
+            raise ValueError("A promoted suggestion needs a non-empty name.")
+        if row.kind == KIND_ROLE:
+            if row.field_id is None:
+                raise RoleHasNoFieldError()
+            field = db.get(Field, row.field_id)
+            if field is None:
+                raise RoleHasNoFieldError()
+            add_role(db, field, curated_name)
+        else:
+            add_field(db, curated_name)
+
+    row.status = status
+    db.commit()
+    return PendingSuggestionView(
+        id=row.id,
+        kind=row.kind,
+        field_name=row.field.name if row.field is not None else None,
+        text=row.raw_text or row.normalized_text,
+        submission_count=row.submission_count,
+    )
