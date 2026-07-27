@@ -3,9 +3,16 @@ from sqlalchemy.orm import Session
 
 from newsagent.api.auth import require_user
 from newsagent.api.deps import get_db
-from newsagent.api.schemas import FieldOut, PreferenceUpdateIn, ProfileOut, ProfileUpdateIn, TopicPreferenceOut
-from newsagent.models import Field, User
-from newsagent.services import preferences, taxonomy
+from newsagent.api.schemas import (
+    FieldOut,
+    PreferenceUpdateIn,
+    ProfileOut,
+    ProfileUpdateIn,
+    RoleOut,
+    TopicPreferenceOut,
+)
+from newsagent.models import Field, Role, User
+from newsagent.services import preferences, profile, taxonomy
 
 router = APIRouter(prefix="/me", tags=["me"])
 
@@ -34,12 +41,27 @@ def list_my_fields(user: User = Depends(require_user), db: Session = Depends(get
     return taxonomy.list_fields(db)
 
 
+@router.get("/fields/{field_id}/roles", response_model=list[RoleOut])
+def list_my_roles(
+    field_id: int, user: User = Depends(require_user), db: Session = Depends(get_db)
+) -> list[Role]:
+    return taxonomy.list_roles(db, field_id)
+
+
 @router.put("/profile", response_model=ProfileOut)
 def update_my_profile(
     body: ProfileUpdateIn,
     user: User = Depends(require_user),
     db: Session = Depends(get_db),
 ) -> User:
-    return taxonomy.record_field_selection(
-        db, user, field_name=body.field_name, is_other=body.is_other
-    )
+    try:
+        return profile.save_profile(
+            db,
+            user,
+            field_name=body.field_name,
+            field_is_other=body.field_is_other,
+            role_name=body.role_name,
+            role_is_other=body.role_is_other,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error

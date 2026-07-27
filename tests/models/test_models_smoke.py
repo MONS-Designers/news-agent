@@ -12,6 +12,7 @@ from newsagent.models import (
     DigestArticle,
     Field,
     PendingTaxonomySuggestion,
+    Role,
     Source,
     Topic,
     User,
@@ -37,6 +38,7 @@ def test_create_and_query_one_row_per_table(session: Session):
     digest = Digest(user=user, date=date.today())
     digest_article = DigestArticle(digest=digest, article=article)
     field = Field(name="Tech")
+    role = Role(field=field, name="Software Engineer")
     pending_taxonomy_suggestion = PendingTaxonomySuggestion(
         kind="field", field_id=None, normalized_text="tech writer", status="pending"
     )
@@ -52,6 +54,7 @@ def test_create_and_query_one_row_per_table(session: Session):
             digest,
             digest_article,
             field,
+            role,
             pending_taxonomy_suggestion,
         ]
     )
@@ -66,4 +69,5 @@ def test_create_and_query_one_row_per_table(session: Session):
     assert session.query(Digest).count() == 1
     assert session.query(DigestArticle).count() == 1
     assert session.query(Field).count() == 1
+    assert session.query(Role).count() == 1
     assert session.query(PendingTaxonomySuggestion).count() == 1

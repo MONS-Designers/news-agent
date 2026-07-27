@@ -26,7 +26,7 @@
 
       <div class="panel" :key="currentStep">
         <div v-if="currentStep === 1" class="stagger">
-          <FieldStep @continue="currentStep = 2" />
+          <AboutYouStep @continue="currentStep = 2" />
         </div>
         <div v-else-if="currentStep === 2" class="stagger">
           <p class="placeholder">Interests step — coming in a later story.</p>
@@ -41,7 +41,7 @@
 
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from "vue";
-import FieldStep from "./FieldStep.vue";
+import AboutYouStep from "./AboutYouStep.vue";
 
 const steps = [
   { n: 1, label: "About you" },

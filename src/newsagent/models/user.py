@@ -22,6 +22,7 @@ class User(Base):
     # Profile: plain strings, not foreign keys — "Other" is a UI concept only,
     # a curated pick and a typed "Other" value are stored identically (AD-6).
     field_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    role_name: Mapped[str | None] = mapped_column(String, nullable=True)
 
     topic_preferences: Mapped[list["UserTopicPreference"]] = relationship(back_populates="user")
     digests: Mapped[list["Digest"]] = relationship(back_populates="user")

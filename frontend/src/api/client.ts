@@ -25,8 +25,21 @@ export interface FieldOption {
   name: string;
 }
 
+export interface RoleOption {
+  id: number;
+  name: string;
+}
+
 export interface Profile {
   field_name: string | null;
+  role_name: string | null;
+}
+
+export interface ProfileUpdate {
+  fieldName: string;
+  fieldIsOther: boolean;
+  roleName: string;
+  roleIsOther: boolean;
 }
 
 export class ApiError extends Error {
@@ -93,10 +106,19 @@ export async function listFields(): Promise<FieldOption[]> {
   return request("/me/fields");
 }
 
-export async function updateMyProfile(fieldName: string, isOther: boolean): Promise<Profile> {
+export async function listRoles(fieldId: number): Promise<RoleOption[]> {
+  return request(`/me/fields/${fieldId}/roles`);
+}
+
+export async function updateMyProfile(update: ProfileUpdate): Promise<Profile> {
   return request("/me/profile", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ field_name: fieldName, is_other: isOther }),
+    body: JSON.stringify({
+      field_name: update.fieldName,
+      field_is_other: update.fieldIsOther,
+      role_name: update.roleName,
+      role_is_other: update.roleIsOther,
+    }),
   });
 }

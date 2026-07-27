@@ -28,6 +28,7 @@ def main(argv: list[str] | None = None) -> int:
 
     subparsers.add_parser("seed-sources", help="Load the curated default topics + RSS sources")
     subparsers.add_parser("seed-fields", help="Load the curated default profile Fields")
+    subparsers.add_parser("seed-roles", help="Load the curated default profile Roles per Field")
     subparsers.add_parser("fetch", help="Fetch new articles from all approved sources")
     subparsers.add_parser("filter", help="Score pending articles for relevance to their topic")
     subparsers.add_parser("summarize", help="Summarize + translate relevant articles to Hebrew")
@@ -54,6 +55,12 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "seed-fields":
             field_report = taxonomy.seed_default_fields(db)
             print(f"Seeded: {field_report.fields_created} new fields")
+        elif args.command == "seed-roles":
+            role_report = taxonomy.seed_default_roles(db)
+            print(
+                f"Seeded: {role_report.fields_created} new fields, "
+                f"{role_report.roles_created} new roles"
+            )
         elif args.command == "fetch":
             fetch_report = fetcher.fetch_approved_sources(db)
             for result in fetch_report.results:

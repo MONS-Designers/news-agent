@@ -1,16 +1,22 @@
 import pytest
 from sqlalchemy import create_engine, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from newsagent.models import PendingTaxonomySuggestion, User
+from newsagent.models import PendingTaxonomySuggestion
 from newsagent.models.base import Base
 from newsagent.services.taxonomy import (
     DEFAULT_FIELDS,
+    DEFAULT_ROLES,
     add_field,
+    add_role,
+    find_field_by_name,
     list_fields,
+    list_roles,
     normalize_taxonomy_text,
-    record_field_selection,
+    record_pending_suggestion,
     seed_default_fields,
+    seed_default_roles,
 )
 
 
@@ -19,13 +25,7 @@ def db() -> Session:
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
     with Session(engine) as session:
-        session.add(User(email="user@example.com"))
-        session.commit()
         yield session
-
-
-def _user(db: Session) -> User:
-    return db.scalar(select(User).where(User.email == "user@example.com"))
 
 
 def test_add_field_is_idempotent(db: Session):
@@ -44,63 +44,161 @@ def test_list_fields_ordered_by_name(db: Session):
     assert names == ["Design", "Finance", "Tech"]
 
 
-def test_record_field_selection_curated(db: Session):
+def test_add_role_is_idempotent(db: Session):
+    field, _ = add_field(db, "Tech")
+
+    _, created = add_role(db, field, "Software Engineer")
+    assert created is True
+    _, created_again = add_role(db, field, "Software Engineer")
+    assert created_again is False
+
+
+def test_same_role_name_coexists_under_two_fields(db: Session):
+    healthcare, _ = add_field(db, "Healthcare")
+    education, _ = add_field(db, "Education")
+
+    add_role(db, healthcare, "Researcher")
+    add_role(db, education, "Researcher")
+
+    assert [r.name for r in list_roles(db, healthcare.id)] == ["Researcher"]
+    assert [r.name for r in list_roles(db, education.id)] == ["Researcher"]
+
+
+def test_list_roles_is_field_scoped_and_ordered(db: Session):
+    tech, _ = add_field(db, "Tech")
+    finance, _ = add_field(db, "Finance")
+    add_role(db, tech, "Product Manager")
+    add_role(db, tech, "Data Scientist")
+    add_role(db, finance, "Analyst")
+
+    assert [r.name for r in list_roles(db, tech.id)] == ["Data Scientist", "Product Manager"]
+
+
+def test_list_roles_for_unknown_field_is_empty(db: Session):
+    assert list_roles(db, 999) == []
+
+
+def test_find_field_by_name_matches_case_and_whitespace_variants(db: Session):
     add_field(db, "Tech")
-    user = _user(db)
 
-    record_field_selection(db, user, field_name="Tech", is_other=False)
-    db.refresh(user)
+    for variant in ("Tech", "tech", "  TECH  "):
+        found = find_field_by_name(db, variant)
+        assert found is not None
+        assert found.name == "Tech"
 
-    assert user.field_name == "Tech"
+
+def test_find_field_by_name_returns_none_for_uncurated_text(db: Session):
+    add_field(db, "Tech")
+    assert find_field_by_name(db, "Marine Biology") is None
+
+
+def test_record_pending_suggestion_does_not_commit(db: Session):
+    """profile.save_profile owns the single commit — this helper must only stage
+    the write, so a later failure rolls the whole save back (AC #9)."""
+    record_pending_suggestion(db, kind="field", field_id=None, text="Marine Biology")
+    db.rollback()
+
     assert db.scalar(select(PendingTaxonomySuggestion)) is None
 
 
-def test_record_field_selection_other_creates_pending_suggestion(db: Session):
-    user = _user(db)
+def test_record_pending_suggestion_scopes_match_by_kind_and_field(db: Session):
+    tech, _ = add_field(db, "Tech")
+    finance, _ = add_field(db, "Finance")
 
-    record_field_selection(db, user, field_name="Marine Biology", is_other=True)
-    db.refresh(user)
-
-    assert user.field_name == "Marine Biology"
-    suggestion = db.scalar(select(PendingTaxonomySuggestion))
-    assert suggestion is not None
-    assert suggestion.kind == "field"
-    assert suggestion.field_id is None
-    assert suggestion.normalized_text == normalize_taxonomy_text("Marine Biology")
-    assert suggestion.submission_count == 1
-    assert suggestion.status == "pending"
-
-
-def test_record_field_selection_other_increments_matching_pending_submission(db: Session):
-    user_a = _user(db)
-    db.add(User(email="user2@example.com"))
+    record_pending_suggestion(db, kind="role", field_id=tech.id, text="DevRel")
+    record_pending_suggestion(db, kind="role", field_id=finance.id, text="DevRel")
+    record_pending_suggestion(db, kind="field", field_id=None, text="DevRel")
     db.commit()
-    user_b = db.scalar(select(User).where(User.email == "user2@example.com"))
-
-    record_field_selection(db, user_a, field_name="Marine Biology", is_other=True)
-    record_field_selection(db, user_b, field_name="marine   biology", is_other=True)  # different case/spacing
 
     suggestions = db.scalars(select(PendingTaxonomySuggestion)).all()
-    assert len(suggestions) == 1
-    assert suggestions[0].submission_count == 2
+    assert len(suggestions) == 3
+    assert all(s.submission_count == 1 for s in suggestions)
 
 
-def test_record_field_selection_other_does_not_reuse_decided_suggestion(db: Session):
-    user = _user(db)
-    normalized = normalize_taxonomy_text("Marine Biology")
-    decided = PendingTaxonomySuggestion(
-        kind="field", field_id=None, normalized_text=normalized, status="approved", submission_count=1
+def test_seed_default_roles_creates_roles_under_their_fields(db: Session):
+    report = seed_default_roles(db)
+
+    assert report.roles_created == sum(len(roles) for roles in DEFAULT_ROLES.values())
+    tech = find_field_by_name(db, "Tech")
+    assert tech is not None
+    assert [r.name for r in list_roles(db, tech.id)] == sorted(DEFAULT_ROLES["Tech"])
+
+
+def test_seed_default_roles_is_idempotent(db: Session):
+    seed_default_roles(db)
+    report = seed_default_roles(db)
+
+    assert report.roles_created == 0
+    assert report.fields_created == 0
+
+
+def test_normalize_strips_invisible_bidi_marks():
+    """A Hebrew/Arabic IME inserts category-Cf marks that render as nothing —
+    without stripping them the queue grows lookalike duplicate rows."""
+    with_rlm = "‏Tech‎"
+    assert normalize_taxonomy_text(with_rlm) == normalize_taxonomy_text("Tech")
+
+
+def test_normalize_unifies_unicode_composition():
+    decomposed = "Café"  # macOS submits NFD
+    composed = "Café"
+    assert normalize_taxonomy_text(decomposed) == normalize_taxonomy_text(composed)
+
+
+def test_open_suggestions_are_unique_per_field_row(db: Session):
+    """The partial unique index must cover kind='field' rows too — their
+    field_id is always NULL, and NULLs never collide in a plain unique index."""
+    record_pending_suggestion(db, kind="field", field_id=None, text="Marine Biology")
+    db.commit()
+
+    db.add(
+        PendingTaxonomySuggestion(
+            kind="field",
+            field_id=None,
+            normalized_text=normalize_taxonomy_text("Marine Biology"),
+            submission_count=1,
+            status="pending",
+        )
     )
-    db.add(decided)
+    with pytest.raises(IntegrityError):
+        db.commit()
+
+
+def test_open_suggestions_are_unique_per_role_row(db: Session):
+    field, _ = add_field(db, "Tech")
+    record_pending_suggestion(db, kind="role", field_id=field.id, text="DevRel")
     db.commit()
 
-    record_field_selection(db, user, field_name="Marine Biology", is_other=True)
+    db.add(
+        PendingTaxonomySuggestion(
+            kind="role",
+            field_id=field.id,
+            normalized_text=normalize_taxonomy_text("DevRel"),
+            submission_count=1,
+            status="pending",
+        )
+    )
+    with pytest.raises(IntegrityError):
+        db.commit()
 
-    suggestions = db.scalars(select(PendingTaxonomySuggestion)).all()
-    statuses = sorted(s.status for s in suggestions)
-    assert statuses == ["approved", "pending"]
-    fresh_pending = next(s for s in suggestions if s.status == "pending")
-    assert fresh_pending.submission_count == 1
+
+def test_decided_suggestions_are_exempt_from_the_unique_index(db: Session):
+    """The same text may legitimately be rejected, resubmitted and rejected
+    again — only open rows are constrained."""
+    normalized = normalize_taxonomy_text("Marine Biology")
+    for _ in range(2):
+        db.add(
+            PendingTaxonomySuggestion(
+                kind="field",
+                field_id=None,
+                normalized_text=normalized,
+                submission_count=1,
+                status="rejected",
+            )
+        )
+    db.commit()
+
+    assert db.query(PendingTaxonomySuggestion).count() == 2
 
 
 def test_normalize_taxonomy_text_case_and_whitespace():

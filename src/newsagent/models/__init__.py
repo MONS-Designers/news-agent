@@ -5,6 +5,7 @@ from newsagent.models.digest import Digest
 from newsagent.models.digest_article import DigestArticle
 from newsagent.models.field import Field
 from newsagent.models.pending_taxonomy_suggestion import PendingTaxonomySuggestion
+from newsagent.models.role import Role
 from newsagent.models.source import Source
 from newsagent.models.topic import Topic
 from newsagent.models.user import User
@@ -21,5 +22,6 @@ __all__ = [
     "Digest",
     "DigestArticle",
     "Field",
+    "Role",
     "PendingTaxonomySuggestion",
 ]
