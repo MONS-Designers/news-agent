@@ -103,6 +103,43 @@ so that I have a clear, low-effort starting point instead of a blank grid.
 - [Source: EXPERIENCE.md#Component-Patterns, #State-Patterns, #Accessibility-Floor] — chip/button behavioral spec, step-mount animation, the div-vs-button gap this story starts closing.
 - [Source: epics.md#Story-1.1] — this story's acceptance criteria, verbatim.
 
+### Review Findings
+
+*Code review 2026-07-26 (Opus, 3 parallel layers: adversarial / edge-case / acceptance-audit). Severity assigned by consequence to the end user.*
+
+**Decisions needed** (block the patches below — the correct fix is ambiguous without a product call):
+
+- [ ] [Review][Decision] `is_other` is client-declared, so the admin review queue is trivially bypassed — `PUT /me/profile {"field_name":"anything","is_other":false}` returns 200, stores arbitrary text as if it were curated, and creates **no** `PendingTaxonomySuggestion`. Verified empirically. Options: (a) server rejects a non-curated name with 400 when `is_other=false`; (b) server ignores the client flag entirely and *derives* it by case/whitespace-normalized lookup against `Field.name` (also fixes "Other" text that duplicates an existing curated Field). [HIGH]
+- [ ] [Review][Decision] No DB backstop for the AD-8 "one pending row per normalized text" rule — `taxonomy.py:69-88` is a non-atomic SELECT-then-INSERT, so two concurrent "Other" submissions create two `submission_count=1` rows instead of one at 2, corrupting the exact demand signal Epic 2 ranks by. My recorded justification for skipping the constraint was incomplete: a **partial** unique index (`WHERE status='pending'`, supported by SQLite) satisfies both AD-8 and the repeat-decision edge case I cited. Add it now, or accept app-level-only for a 2-user MVP? [MEDIUM]
+- [ ] [Review][Decision] `PendingTaxonomySuggestion` stores only casefolded `normalized_text`, so the submission's display form is lost before Story 2.2 needs it — promoting "Marine Biology" would mint a lowercase `Field` sitting next to "Tech"/"Finance". Add a `raw_text` column now (one-line migration) or backfill after Epic 2 ships? [MEDIUM]
+- [ ] [Review][Decision] `PUT /me/profile` with required `field_name` + scalar `is_other` cannot express "Field curated, Role Other" — Story 1.2 must rewrite the contract rather than extend it. Switch to `PATCH` with all-optional fields now, before 1.2 builds on it? [MEDIUM]
+- [ ] [Review][Decision] Profile mutation lives in `services/taxonomy.py`, but ARCHITECTURE-SPINE § Structural Seed names `services/profile.py`, and Story 1.6's AD-5 BackgroundTask fires on profile save. Move it now or let 1.6 migrate it? [LOW]
+
+**Patches** (unambiguous fixes):
+
+- [ ] [Review][Patch] Save failure is silently swallowed — `onContinue` is `try/finally` with no `catch`; on 401/500 the step never advances and the user gets zero feedback, forever [frontend/src/components/profile-picker/FieldStep.vue:83] [HIGH]
+- [ ] [Review][Patch] No input validation — empty, whitespace-only, and unbounded-length `field_name` all accepted; whitespace-only creates a permanent empty-`normalized_text` row at the top of the Epic 2 queue (verified empirically) [src/newsagent/api/schemas/profile.py:5] [HIGH]
+- [ ] [Review][Patch] AC-2's *staggered* entrance was never implemented — `.stagger` is applied to three whole-step wrappers with no `animation-delay` anywhere, so the step fades in as one block; the approved mockup staggers every child at .02–.26s [frontend/src/components/profile-picker/ProfilePickerShell.vue:28-36,284] [MEDIUM]
+- [ ] [Review][Patch] Correct false claims in this story's own Dev Agent Record: "24 new tests" (actual: 14 — 9 service + 5 router; the smoke file gained assertions, not tests); the claimed composite index on `(kind, field_id, normalized_text, status)` (actual: three single-column indexes, none on `field_id`); and the AD-1 claim that the service "raises `ValueError`, router translates to `HTTPException(400)`" (no such code exists) [MEDIUM]
+- [ ] [Review][Patch] Normalization misses zero-width and bidi marks (category `Cf`) and Unicode NFC/NFD — `"‏Tech"` from an RTL/Hebrew IME and NFD `"Café"` each create duplicate queue rows; this is a Hebrew-first product [src/newsagent/services/taxonomy.py:22] [MEDIUM]
+- [ ] [Review][Patch] `field_name` is persisted raw and unstripped, so `"  Tech  "` will never match curated `"Tech"` at the AD-6 name-lookup this design depends on [src/newsagent/services/taxonomy.py:65] [MEDIUM]
+- [ ] [Review][Patch] Accessibility gaps in the very controls this story introduced: no `:focus-visible` styles anywhere in the picker, `outline: none` on the "Other" input with no replacement, and disabled Continue keeps `pointer-events:none` but stays in the tab order with no `disabled`/`tabindex="-1"` — a keyboard user tabs to it, presses Enter, gets silence [frontend/src/components/profile-picker/FieldStep.vue:44-51,180] [MEDIUM]
+- [ ] [Review][Patch] `loading` initialises to `false`, so the success branch paints before `onMounted` runs — the picker mounts, fires `GET /me/fields`, flashes "No topics available", unmounts, and remounts, firing the request a second time [frontend/src/views/PreferencesView.vue:77] [MEDIUM]
+- [ ] [Review][Patch] Unthrottled global `mousemove` repositions three `blur(70px)` orbs behind a `backdrop-filter: blur(18px)` panel, forcing a full backdrop recomposite on every pointer pixel anywhere on the page (and unlike the scroll listener beside it, not `{passive:true}`) [frontend/src/components/profile-picker/ProfilePickerShell.vue:110] [MEDIUM]
+- [ ] [Review][Patch] Weak tests: `assert seeded_db.scalar(select(Field)) is not None` two lines after the test inserts that Field cannot fail; no negative-path coverage (bogus `is_other=false`, empty input, curated-duplicate "Other"); `KIND_ROLE` and the `field_id` relationship ship entirely untested [tests/api/routers/test_me.py:47] [MEDIUM]
+- [ ] [Review][Patch] `seed-fields` is documented nowhere and is in no deploy path — on a fresh install the chip row renders "Other" only, indistinguishable from a failed fetch, silently failing AC-3 [src/newsagent/cli.py:54] [MEDIUM]
+- [ ] [Review][Patch] DESIGN.md layout/token drift: no 640px `chrome-max-width` cap applied; `.step-dot` border `0.15` vs token `0.09`; active dot background `0.25` vs `{colors.accent-soft}` `0.14`; `.load-error` introduces `#e5555f`, a second chromatic accent the spec's Do/Don't table forbids; specced stepper connecting line absent [frontend/src/components/profile-picker/ProfilePickerShell.vue:241,255] [LOW]
+- [ ] [Review][Patch] Toggling curated → "Other" again resubmits stale `otherText`; `selectOther()` clears nothing [frontend/src/components/profile-picker/FieldStep.vue:79] [LOW]
+- [ ] [Review][Patch] `"FieldOut"` appended after `"SourceStatusUpdate"`, breaking the alphabetical `__all__` it was inserted into [src/newsagent/api/schemas/__init__.py] [LOW]
+
+**Deferred:**
+
+- [x] [Review][Defer] No `GET /me/profile`, and picker state lives inside `FieldStep` and dies on unmount — a returning user sees a blank picker, and clicking Reload discards in-progress input. Story 1.3's AC ("previously selected Field/Role/Experience still show as selected") owns this. — deferred to Story 1.3
+- [x] [Review][Defer] No Back navigation; Continue dead-ends into placeholder steps 2/3. EXPERIENCE.md requires Back always available, but steps 2/3 are stubs by design here. — deferred to Story 1.4
+- [x] [Review][Defer] Not responsive; stepper overflows below ~375px, no media queries. — deferred, tracked as news-agent#30
+- [x] [Review][Defer] `add_field` get-or-create is TOCTOU-racy against `ix_fields_name` with no rollback, aborting `seed_default_fields` mid-loop. — deferred, pre-existing: faithfully mirrors `add_topic`/`add_source`
+- [x] [Review][Defer] Editable install of `newsagent` resolves to `.claude/worktrees/github-issues-review-6e1f99`; `alembic` from a plain shell compares against another branch's models. — deferred, pre-existing environment issue
+
 ## Dev Agent Record
 
 ### Agent Model Used
