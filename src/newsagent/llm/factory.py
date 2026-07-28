@@ -3,10 +3,12 @@
 
 from newsagent.config import settings
 from newsagent.llm.base import LLMProvider
+from newsagent.llm.external import ExternalLLMProvider
 from newsagent.llm.mock import MockLLMProvider
 
 _PROVIDERS: dict[str, type[LLMProvider]] = {
     "mock": MockLLMProvider,
+    "external": ExternalLLMProvider,
 }
 
 

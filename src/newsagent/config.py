@@ -1,3 +1,4 @@
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -31,6 +32,18 @@ class Settings(BaseSettings):
     # Publicly reachable base URL of this API — used to build the open-tracking
     # pixel URL embedded in outgoing digest emails.
     backend_base_url: str = "http://127.0.0.1:8000"
+
+    # External LLM (llm_provider="external", articles) — unprefixed, shared
+    # with no other adapter.
+    external_llm_base_url: str = Field(default="", alias="EXTERNAL_LLM_BASE_URL")
+    external_llm_auth_token: str = Field(default="", alias="EXTERNAL_LLM_AUTH_TOKEN")
+    external_llm_model: str = Field(default="", alias="EXTERNAL_LLM_MODEL")
+
+    # Local LLM (suggestion_provider="llm", profile suggestions) — unprefixed,
+    # deliberately separate config from external_llm_* (AD-3).
+    local_llm_base_url: str = Field(default="", alias="LOCAL_LLM_BASE_URL")
+    local_llm_auth_token: str = Field(default="", alias="LOCAL_LLM_AUTH_TOKEN")
+    local_llm_model: str = Field(default="", alias="LOCAL_LLM_MODEL")
 
 
 settings = Settings()

@@ -3,10 +3,12 @@
 
 from newsagent.config import settings
 from newsagent.suggestions.base import SuggestionSource
+from newsagent.suggestions.llm import LLMSuggestionSource
 from newsagent.suggestions.popularity import PopularitySuggestionSource
 
 _PROVIDERS: dict[str, type[SuggestionSource]] = {
     "popularity": PopularitySuggestionSource,
+    "llm": LLMSuggestionSource,
 }
 
 
