@@ -5,14 +5,18 @@ from sqlalchemy.orm import Session
 from newsagent.models import PendingTaxonomySuggestion, User
 from newsagent.models.base import Base
 from newsagent.models.user import SUGGESTION_STATUS_NONE, SUGGESTION_STATUS_PENDING
+from newsagent.services import profile as profile_module
 from newsagent.services.profile import (
     EXPERIENCE_BUCKETS,
     INVALID_PROFILE,
     MAX_INTEREST_LENGTH,
     MAX_NAME_LENGTH,
     save_profile,
+    suggest_prompts_for_user,
 )
 from newsagent.services.taxonomy import add_field, add_role, normalize_taxonomy_text
+from newsagent.suggestions.errors import SuggestionError
+from newsagent.suggestions.types import PromptText
 
 
 @pytest.fixture
@@ -456,3 +460,67 @@ def test_second_successful_save_bumps_seq_again(db: Session):
 
     assert user.suggestion_status == SUGGESTION_STATUS_PENDING
     assert user.suggestion_request_seq == 2
+
+
+# --- suggest_prompts_for_user (Role and Prompt Suggestions story) ---------
+
+
+class _FakeSource:
+    """Minimal double for get_suggestion_source()'s return value — only
+    suggest_prompts is exercised here."""
+
+    def __init__(self, texts: list[str] | None = None, error: Exception | None = None):
+        self._texts = texts or []
+        self._error = error
+        self.calls: list[tuple] = []
+
+    def suggest_prompts(self, *, field_name=None, role_name=None, experience_bucket=None):
+        self.calls.append((field_name, role_name, experience_bucket))
+        if self._error is not None:
+            raise self._error
+        return [PromptText(text=text) for text in self._texts]
+
+
+def test_suggest_prompts_for_user_returns_texts_using_saved_profile(
+    db: Session, monkeypatch: pytest.MonkeyPatch
+):
+    add_field(db, "Tech")
+    user = _user(db)
+    _save(db, user, field_name="Tech", experience_bucket="3-5")
+    user.role_name = "Software Engineer"
+
+    source = _FakeSource(texts=["What excites you about AI?", "Any favorite newsletters?"])
+    monkeypatch.setattr(profile_module, "get_suggestion_source", lambda: source)
+
+    result = suggest_prompts_for_user(user)
+
+    assert result == ["What excites you about AI?", "Any favorite newsletters?"]
+    assert source.calls == [("Tech", "Software Engineer", "3-5")]
+
+
+def test_suggest_prompts_for_user_returns_empty_on_suggestion_error(
+    db: Session, monkeypatch: pytest.MonkeyPatch
+):
+    user = _user(db)
+    source = _FakeSource(error=SuggestionError("local LLM unreachable"))
+    monkeypatch.setattr(profile_module, "get_suggestion_source", lambda: source)
+
+    assert suggest_prompts_for_user(user) == []
+
+
+def test_suggest_prompts_for_user_caps_at_three(db: Session, monkeypatch: pytest.MonkeyPatch):
+    """FR-5: "up to 3" is a contract of the service, not just a frontend
+    .slice(0, 3) — the API itself must not return more."""
+    user = _user(db)
+    source = _FakeSource(texts=[f"Prompt {i}" for i in range(5)])
+    monkeypatch.setattr(profile_module, "get_suggestion_source", lambda: source)
+
+    assert suggest_prompts_for_user(user) == ["Prompt 0", "Prompt 1", "Prompt 2"]
+
+
+def test_suggest_prompts_for_user_skips_blank_prompts(db: Session, monkeypatch: pytest.MonkeyPatch):
+    user = _user(db)
+    source = _FakeSource(texts=["  ", "What excites you about AI?"])
+    monkeypatch.setattr(profile_module, "get_suggestion_source", lambda: source)
+
+    assert suggest_prompts_for_user(user) == ["What excites you about AI?"]

@@ -31,11 +31,25 @@ class SuggestionSource(ABC):
 
     # -- public contract -----------------------------------------------------
 
-    def suggest_roles(self, field_name: str) -> list[RoleOption]:
-        return self._run(lambda: self._suggest_roles(field_name))
+    def suggest_roles(
+        self, field_name: str, *, existing_roles: Sequence[str] = ()
+    ) -> list[RoleOption]:
+        return self._run(lambda: self._suggest_roles(field_name, existing_roles=existing_roles))
 
-    def suggest_prompts(self) -> list[PromptText]:
-        return self._run(lambda: self._suggest_prompts())
+    def suggest_prompts(
+        self,
+        *,
+        field_name: str | None = None,
+        role_name: str | None = None,
+        experience_bucket: str | None = None,
+    ) -> list[PromptText]:
+        return self._run(
+            lambda: self._suggest_prompts(
+                field_name=field_name,
+                role_name=role_name,
+                experience_bucket=experience_bucket,
+            )
+        )
 
     def suggest_topics(
         self,
@@ -57,10 +71,18 @@ class SuggestionSource(ABC):
     # -- adapter surface -----------------------------------------------------
 
     @abstractmethod
-    def _suggest_roles(self, field_name: str) -> list[RoleOption]: ...
+    def _suggest_roles(
+        self, field_name: str, *, existing_roles: Sequence[str] = ()
+    ) -> list[RoleOption]: ...
 
     @abstractmethod
-    def _suggest_prompts(self) -> list[PromptText]: ...
+    def _suggest_prompts(
+        self,
+        *,
+        field_name: str | None = None,
+        role_name: str | None = None,
+        experience_bucket: str | None = None,
+    ) -> list[PromptText]: ...
 
     @abstractmethod
     def _suggest_topics(

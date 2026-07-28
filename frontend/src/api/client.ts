@@ -34,8 +34,8 @@ export interface FieldOption {
 }
 
 export interface RoleOption {
-  id: number;
   name: string;
+  isCurated: boolean;
 }
 
 export interface Profile {
@@ -139,8 +139,18 @@ export async function listFields(): Promise<FieldOption[]> {
   return request("/me/fields");
 }
 
+interface RoleOptionDto {
+  name: string;
+  is_curated: boolean;
+}
+
 export async function listRoles(fieldId: number): Promise<RoleOption[]> {
-  return request(`/me/fields/${fieldId}/roles`);
+  const rows = await request<RoleOptionDto[]>(`/me/fields/${fieldId}/roles`);
+  return rows.map((row) => ({ name: row.name, isCurated: row.is_curated }));
+}
+
+export async function getPromptSuggestions(): Promise<string[]> {
+  return request("/me/prompt-suggestions");
 }
 
 export async function getTopicSuggestions(): Promise<TopicSuggestions> {

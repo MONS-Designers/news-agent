@@ -15,6 +15,17 @@ from newsagent.models.pending_taxonomy_suggestion import (
     STATUS_APPROVED,
     STATUS_PENDING,
 )
+from newsagent.suggestions.errors import SuggestionError
+from newsagent.suggestions.factory import get_suggestion_source
+
+# Role picker cap (Story: Role and Prompt Suggestions) — curated Roles always
+# shown first, LLM-invented names fill any remaining slots up to this count.
+ROLE_SUGGESTION_CAP = 10
+
+# Mirrors services/profile.py's MAX_NAME_LENGTH — an LLM-suggested name past
+# this (or blank) would fail save_profile's own check anyway, so it is
+# filtered out here rather than offered as a chip that can't actually be saved.
+ROLE_NAME_MAX_LENGTH = 100
 
 
 # Generic starter Field content (PRD: PM authors initial seed, no real
@@ -106,6 +117,59 @@ def find_role_by_name(db: Session, field_id: int, name: str) -> Role | None:
         if normalize_taxonomy_text(role.name) == normalized:
             return role
     return None
+
+
+@dataclass(frozen=True)
+class RoleSuggestionView:
+    """One Role option shown in the Step 1 Role picker — either curated (already
+    a `Role` row) or LLM-invented and not yet reviewed. The router serializes
+    this, never a raw `Role`, so an uncurated suggestion has somewhere to live
+    without a real `Role.id` (AD-1)."""
+
+    name: str
+    is_curated: bool
+
+
+def suggest_roles_for_field(db: Session, field: Field) -> list[RoleSuggestionView]:
+    """Up to `ROLE_SUGGESTION_CAP` Role options for the Step 1 picker: curated
+    Roles first (already vetted), then LLM-invented names not duplicating any
+    curated Role (`normalize_taxonomy_text`, AD-6), filling any remaining slots.
+
+    If curated Roles alone already reach the cap, they are capped at exactly
+    `ROLE_SUGGESTION_CAP` and the LLM is not called at all — there is nothing
+    for it to contribute. If the LLM call fails, the curated list is still
+    returned in full (up to the cap) — a suggestion failure never blocks Role
+    selection, it just means no new names this time.
+    """
+    curated = list_roles(db, field.id)
+    views = [
+        RoleSuggestionView(name=role.name, is_curated=True)
+        for role in curated[:ROLE_SUGGESTION_CAP]
+    ]
+    if len(curated) >= ROLE_SUGGESTION_CAP:
+        return views
+
+    try:
+        suggested = get_suggestion_source().suggest_roles(
+            field.name, existing_roles=[role.name for role in curated]
+        )
+    except SuggestionError:
+        suggested = []
+
+    seen = {normalize_taxonomy_text(role.name) for role in curated}
+    for option in suggested:
+        if len(views) >= ROLE_SUGGESTION_CAP:
+            break
+        name = option.name.strip()
+        if not name or len(name) > ROLE_NAME_MAX_LENGTH:
+            continue
+        normalized = normalize_taxonomy_text(name)
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        views.append(RoleSuggestionView(name=name, is_curated=False))
+
+    return views
 
 
 @dataclass

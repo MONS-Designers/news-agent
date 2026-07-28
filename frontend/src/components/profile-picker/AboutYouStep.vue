@@ -124,7 +124,13 @@ const selectedField = computed(() =>
   fieldIsOther.value ? null : (fields.value.find((f) => f.name === fieldName.value) ?? null),
 );
 
-const rolePlaceholder = computed(() => (fieldSatisfied.value ? null : "Pick a field first"));
+const rolesLoading = ref(false);
+
+const rolePlaceholder = computed(() => {
+  if (!fieldSatisfied.value) return "Pick a field first";
+  if (rolesLoading.value) return "Loading roles…";
+  return null;
+});
 
 // Changing the Field invalidates the Role: its options are Field-scoped, so a
 // role kept from the previous Field would no longer belong to anything.
@@ -143,11 +149,17 @@ watch([fieldName, fieldIsOther], async () => {
   const field = selectedField.value;
   if (!field) return; // an "Other" Field has no curated roles by definition
 
+  // The Role fetch now merges in an LLM call (Role and Prompt Suggestions
+  // story), so it can take noticeably longer than the old DB-only read —
+  // without this, the row just looks empty/broken for that stretch.
+  rolesLoading.value = true;
   try {
     const fetched = await listRoles(field.id);
     if (token === rolesFetchToken) roles.value = fetched;
   } catch {
     if (token === rolesFetchToken) loadError.value = true;
+  } finally {
+    if (token === rolesFetchToken) rolesLoading.value = false;
   }
 });
 

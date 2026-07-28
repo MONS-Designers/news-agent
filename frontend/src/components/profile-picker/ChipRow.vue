@@ -10,20 +10,20 @@
     <div v-else class="chip-row" role="group" :aria-label="label">
       <button
         v-for="option in options"
-        :key="option.id"
+        :key="option.id ?? option.name"
         type="button"
         class="chip"
-        :class="{ selected: selectedName === option.name && !isOther }"
-        :aria-pressed="selectedName === option.name && !isOther"
-        @click="selectCurated(option.name)"
+        :class="{ selected: isChipSelected(option) }"
+        :aria-pressed="isChipSelected(option)"
+        @click="selectChip(option)"
       >
         {{ option.name }}
       </button>
       <button
         type="button"
         class="chip chip-other"
-        :class="{ selected: isOther }"
-        :aria-pressed="isOther"
+        :class="{ selected: otherButtonActive }"
+        :aria-pressed="otherButtonActive"
         @click="selectOther"
       >
         Other
@@ -31,7 +31,7 @@
     </div>
 
     <input
-      v-if="isOther && !placeholderText"
+      v-if="otherButtonActive && !placeholderText"
       v-model="otherText"
       type="text"
       class="other-input"
@@ -43,14 +43,18 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from "vue";
+
 // Server-side bound (services/profile.py MAX_NAME_LENGTH). Mirrored here so the
 // input cannot produce a value the save will reject.
 const MAX_NAME_LENGTH = 100;
 
+type Option = { id?: number | null; name: string; isCurated?: boolean };
+
 defineProps<{
   stepNum: string;
   label: string;
-  options: { id: number; name: string }[];
+  options: Option[];
   otherPlaceholder: string;
   /** When set, the row renders this hint instead of any chips. */
   placeholderText: string | null;
@@ -60,10 +64,41 @@ const selectedName = defineModel<string | null>("selectedName", { required: true
 const isOther = defineModel<boolean>("isOther", { required: true });
 const otherText = defineModel<string>("otherText", { required: true });
 
+// True only when `isOther` is set by the real "Other" free-text button, not
+// by a not-yet-curated chip (selectNew also sets isOther=true, but keeps
+// selectedName pointed at the chip's name — selectOther clears it to null).
+// Derived, not local state: a parent resetting isOther/selectedName directly
+// (e.g. AboutYouStep.vue clearing the Role row on Field change) must not
+// leave this stale, since nothing else here would resync it.
+const otherButtonActive = computed(() => isOther.value && selectedName.value === null);
+
+function isChipSelected(option: Option): boolean {
+  if (option.isCurated ?? true) {
+    return selectedName.value === option.name && !isOther.value;
+  }
+  return selectedName.value === option.name;
+}
+
+function selectChip(option: Option) {
+  if (option.isCurated ?? true) {
+    selectCurated(option.name);
+  } else {
+    selectNew(option.name);
+  }
+}
+
 function selectCurated(name: string) {
   isOther.value = false;
   otherText.value = "";
   selectedName.value = name;
+}
+
+/** A not-yet-curated chip: saved exactly like typed "Other" text (same
+ * isOther/otherText model values), but rendered as a selected chip. */
+function selectNew(name: string) {
+  otherText.value = name;
+  selectedName.value = name;
+  isOther.value = true;
 }
 
 function selectOther() {

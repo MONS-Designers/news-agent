@@ -5,6 +5,18 @@
       <span class="step-label">Interests (optional)</span>
     </div>
 
+    <div v-if="promptSuggestions.length" class="prompt-chips" role="group" aria-label="Example prompts">
+      <button
+        v-for="(prompt, index) in promptSuggestions"
+        :key="`${index}-${prompt}`"
+        type="button"
+        class="prompt-chip"
+        @click="interestFreeText = prompt"
+      >
+        {{ prompt }}
+      </button>
+    </div>
+
     <textarea
       v-model="interestFreeText"
       class="interest-textarea"
@@ -31,14 +43,26 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
-import { updateMyProfile } from "@/api/client";
+import { onMounted, ref } from "vue";
+import { getPromptSuggestions, updateMyProfile } from "@/api/client";
 
 const emit = defineEmits<{ continue: []; back: [] }>();
 
 const interestFreeText = ref("");
 const saving = ref(false);
 const saveError = ref("");
+const promptSuggestions = ref<string[]>([]);
+
+// Illustrative only (FR-5) — clicking one just fills the textarea, still
+// freely editable; a fetch failure just means no hints show, same as the
+// pre-LLM behavior, so there's no error branch here.
+onMounted(async () => {
+  try {
+    promptSuggestions.value = (await getPromptSuggestions()).slice(0, 3);
+  } catch {
+    promptSuggestions.value = [];
+  }
+});
 
 /** Continue and Skip do the same thing here — Step 2 is never gated (PRD
  * FR-4). Both save whatever text exists (nothing to save if blank, so no API
@@ -91,6 +115,31 @@ async function advance() {
   letter-spacing: 2px;
   text-transform: uppercase;
   color: #6b7288;
+}
+
+.prompt-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.prompt-chip {
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: rgba(255, 255, 255, 0.02);
+  color: #8b93a7;
+  font-size: 12.5px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.prompt-chip:hover {
+  border-color: rgba(255, 255, 255, 0.22);
+  color: #c4cadb;
+}
+.prompt-chip:focus-visible {
+  outline: 2px solid #6d7bff;
+  outline-offset: 2px;
 }
 
 .interest-textarea {

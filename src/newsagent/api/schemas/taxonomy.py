@@ -10,10 +10,15 @@ class FieldOut(BaseModel):
     name: str
 
 class RoleOut(BaseModel):
+    """One Role option in the Step 1 picker — curated or LLM-suggested
+    (serialized from `taxonomy.RoleSuggestionView`, not a raw `Role` — an
+    uncurated suggestion has no real `Role.id`, so this carries no `id` at
+    all rather than a fake/optional one)."""
+
     model_config = ConfigDict(from_attributes=True)
 
-    id: int
     name: str
+    is_curated: bool
 
 
 class PendingTaxonomySuggestionOut(BaseModel):

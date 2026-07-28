@@ -19,8 +19,26 @@ def test_suggest_roles_returns_empty():
     assert PopularitySuggestionSource().suggest_roles("Tech") == []
 
 
+def test_suggest_roles_returns_empty_with_existing_roles_context():
+    assert (
+        PopularitySuggestionSource().suggest_roles(
+            "Tech", existing_roles=["Software Engineer"]
+        )
+        == []
+    )
+
+
 def test_suggest_prompts_returns_empty():
     assert PopularitySuggestionSource().suggest_prompts() == []
+
+
+def test_suggest_prompts_returns_empty_with_context():
+    assert (
+        PopularitySuggestionSource().suggest_prompts(
+            field_name="Tech", role_name="Software Engineer", experience_bucket="3-5"
+        )
+        == []
+    )
 
 
 def test_suggest_topics_with_no_profile_match_returns_non_empty_ranked_list():
@@ -86,11 +104,13 @@ class _FlakySource(SuggestionSource):
             self._fail_transient -= 1
             raise SuggestionTransportError("injected transient failure")
 
-    def _suggest_roles(self, field_name: str) -> list[RoleOption]:
+    def _suggest_roles(self, field_name: str, *, existing_roles=()) -> list[RoleOption]:
         self._maybe_fail()
         return []
 
-    def _suggest_prompts(self) -> list[PromptText]:
+    def _suggest_prompts(
+        self, *, field_name=None, role_name=None, experience_bucket=None
+    ) -> list[PromptText]:
         self._maybe_fail()
         return []
 

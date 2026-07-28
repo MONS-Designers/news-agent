@@ -32,6 +32,9 @@ MAX_INTEREST_LENGTH = 2000
 # frontend-only concern.
 EXPERIENCE_BUCKETS: list[str] = ["0-2", "3-5", "6-10", "10+"]
 
+# Cap for suggest_prompts_for_user (FR-5: "up to 3 example prompts").
+PROMPT_SUGGESTION_CAP = 3
+
 # One fixed message for every rejection cause. Which check failed (blank, too
 # long, not actually curated) is deliberately not disclosed — the frontend
 # validates before submitting, so a user only reaches this via a hand-built
@@ -201,6 +204,24 @@ def _apply(
     db.commit()
     db.refresh(user)
     return user
+
+
+def suggest_prompts_for_user(user: User) -> list[str]:
+    """Up to `PROMPT_SUGGESTION_CAP` illustrative example prompts for the
+    Interests step (FR-5), generated from the user's already-saved
+    Field/Role/Experience Bucket. Fetching never writes anything (FR-5) — a
+    failure just means no prompts show, matching the pre-LLM behavior, not an
+    error surfaced to the user."""
+    try:
+        prompts = get_suggestion_source().suggest_prompts(
+            field_name=user.field_name,
+            role_name=user.role_name,
+            experience_bucket=user.experience_bucket,
+        )
+    except SuggestionError:
+        return []
+    texts = [p.text.strip() for p in prompts if p.text.strip()]
+    return texts[:PROMPT_SUGGESTION_CAP]
 
 
 # -- Async suggestion computation (AD-5, AD-7) -------------------------------

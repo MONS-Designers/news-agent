@@ -44,12 +44,57 @@ def test_suggest_roles_parses_response():
     ]
 
 
+def test_suggest_roles_includes_existing_roles_in_the_prompt():
+    """existing_roles is context for the model, not something enforced
+    client-side — this just proves it reaches the request body."""
+    captured: dict[str, str] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["body"] = request.content.decode()
+        return _content_response(json.dumps({"roles": ["Backend Engineer"]}))
+
+    source = _source_with_handler(handler)
+    source.suggest_roles("Tech", existing_roles=["Software Engineer", "Product Manager"])
+
+    assert "Software Engineer" in captured["body"]
+    assert "Product Manager" in captured["body"]
+
+
 def test_suggest_prompts_parses_response():
     def handler(request: httpx.Request) -> httpx.Response:
         return _content_response(json.dumps({"prompts": ["I'm curious about AI safety"]}))
 
     source = _source_with_handler(handler)
     assert source.suggest_prompts() == [PromptText(text="I'm curious about AI safety")]
+
+
+def test_suggest_prompts_includes_context_in_the_prompt():
+    captured: dict[str, str] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["body"] = request.content.decode()
+        return _content_response(json.dumps({"prompts": ["I'm curious about AI safety"]}))
+
+    source = _source_with_handler(handler)
+    source.suggest_prompts(field_name="Tech", role_name="Software Engineer", experience_bucket="3-5")
+
+    assert "Tech" in captured["body"]
+    assert "Software Engineer" in captured["body"]
+    assert "3-5" in captured["body"]
+
+
+def test_suggest_prompts_omits_none_context_fields_from_the_prompt():
+    captured: dict[str, str] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["body"] = request.content.decode()
+        return _content_response(json.dumps({"prompts": []}))
+
+    source = _source_with_handler(handler)
+    source.suggest_prompts(field_name="Tech")
+
+    assert "ROLE" not in captured["body"]
+    assert "EXPERIENCE_BUCKET" not in captured["body"]
 
 
 def test_suggest_topics_parses_response():

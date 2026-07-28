@@ -1,8 +1,11 @@
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from newsagent.models import Field, PendingTaxonomySuggestion, Role, Topic
+from newsagent.services import taxonomy
+from newsagent.suggestions.types import RoleOption
 
 
 def test_unauthenticated_gets_401(client: TestClient):
@@ -131,10 +134,52 @@ def test_get_roles_is_scoped_to_the_field(as_user_with_db: TestClient, seeded_db
     assert [item["name"] for item in response.json()] == ["Data Scientist", "Software Engineer"]
 
 
-def test_get_roles_for_unknown_field_returns_empty_list(as_user_with_db: TestClient):
+def test_get_roles_for_unknown_field_returns_404(as_user_with_db: TestClient):
+    """Changed by the Role/Prompt Suggestions story: the endpoint now needs the
+    Field row itself (to pass field.name into the suggestion source), so a
+    missing field_id 404s instead of silently returning []."""
     response = as_user_with_db.get("/me/fields/999/roles")
+    assert response.status_code == 404
+
+
+def test_get_roles_includes_is_curated_flag(as_user_with_db: TestClient, seeded_db: Session):
+    tech = Field(name="Tech")
+    seeded_db.add(tech)
+    seeded_db.commit()
+    seeded_db.add(Role(field_id=tech.id, name="Software Engineer"))
+    seeded_db.commit()
+
+    response = as_user_with_db.get(f"/me/fields/{tech.id}/roles")
     assert response.status_code == 200
-    assert response.json() == []
+    assert response.json() == [{"name": "Software Engineer", "is_curated": True}]
+
+
+def test_get_roles_includes_llm_suggestion_as_not_curated(
+    as_user_with_db: TestClient, seeded_db: Session, monkeypatch: pytest.MonkeyPatch
+):
+    """The is_curated: false path (an LLM-invented, not-yet-curated Role) is
+    otherwise only exercised at the service level (test_taxonomy.py) — this
+    proves it also serializes correctly through the actual RoleOut/router
+    boundary, not just the RoleSuggestionView dataclass."""
+
+    class _FakeSource:
+        def suggest_roles(self, field_name: str, *, existing_roles=()):
+            return [RoleOption(name="Developer Relations")]
+
+    monkeypatch.setattr(taxonomy, "get_suggestion_source", lambda: _FakeSource())
+
+    tech = Field(name="Tech")
+    seeded_db.add(tech)
+    seeded_db.commit()
+    seeded_db.add(Role(field_id=tech.id, name="Software Engineer"))
+    seeded_db.commit()
+
+    response = as_user_with_db.get(f"/me/fields/{tech.id}/roles")
+    assert response.status_code == 200
+    assert response.json() == [
+        {"name": "Software Engineer", "is_curated": True},
+        {"name": "Developer Relations", "is_curated": False},
+    ]
 
 
 def test_put_profile_curated_role_saves_role_name(as_user_with_db: TestClient, seeded_db: Session):
@@ -327,3 +372,19 @@ def test_profile_save_triggers_background_computation_visible_via_get(
     body = get_response.json()
     assert body["suggestion_status"] == "ready"
     assert body["suggested_topic_ids"]  # non-empty — the 3 seeded topics
+
+
+# --- Prompt suggestions (Role and Prompt Suggestions story) -----------------
+
+
+def test_prompt_suggestions_unauthenticated_gets_401(client: TestClient):
+    response = client.get("/me/prompt-suggestions")
+    assert response.status_code == 401
+
+
+def test_prompt_suggestions_with_popularity_provider_is_empty(as_user_with_db: TestClient):
+    """PopularitySuggestionSource (the test default) has nothing to generate —
+    this is the same "no error, just no prompts" contract as an LLM failure."""
+    response = as_user_with_db.get("/me/prompt-suggestions")
+    assert response.status_code == 200
+    assert response.json() == []

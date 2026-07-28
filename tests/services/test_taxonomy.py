@@ -5,10 +5,13 @@ from sqlalchemy.orm import Session
 
 from newsagent.models import Field, PendingTaxonomySuggestion, Role, User
 from newsagent.models.base import Base
+from newsagent.services import taxonomy
 from newsagent.services.taxonomy import (
     DEFAULT_FIELDS,
     DEFAULT_ROLES,
+    ROLE_SUGGESTION_CAP,
     RoleHasNoFieldError,
+    RoleSuggestionView,
     SuggestionNotPendingError,
     add_field,
     add_role,
@@ -21,7 +24,10 @@ from newsagent.services.taxonomy import (
     record_pending_suggestion,
     seed_default_fields,
     seed_default_roles,
+    suggest_roles_for_field,
 )
+from newsagent.suggestions.errors import SuggestionError
+from newsagent.suggestions.types import RoleOption
 
 
 @pytest.fixture
@@ -462,3 +468,136 @@ def test_resubmitting_decided_text_opens_a_fresh_row(db: Session):
     assert len(views) == 1
     assert views[0].submission_count == 1
     assert db.query(PendingTaxonomySuggestion).count() == 2
+
+
+# --- suggest_roles_for_field (Role and Prompt Suggestions story) -----------
+
+
+class _FakeSource:
+    """Minimal double standing in for get_suggestion_source()'s return value —
+    only suggest_roles is exercised here, matching how LLMSuggestionSource's
+    own contract tests avoid spinning up the real HTTP path where possible."""
+
+    def __init__(self, names: list[str] | None = None, error: Exception | None = None):
+        self._names = names or []
+        self._error = error
+        self.calls: list[tuple[str, tuple[str, ...]]] = []
+
+    def suggest_roles(self, field_name: str, *, existing_roles=()):
+        self.calls.append((field_name, tuple(existing_roles)))
+        if self._error is not None:
+            raise self._error
+        return [RoleOption(name=name) for name in self._names]
+
+
+def _patch_source(monkeypatch: pytest.MonkeyPatch, source: _FakeSource) -> None:
+    monkeypatch.setattr(taxonomy, "get_suggestion_source", lambda: source)
+
+
+def test_suggest_roles_for_field_fills_all_ten_when_field_has_no_curated_roles(
+    db: Session, monkeypatch: pytest.MonkeyPatch
+):
+    field, _ = add_field(db, "Tech")
+    source = _FakeSource(names=[f"Role {i}" for i in range(10)])
+    _patch_source(monkeypatch, source)
+
+    views = suggest_roles_for_field(db, field)
+
+    assert views == [RoleSuggestionView(name=f"Role {i}", is_curated=False) for i in range(10)]
+    assert source.calls == [("Tech", ())]
+
+
+def test_suggest_roles_for_field_merges_curated_first_then_llm(
+    db: Session, monkeypatch: pytest.MonkeyPatch
+):
+    field, _ = add_field(db, "Tech")
+    add_role(db, field, "Software Engineer")
+    add_role(db, field, "Product Manager")
+    source = _FakeSource(names=["Backend Engineer", "Frontend Engineer"])
+    _patch_source(monkeypatch, source)
+
+    views = suggest_roles_for_field(db, field)
+
+    assert views == [
+        RoleSuggestionView(name="Product Manager", is_curated=True),
+        RoleSuggestionView(name="Software Engineer", is_curated=True),
+        RoleSuggestionView(name="Backend Engineer", is_curated=False),
+        RoleSuggestionView(name="Frontend Engineer", is_curated=False),
+    ]
+    assert source.calls == [("Tech", ("Product Manager", "Software Engineer"))]
+
+
+def test_suggest_roles_for_field_caps_curated_alone_at_ten_and_skips_llm_call(
+    db: Session, monkeypatch: pytest.MonkeyPatch
+):
+    field, _ = add_field(db, "Tech")
+    for i in range(12):
+        add_role(db, field, f"Role {i:02d}")
+    source = _FakeSource(names=["Should never appear"])
+    _patch_source(monkeypatch, source)
+
+    views = suggest_roles_for_field(db, field)
+
+    assert len(views) == ROLE_SUGGESTION_CAP
+    assert all(v.is_curated for v in views)
+    assert source.calls == []  # LLM never called — nothing for it to contribute
+
+
+def test_suggest_roles_for_field_caps_curated_plus_llm_fill_at_ten(
+    db: Session, monkeypatch: pytest.MonkeyPatch
+):
+    field, _ = add_field(db, "Tech")
+    add_role(db, field, "Software Engineer")
+    add_role(db, field, "Product Manager")
+    source = _FakeSource(names=[f"New Role {i}" for i in range(20)])
+    _patch_source(monkeypatch, source)
+
+    views = suggest_roles_for_field(db, field)
+
+    assert len(views) == ROLE_SUGGESTION_CAP
+    assert [v.name for v in views[:2]] == ["Product Manager", "Software Engineer"]
+    assert all(not v.is_curated for v in views[2:])
+
+
+def test_suggest_roles_for_field_dedupes_llm_names_against_curated(
+    db: Session, monkeypatch: pytest.MonkeyPatch
+):
+    field, _ = add_field(db, "Tech")
+    add_role(db, field, "Software Engineer")
+    source = _FakeSource(names=["  software   engineer ", "Backend Engineer"])
+    _patch_source(monkeypatch, source)
+
+    views = suggest_roles_for_field(db, field)
+
+    assert views == [
+        RoleSuggestionView(name="Software Engineer", is_curated=True),
+        RoleSuggestionView(name="Backend Engineer", is_curated=False),
+    ]
+
+
+def test_suggest_roles_for_field_falls_back_to_curated_only_on_suggestion_error(
+    db: Session, monkeypatch: pytest.MonkeyPatch
+):
+    field, _ = add_field(db, "Tech")
+    add_role(db, field, "Software Engineer")
+    source = _FakeSource(error=SuggestionError("local LLM unreachable"))
+    _patch_source(monkeypatch, source)
+
+    views = suggest_roles_for_field(db, field)
+
+    assert views == [RoleSuggestionView(name="Software Engineer", is_curated=True)]
+
+
+def test_suggest_roles_for_field_skips_blank_and_overlong_llm_names(
+    db: Session, monkeypatch: pytest.MonkeyPatch
+):
+    """A blank or oversized LLM-suggested name would fail save_profile's own
+    _clean() check anyway, so it should never reach the picker as a clickable
+    chip that can't actually be saved."""
+    field, _ = add_field(db, "Tech")
+    source = _FakeSource(names=["   ", "x" * 101, "Backend Engineer"])
+    _patch_source(monkeypatch, source)
+
+    views = suggest_roles_for_field(db, field)
+
+    assert views == [RoleSuggestionView(name="Backend Engineer", is_curated=False)]

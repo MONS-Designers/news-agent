@@ -1,4 +1,4 @@
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from newsagent.api.auth import require_user
@@ -12,7 +12,7 @@ from newsagent.api.schemas import (
     TopicPreferenceOut,
     TopicSuggestionsOut,
 )
-from newsagent.models import Field, Role, User
+from newsagent.models import Field, User
 from newsagent.services import preferences, profile, taxonomy
 
 router = APIRouter(prefix="/me", tags=["me"])
@@ -47,8 +47,11 @@ def list_my_fields(user: User = Depends(require_user), db: Session = Depends(get
 @router.get("/fields/{field_id}/roles", response_model=list[RoleOut])
 def list_my_roles(
     field_id: int, user: User = Depends(require_user), db: Session = Depends(get_db)
-) -> list[Role]:
-    return taxonomy.list_roles(db, field_id)
+) -> list[taxonomy.RoleSuggestionView]:
+    field = db.get(Field, field_id)
+    if field is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Field not found")
+    return taxonomy.suggest_roles_for_field(db, field)
 
 
 @router.put("/profile", response_model=ProfileOut)
@@ -83,3 +86,8 @@ def update_my_profile(
 @router.get("/topic-suggestions", response_model=TopicSuggestionsOut)
 def get_my_topic_suggestions(user: User = Depends(require_user)) -> User:
     return user
+
+
+@router.get("/prompt-suggestions", response_model=list[str])
+def get_my_prompt_suggestions(user: User = Depends(require_user)) -> list[str]:
+    return profile.suggest_prompts_for_user(user)

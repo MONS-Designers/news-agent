@@ -13,10 +13,18 @@ from newsagent.suggestions.types import PromptText, RoleOption, TopicPopularity,
 
 
 class PopularitySuggestionSource(SuggestionSource):
-    def _suggest_roles(self, field_name: str) -> list[RoleOption]:
+    def _suggest_roles(
+        self, field_name: str, *, existing_roles: Sequence[str] = ()
+    ) -> list[RoleOption]:
         return []
 
-    def _suggest_prompts(self) -> list[PromptText]:
+    def _suggest_prompts(
+        self,
+        *,
+        field_name: str | None = None,
+        role_name: str | None = None,
+        experience_bucket: str | None = None,
+    ) -> list[PromptText]:
         return []
 
     def _suggest_topics(
