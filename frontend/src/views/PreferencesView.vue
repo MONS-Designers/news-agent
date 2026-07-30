@@ -1,18 +1,10 @@
 <template>
   <div class="space-y-6">
-    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <h1 class="text-2xl font-semibold tracking-tight">My topic preferences</h1>
-        <p class="mt-1 text-sm text-neutral-500">
-          Choose which topics appear in your daily digest.
-        </p>
-      </div>
-      <button
-        @click="loadPreferences"
-        class="inline-flex items-center justify-center rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900"
-      >
-        Reload
-      </button>
+    <div>
+      <h1 class="text-2xl font-semibold tracking-tight">My topic preferences</h1>
+      <p class="mt-1 text-sm text-neutral-500">
+        Choose which topics appear in your daily digest.
+      </p>
     </div>
 
     <div v-if="loading" class="text-sm text-neutral-500">Loading…</div>
