@@ -38,7 +38,7 @@
           <AboutYouStep @continue="currentStep = 2" />
         </div>
         <div ref="step2El" v-show="currentStep === 2" class="stagger">
-          <InterestsStep @continue="currentStep = 3" @back="currentStep = 1" />
+          <InterestsStep :active="currentStep === 2" @continue="currentStep = 3" @back="currentStep = 1" />
         </div>
         <div ref="step3El" v-show="currentStep === 3" class="stagger">
           <TopicsStep

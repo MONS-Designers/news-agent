@@ -43,9 +43,10 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { watch, ref } from "vue";
 import { getPromptSuggestions, updateMyProfile } from "@/api/client";
 
+const props = defineProps<{ active: boolean }>();
 const emit = defineEmits<{ continue: []; back: [] }>();
 
 const interestFreeText = ref("");
@@ -55,14 +56,20 @@ const promptSuggestions = ref<string[]>([]);
 
 // Illustrative only (FR-5) — clicking one just fills the textarea, still
 // freely editable; a fetch failure just means no hints show, same as the
-// pre-LLM behavior, so there's no error branch here.
-onMounted(async () => {
-  try {
-    promptSuggestions.value = (await getPromptSuggestions()).slice(0, 3);
-  } catch {
-    promptSuggestions.value = [];
+// pre-LLM behavior, so there's no error branch here. Prompts are fetched
+// based on the user's saved profile from Step 1, so wait until this step
+// is active (meaning Step 1 has been saved) before fetching.
+watch(
+  () => props.active,
+  async (newActive: boolean) => {
+    if (!newActive) return;
+    try {
+      promptSuggestions.value = (await getPromptSuggestions()).slice(0, 3);
+    } catch {
+      promptSuggestions.value = [];
+    }
   }
-});
+);
 
 /** Continue and Skip do the same thing here — Step 2 is never gated (PRD
  * FR-4). Both save whatever text exists (nothing to save if blank, so no API
