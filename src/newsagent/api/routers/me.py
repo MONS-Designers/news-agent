@@ -54,6 +54,11 @@ def list_my_roles(
     return taxonomy.suggest_roles_for_field(db, field)
 
 
+@router.get("/profile", response_model=ProfileOut)
+def get_my_profile(user: User = Depends(require_user)) -> User:
+    return user
+
+
 @router.put("/profile", response_model=ProfileOut)
 def update_my_profile(
     body: ProfileUpdateIn,

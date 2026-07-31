@@ -1,5 +1,11 @@
 # Deferred Work
 
+## Deferred from: live manual testing of spec-topic-suggestions (2026-07-31)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-topic-suggestions.md`
+  summary: `_compute_and_store_suggestions` (`services/profile.py`) calls `suggest_topics` and `suggest_new_topics` sequentially — measured ~25s combined against the real configured OpenRouter model — so Step 3 shows "Finding suggestions for you…" for up to ~25-45s. GitHub issue: MONS-Designers/news-agent#36.
+  evidence: Confirmed live: the two calls independently took ~11.4s and ~14.0s (~25.4s total) against `z-ai/glm-5.2` via OpenRouter. The immediate symptom (a too-short frontend poll budget silently falling back to "current subscriptions," making the feature look broken) was already patched in `TopicsStep.vue` (poll budget widened ~8s -> ~45s) — but the underlying latency itself is untouched and still a poor first-run experience even though it now resolves correctly instead of timing out. Neither call depends on the other's output, so they're a candidate for parallelization (e.g. `asyncio.gather` if the suggestion-source interface moves async, or a `ThreadPoolExecutor` given the current synchronous `SuggestionSource` contract) rather than a UI-only fix — out of scope to fix inline during a bug report, flagged for a dedicated pass.
+
 ## Deferred from: code review of spec-topic-suggestions (2026-07-31)
 
 - source_spec: `_bmad-output/implementation-artifacts/spec-topic-suggestions.md`

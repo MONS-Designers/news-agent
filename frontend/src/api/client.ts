@@ -161,6 +161,10 @@ export async function getTopicSuggestions(): Promise<TopicSuggestions> {
   return request("/me/topic-suggestions");
 }
 
+export async function getMyProfile(): Promise<Profile> {
+  return request("/me/profile");
+}
+
 export async function updateMyProfile(update: ProfileUpdate): Promise<Profile> {
   // Only include keys the caller actually set — e.g. InterestsStep saves
   // interest_free_text alone; sending undefined Field/Role keys would falsely

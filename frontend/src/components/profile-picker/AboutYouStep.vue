@@ -69,6 +69,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import ChipRow from "./ChipRow.vue";
 import {
+  getMyProfile,
   listFields,
   listRoles,
   updateMyProfile,
@@ -103,6 +104,28 @@ const experienceBucket = ref<string | null>(null);
 const saving = ref(false);
 const loadError = ref(false);
 const saveError = ref("");
+
+const pendingRolePrefill = ref<string | null>(null);
+
+const initialSnapshot = ref<{
+  field: string | null;
+  role: string | null;
+  experienceBucket: string | null;
+} | null>(null);
+
+function effectiveField(): string | null {
+  return fieldIsOther.value ? fieldOtherText.value.trim() : fieldName.value;
+}
+function effectiveRole(): string | null {
+  return roleIsOther.value ? roleOtherText.value.trim() : roleName.value;
+}
+function captureSnapshot() {
+  initialSnapshot.value = {
+    field: effectiveField(),
+    role: effectiveRole(),
+    experienceBucket: experienceBucket.value,
+  };
+}
 
 /** A row is satisfied by a curated pick, or by "Other" with non-blank text. */
 function satisfied(selected: string | null, isOther: boolean, otherText: string): boolean {
@@ -140,6 +163,8 @@ let rolesFetchToken = 0;
 
 watch([fieldName, fieldIsOther], async () => {
   const token = ++rolesFetchToken;
+  const rolePrefill = pendingRolePrefill.value;
+  pendingRolePrefill.value = null;
 
   roleName.value = null;
   roleIsOther.value = false;
@@ -147,7 +172,10 @@ watch([fieldName, fieldIsOther], async () => {
   roles.value = [];
 
   const field = selectedField.value;
-  if (!field) return; // an "Other" Field has no curated roles by definition
+  if (!field) {
+    if (rolePrefill !== null) captureSnapshot(); // "Other" Field pre-fill, no Role row to resolve
+    return; // an "Other" Field has no curated roles by definition
+  }
 
   // The Role fetch now merges in an LLM call (Role and Prompt Suggestions
   // story), so it can take noticeably longer than the old DB-only read —
@@ -155,7 +183,21 @@ watch([fieldName, fieldIsOther], async () => {
   rolesLoading.value = true;
   try {
     const fetched = await listRoles(field.id);
-    if (token === rolesFetchToken) roles.value = fetched;
+    if (token === rolesFetchToken) {
+      roles.value = fetched;
+      if (rolePrefill !== null) {
+        const match = fetched.find((r) => r.name === rolePrefill);
+        if (match) {
+          roleName.value = match.name;
+          roleIsOther.value = false;
+        } else {
+          roleName.value = rolePrefill;
+          roleIsOther.value = true;
+          roleOtherText.value = rolePrefill;
+        }
+        captureSnapshot();
+      }
+    }
   } catch {
     if (token === rolesFetchToken) loadError.value = true;
   } finally {
@@ -165,6 +207,17 @@ watch([fieldName, fieldIsOther], async () => {
 
 async function onContinue() {
   if (!canContinue.value || saving.value) return;
+
+  if (
+    initialSnapshot.value &&
+    initialSnapshot.value.field === effectiveField() &&
+    initialSnapshot.value.role === effectiveRole() &&
+    initialSnapshot.value.experienceBucket === experienceBucket.value
+  ) {
+    emit("continue");
+    return;
+  }
+
   saving.value = true;
   saveError.value = "";
   try {
@@ -175,6 +228,7 @@ async function onContinue() {
       roleIsOther: roleIsOther.value,
       experienceBucket: experienceBucket.value,
     });
+    captureSnapshot();
     emit("continue");
   } catch {
     saveError.value = "Couldn't save. Check your connection and try again.";
@@ -185,7 +239,25 @@ async function onContinue() {
 
 onMounted(async () => {
   try {
-    fields.value = await listFields();
+    const [fetchedFields, profile] = await Promise.all([listFields(), getMyProfile()]);
+    fields.value = fetchedFields;
+    experienceBucket.value = profile.experience_bucket;
+
+    if (profile.field_name === null) {
+      captureSnapshot(); // brand-new user — nothing to pre-fill, snapshot is all-blank
+      return;
+    }
+
+    pendingRolePrefill.value = profile.role_name;
+    const curated = fetchedFields.some((f) => f.name === profile.field_name);
+    if (curated) {
+      fieldName.value = profile.field_name;
+      fieldIsOther.value = false;
+    } else {
+      fieldName.value = profile.field_name;
+      fieldIsOther.value = true;
+      fieldOtherText.value = profile.field_name;
+    }
   } catch {
     loadError.value = true;
   }

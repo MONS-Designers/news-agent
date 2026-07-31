@@ -28,7 +28,7 @@
           <span v-if="isPicked(chip)" class="x" aria-hidden="true">✕</span>
         </button>
       </div>
-      <p class="hint">Tap a faint topic to swap it in for one of your 4.</p>
+      <p class="hint">{{ capHintMessage || "Tap a faint topic to select it." }}</p>
     </template>
 
     <div class="nav-row">
@@ -52,7 +52,10 @@
 
 <script setup lang="ts">
 import { ref, watch } from "vue";
+import { useRouter } from "vue-router";
 import { getTopicSuggestions, listMyPreferences, updateMyPreferences } from "@/api/client";
+
+const router = useRouter();
 
 const props = defineProps<{ active: boolean }>();
 const emit = defineEmits<{ back: []; saved: [] }>();
@@ -123,14 +126,25 @@ async function pollForSuggestions() {
   };
 }
 
+const capHintMessage = ref("");
+let capHintTimer: ReturnType<typeof setTimeout> | undefined;
+
+function showCapHint() {
+  capHintMessage.value = "Deselect a topic first — you're at 4.";
+  clearTimeout(capHintTimer);
+  capHintTimer = setTimeout(() => {
+    capHintMessage.value = "";
+  }, 2500);
+}
+
 function toggleChip(chip: SuggestionChip) {
   const key = chipKey(chip);
   if (isPicked(chip)) {
     pickedChips.value = pickedChips.value.filter((pick) => chipKey(pick) !== key);
   } else if (pickedChips.value.length >= MAX_TOPICS) {
-    // FIFO swap: drop the oldest pick, add the newly-tapped one — keeps the
-    // total at exactly 4, matching "swaps it in for one of the 4."
-    pickedChips.value = [...pickedChips.value.slice(1), toPick(chip)];
+    // Never decide for the user which of their 4 to drop — do nothing and
+    // tell them why, instead of silently auto-swapping out the oldest pick.
+    showCapHint();
   } else {
     pickedChips.value = [...pickedChips.value, toPick(chip)];
   }
@@ -150,6 +164,7 @@ async function onSave() {
     await updateMyPreferences(topicIds, newTopicNames);
     saveMessage.value = "Saved.";
     emit("saved");
+    router.push("/");
   } catch {
     saveMessage.value = "Failed to save preferences.";
   } finally {

@@ -119,6 +119,33 @@ def test_put_profile_unauthenticated_gets_401(client: TestClient):
     assert response.status_code == 401
 
 
+def test_get_profile_unauthenticated_gets_401(client: TestClient):
+    response = client.get("/me/profile")
+    assert response.status_code == 401
+
+
+def test_get_profile_before_any_save_is_all_none(as_user_with_db: TestClient):
+    response = as_user_with_db.get("/me/profile")
+    assert response.status_code == 200
+    assert response.json() == {
+        "field_name": None,
+        "role_name": None,
+        "experience_bucket": None,
+        "interest_free_text": None,
+    }
+
+
+def test_get_profile_reflects_a_prior_save(as_user_with_db: TestClient, seeded_db: Session):
+    seeded_db.add(Field(name="Tech"))
+    seeded_db.commit()
+    as_user_with_db.put("/me/profile", json={"field_name": "Tech", "field_is_other": False})
+
+    response = as_user_with_db.get("/me/profile")
+
+    assert response.status_code == 200
+    assert response.json()["field_name"] == "Tech"
+
+
 def test_put_profile_curated_field_saves_field_name(as_user_with_db: TestClient, seeded_db: Session):
     seeded_db.add(Field(name="Tech"))
     seeded_db.commit()
