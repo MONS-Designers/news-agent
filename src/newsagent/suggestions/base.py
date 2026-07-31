@@ -12,7 +12,13 @@ from collections.abc import Callable, Sequence
 from typing import TypeVar
 
 from newsagent.suggestions.errors import SuggestionError
-from newsagent.suggestions.types import PromptText, RoleOption, TopicPopularity, TopicSuggestion
+from newsagent.suggestions.types import (
+    PromptText,
+    RoleOption,
+    TopicOption,
+    TopicPopularity,
+    TopicSuggestion,
+)
 
 T = TypeVar("T")
 
@@ -68,6 +74,23 @@ class SuggestionSource(ABC):
             )
         )
 
+    def suggest_new_topics(
+        self,
+        *,
+        field_name: str | None,
+        role_name: str | None,
+        interest_free_text: str | None,
+        existing_topic_names: Sequence[str],
+    ) -> list[TopicOption]:
+        return self._run(
+            lambda: self._suggest_new_topics(
+                field_name=field_name,
+                role_name=role_name,
+                interest_free_text=interest_free_text,
+                existing_topic_names=existing_topic_names,
+            )
+        )
+
     # -- adapter surface -----------------------------------------------------
 
     @abstractmethod
@@ -93,6 +116,16 @@ class SuggestionSource(ABC):
         interest_free_text: str | None,
         popularity: Sequence[TopicPopularity],
     ) -> list[TopicSuggestion]: ...
+
+    @abstractmethod
+    def _suggest_new_topics(
+        self,
+        *,
+        field_name: str | None,
+        role_name: str | None,
+        interest_free_text: str | None,
+        existing_topic_names: Sequence[str],
+    ) -> list[TopicOption]: ...
 
     # -- shared retry mechanics ----------------------------------------------
 

@@ -6,7 +6,7 @@
         <span class="step-label">Suggested topics</span>
       </div>
       <p v-if="!loading && !loadError" class="counter">
-        Selected <b>{{ pickedIds.length }}</b> / {{ MAX_TOPICS }}
+        Selected <b>{{ pickedChips.length }}</b> / {{ MAX_TOPICS }}
       </p>
     </div>
 
@@ -16,16 +16,16 @@
     <template v-else>
       <div class="topic-grid" role="group" aria-label="Suggested topics">
         <button
-          v-for="id in allTopicIds"
-          :key="id"
+          v-for="chip in allChips"
+          :key="chipKey(chip)"
           type="button"
           class="topic"
-          :class="{ picked: pickedIds.includes(id), faint: !pickedIds.includes(id) }"
-          :aria-pressed="pickedIds.includes(id)"
-          @click="toggleTopic(id)"
+          :class="{ picked: isPicked(chip), faint: !isPicked(chip) }"
+          :aria-pressed="isPicked(chip)"
+          @click="toggleChip(chip)"
         >
-          {{ topicNames.get(id) ?? `Topic ${id}` }}
-          <span v-if="pickedIds.includes(id)" class="x" aria-hidden="true">✕</span>
+          {{ chip.name }}
+          <span v-if="isPicked(chip)" class="x" aria-hidden="true">✕</span>
         </button>
       </div>
       <p class="hint">Tap a faint topic to swap it in for one of your 4.</p>
@@ -61,16 +61,46 @@ const emit = defineEmits<{ back: []; saved: [] }>();
 const MAX_TOPICS = 4;
 
 const POLL_INTERVAL_MS = 400;
-const MAX_POLL_ATTEMPTS = 20; // ~8s budget for a "brief loading state"
+// ~45s budget. This story added a second sequential LLM call
+// (suggest_new_topics after suggest_topics) to the same background
+// computation this polls for — measured ~25s combined against a real
+// OpenRouter model, well past the previous single-call ~8s budget. A
+// too-short budget doesn't error, it silently falls back to "current
+// subscriptions", which looks indistinguishable from the feature not
+// working at all.
+const MAX_POLL_ATTEMPTS = 112;
 
 const loading = ref(true);
 const loadError = ref(false);
 const saving = ref(false);
 const saveMessage = ref("");
 
-const allTopicIds = ref<number[]>([]);
-const pickedIds = ref<number[]>([]);
-const topicNames = ref<Map<number, string>>(new Map());
+// A suggestion chip is either an existing Topic (real topic_id, shown by its
+// stored name) or an LLM-invented not-yet-existing name (no id until saved).
+// Picks are tracked as the same tagged union, not a bare number[], since a
+// "new" pick has no id to store until Save preferences resolves it.
+type SuggestionChip =
+  | { kind: "existing"; topicId: number; name: string }
+  | { kind: "new"; name: string };
+type Pick = { kind: "existing"; topicId: number } | { kind: "new"; name: string };
+
+const allChips = ref<SuggestionChip[]>([]);
+const pickedChips = ref<Pick[]>([]);
+
+function chipKey(chip: SuggestionChip | Pick): string {
+  return chip.kind === "existing" ? `existing:${chip.topicId}` : `new:${chip.name}`;
+}
+
+function toPick(chip: SuggestionChip): Pick {
+  return chip.kind === "existing"
+    ? { kind: "existing", topicId: chip.topicId }
+    : { kind: "new", name: chip.name };
+}
+
+function isPicked(chip: SuggestionChip): boolean {
+  const key = chipKey(chip);
+  return pickedChips.value.some((pick) => chipKey(pick) === key);
+}
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -86,18 +116,23 @@ async function pollForSuggestions() {
   }
   // Exhausted the polling budget — treat like a failure so the fallback below
   // still produces a non-empty pick (FR-9), never an infinite loading state.
-  return { suggestion_status: "failed" as const, suggested_topic_ids: null };
+  return {
+    suggestion_status: "failed" as const,
+    suggested_topic_ids: null,
+    suggested_new_topic_names: null,
+  };
 }
 
-function toggleTopic(id: number) {
-  if (pickedIds.value.includes(id)) {
-    pickedIds.value = pickedIds.value.filter((x) => x !== id);
-  } else if (pickedIds.value.length >= MAX_TOPICS) {
+function toggleChip(chip: SuggestionChip) {
+  const key = chipKey(chip);
+  if (isPicked(chip)) {
+    pickedChips.value = pickedChips.value.filter((pick) => chipKey(pick) !== key);
+  } else if (pickedChips.value.length >= MAX_TOPICS) {
     // FIFO swap: drop the oldest pick, add the newly-tapped one — keeps the
     // total at exactly 4, matching "swaps it in for one of the 4."
-    pickedIds.value = [...pickedIds.value.slice(1), id];
+    pickedChips.value = [...pickedChips.value.slice(1), toPick(chip)];
   } else {
-    pickedIds.value = [...pickedIds.value, id];
+    pickedChips.value = [...pickedChips.value, toPick(chip)];
   }
 }
 
@@ -106,7 +141,13 @@ async function onSave() {
   saving.value = true;
   saveMessage.value = "";
   try {
-    await updateMyPreferences(pickedIds.value);
+    const topicIds = pickedChips.value
+      .filter((pick): pick is { kind: "existing"; topicId: number } => pick.kind === "existing")
+      .map((pick) => pick.topicId);
+    const newTopicNames = pickedChips.value
+      .filter((pick): pick is { kind: "new"; name: string } => pick.kind === "new")
+      .map((pick) => pick.name);
+    await updateMyPreferences(topicIds, newTopicNames);
     saveMessage.value = "Saved.";
     emit("saved");
   } catch {
@@ -122,26 +163,43 @@ async function load() {
       pollForSuggestions(),
       listMyPreferences(),
     ]);
-    topicNames.value = new Map(allPrefs.map((p) => [p.topic_id, p.name]));
+    const topicNames = new Map(allPrefs.map((p) => [p.topic_id, p.name]));
 
-    if (
-      suggestionResult.suggestion_status === "ready" &&
-      suggestionResult.suggested_topic_ids &&
-      suggestionResult.suggested_topic_ids.length > 0
-    ) {
-      allTopicIds.value = suggestionResult.suggested_topic_ids;
-      pickedIds.value = allTopicIds.value.slice(0, MAX_TOPICS);
+    const suggestedExistingIds = suggestionResult.suggested_topic_ids ?? [];
+    const suggestedNewNames = suggestionResult.suggested_new_topic_names ?? [];
+
+    // Built before the ready-check below (not filtered post-hoc) — a
+    // suggested id that doesn't resolve locally (e.g. stale by the time this
+    // page loads) must not silently pass the non-empty check and then render
+    // an empty grid, breaking FR-9's "never risk a dead end" guarantee.
+    const existingChips: SuggestionChip[] = suggestedExistingIds
+      .filter((id) => topicNames.has(id))
+      .map((id) => ({ kind: "existing", topicId: id, name: topicNames.get(id)! }));
+    const newChips: SuggestionChip[] = suggestedNewNames.map((name) => ({
+      kind: "new",
+      name,
+    }));
+    const readyChips = [...existingChips, ...newChips];
+
+    if (suggestionResult.suggestion_status === "ready" && readyChips.length > 0) {
+      allChips.value = readyChips;
+      pickedChips.value = allChips.value.slice(0, MAX_TOPICS).map(toPick);
     } else {
       // Failed, or ready-but-empty (shouldn't happen given the popularity
       // fallback ranks every topic, but never risk a dead end — FR-9).
       // Prefer the user's own existing subscriptions over arbitrary topics.
-      const subscribed = allPrefs.filter((p) => p.subscribed).map((p) => p.topic_id);
-      const rest = allPrefs.map((p) => p.topic_id).filter((id) => !subscribed.includes(id));
-      allTopicIds.value = [...subscribed, ...rest];
-      pickedIds.value = (subscribed.length > 0 ? subscribed : allTopicIds.value).slice(
-        0,
-        MAX_TOPICS,
-      );
+      const subscribed = allPrefs.filter((p) => p.subscribed);
+      const rest = allPrefs.filter((p) => !p.subscribed);
+      const ordered = [...subscribed, ...rest];
+      allChips.value = ordered.map((p) => ({
+        kind: "existing" as const,
+        topicId: p.topic_id,
+        name: p.name,
+      }));
+      const picked = subscribed.length > 0 ? subscribed : ordered;
+      pickedChips.value = picked
+        .slice(0, MAX_TOPICS)
+        .map((p) => ({ kind: "existing" as const, topicId: p.topic_id }));
     }
   } catch {
     loadError.value = true;

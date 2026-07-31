@@ -27,3 +27,4 @@ class TopicSuggestionsOut(BaseModel):
 
     suggestion_status: str
     suggested_topic_ids: list[int] | None
+    suggested_new_topic_names: list[str] | None

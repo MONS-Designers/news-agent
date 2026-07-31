@@ -33,6 +33,30 @@ def test_add_topic_and_source_are_idempotent(db: Session):
     assert created_again is False
 
 
+def test_add_topic_defaults_to_approved(db: Session):
+    """The admin/seed path calls add_topic without a status arg — must stay
+    approved so existing behavior (Source seeding, admin-curated topics) is
+    unaffected by the new-topic-suggestion status gate."""
+    topic, _ = add_topic(db, "AI")
+    assert topic.status == "approved"
+
+
+def test_add_topic_accepts_explicit_status(db: Session):
+    """The new-topic-suggestion save path passes status='pending' explicitly."""
+    topic, _ = add_topic(db, "Quantum Computing", status="pending")
+    assert topic.status == "pending"
+
+
+def test_add_topic_get_or_create_ignores_status_on_repeat_call(db: Session):
+    """get-or-create is by exact name only — an existing Topic's status is not
+    overwritten by a later call with a different status."""
+    topic, _ = add_topic(db, "AI", status="approved")
+    again, created = add_topic(db, "AI", status="pending")
+    assert created is False
+    assert again.id == topic.id
+    assert again.status == "approved"
+
+
 def test_seed_creates_all_defaults_as_approved(db: Session):
     report = seed_default_sources(db)
     assert report.topics_created == len(DEFAULT_SOURCES)

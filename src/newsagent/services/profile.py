@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from newsagent.models import Topic, User, UserTopicPreference
 from newsagent.models.pending_taxonomy_suggestion import KIND_FIELD, KIND_ROLE
+from newsagent.models.topic import STATUS_APPROVED as TOPIC_STATUS_APPROVED
 from newsagent.models.user import (
     SUGGESTION_STATUS_FAILED,
     SUGGESTION_STATUS_PENDING,
@@ -34,6 +35,10 @@ EXPERIENCE_BUCKETS: list[str] = ["0-2", "3-5", "6-10", "10+"]
 
 # Cap for suggest_prompts_for_user (FR-5: "up to 3 example prompts").
 PROMPT_SUGGESTION_CAP = 3
+
+# Merged existing+new Topic suggestion-grid display cap (Real Topic
+# Suggestions story), matching ROLE_SUGGESTION_CAP's convention.
+TOPIC_SUGGESTION_CAP = 10
 
 # One fixed message for every rejection cause. Which check failed (blank, too
 # long, not actually curated) is deliberately not disclosed — the frontend
@@ -228,20 +233,31 @@ def suggest_prompts_for_user(user: User) -> list[str]:
 
 
 def _topic_popularity(db: Session) -> list[TopicPopularity]:
-    """Every Topic's cross-user selection count, including zero — a topic
-    nobody has picked yet is still a valid fallback candidate, and dropping it
-    would risk an empty popularity list (breaking FR-9's non-empty guarantee)
-    the moment no topic has ever been selected system-wide. Starting the query
-    from Topic with an outer join (not from UserTopicPreference) is what keeps
-    zero-selection topics in the result."""
+    """Every *approved* Topic's cross-user selection count, including zero — a
+    topic nobody has picked yet is still a valid fallback candidate, and
+    dropping it would risk an empty popularity list (breaking FR-9's
+    non-empty guarantee) the moment no topic has ever been selected
+    system-wide. Starting the query from Topic with an outer join (not from
+    UserTopicPreference) is what keeps zero-selection topics in the result.
+
+    Filtered to `status='approved'` (CAP-3) — a still-`pending` Topic (e.g.
+    another user's not-yet-reviewed invented name) must never be offered as a
+    candidate to anyone else. Carries `name` alongside `topic_id` +
+    `selection_count` so a provider can reason about (and avoid duplicating)
+    a topic it can otherwise only see as an opaque id.
+    """
     rows = db.execute(
-        select(Topic.id, func.count(UserTopicPreference.id))
+        select(Topic.id, Topic.name, func.count(UserTopicPreference.id))
         .select_from(Topic)
         .outerjoin(UserTopicPreference, UserTopicPreference.topic_id == Topic.id)
+        .where(Topic.status == TOPIC_STATUS_APPROVED)
         .group_by(Topic.id)
         .order_by(Topic.id)
     ).all()
-    return [TopicPopularity(topic_id=topic_id, selection_count=count) for topic_id, count in rows]
+    return [
+        TopicPopularity(topic_id=topic_id, name=name, selection_count=count)
+        for topic_id, name, count in rows
+    ]
 
 
 def _compute_and_store_suggestions(db: Session, user_id: int, expected_seq: int) -> None:
@@ -257,6 +273,7 @@ def _compute_and_store_suggestions(db: Session, user_id: int, expected_seq: int)
 
     try:
         popularity = _topic_popularity(db)
+        approved_names = [p.name for p in popularity]
         source = get_suggestion_source()
         suggestions = source.suggest_topics(
             field_name=user.field_name,
@@ -264,17 +281,49 @@ def _compute_and_store_suggestions(db: Session, user_id: int, expected_seq: int)
             interest_free_text=user.interest_free_text,
             popularity=popularity,
         )
-        topic_ids: list[int] | None = [s.topic_id for s in suggestions]
+        new_options = source.suggest_new_topics(
+            field_name=user.field_name,
+            role_name=user.role_name,
+            interest_free_text=user.interest_free_text,
+            existing_topic_names=approved_names,
+        )
+
+        computed_topic_ids = [s.topic_id for s in suggestions][:TOPIC_SUGGESTION_CAP]
+
+        # Dedupe invented names against the approved catalog (case/whitespace
+        # -insensitive, AD-6's normalize_taxonomy_text) — "ai" must not show
+        # as a separate pill next to an existing "AI" Topic. Fill only the
+        # slots the existing-topic picks above didn't already use, so the
+        # merged existing+new total never exceeds TOPIC_SUGGESTION_CAP.
+        seen = {taxonomy.normalize_taxonomy_text(name) for name in approved_names}
+        remaining = TOPIC_SUGGESTION_CAP - len(computed_topic_ids)
+        computed_new_names: list[str] = []
+        for option in new_options:
+            if remaining <= 0:
+                break
+            name = option.name.strip()
+            if not name:
+                continue
+            normalized = taxonomy.normalize_taxonomy_text(name)
+            if normalized in seen:
+                continue
+            seen.add(normalized)
+            computed_new_names.append(name)
+            remaining -= 1
+
+        topic_ids: list[int] | None = computed_topic_ids
+        new_names: list[str] | None = computed_new_names
         status = SUGGESTION_STATUS_READY
     except SuggestionError:
         topic_ids = None
+        new_names = None
         status = SUGGESTION_STATUS_FAILED
 
     # Race guard, checked immediately before the write, not at function entry:
     # a concurrent save may have advanced suggestion_request_seq while
-    # suggest_topics (above) was running, so the check must happen after that
-    # work, on freshly-read state, not on the `user` object as it looked when
-    # this function started.
+    # suggest_topics/suggest_new_topics (above) were running, so the check
+    # must happen after that work, on freshly-read state, not on the `user`
+    # object as it looked when this function started.
     db.refresh(user)
     if user.suggestion_request_seq != expected_seq:
         return
@@ -282,6 +331,8 @@ def _compute_and_store_suggestions(db: Session, user_id: int, expected_seq: int)
     user.suggestion_status = status
     if topic_ids is not None:
         user.suggested_topic_ids = topic_ids
+    if new_names is not None:
+        user.suggested_new_topic_names = new_names
     db.commit()
 
 

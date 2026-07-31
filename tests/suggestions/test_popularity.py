@@ -9,9 +9,9 @@ from newsagent.suggestions.popularity import PopularitySuggestionSource
 from newsagent.suggestions.types import PromptText, RoleOption, TopicPopularity, TopicSuggestion
 
 POPULARITY = [
-    TopicPopularity(topic_id=1, selection_count=5),
-    TopicPopularity(topic_id=2, selection_count=20),
-    TopicPopularity(topic_id=3, selection_count=0),
+    TopicPopularity(topic_id=1, name="AI", selection_count=5),
+    TopicPopularity(topic_id=2, name="Cybersecurity", selection_count=20),
+    TopicPopularity(topic_id=3, name="Space", selection_count=0),
 ]
 
 
@@ -84,6 +84,20 @@ def test_suggest_topics_empty_popularity_returns_empty():
     assert result == []
 
 
+def test_suggest_new_topics_returns_empty():
+    """No connected LLM-backed source, so nothing to invent — mirrors
+    suggest_roles/suggest_prompts's empty-return stance for this provider."""
+    assert (
+        PopularitySuggestionSource().suggest_new_topics(
+            field_name="Tech",
+            role_name="Software Engineer",
+            interest_free_text="curious about ML",
+            existing_topic_names=["AI"],
+        )
+        == []
+    )
+
+
 # --- Retry mechanics (inherited from base.py, exercised via a local double) -
 
 
@@ -115,6 +129,10 @@ class _FlakySource(SuggestionSource):
         return []
 
     def _suggest_topics(self, *, field_name, role_name, interest_free_text, popularity):
+        self._maybe_fail()
+        return []
+
+    def _suggest_new_topics(self, *, field_name, role_name, interest_free_text, existing_topic_names):
         self._maybe_fail()
         return []
 

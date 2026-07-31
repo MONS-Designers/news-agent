@@ -1,5 +1,23 @@
 # Deferred Work
 
+## Deferred from: code review of spec-topic-suggestions (2026-07-31)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-topic-suggestions.md`
+  summary: `suggest_new_topics`'s de-dup context (`existing_topic_names`, built from `_topic_popularity`'s approved-only rows) never includes other users' still-`pending` invented Topic names, so the LLM can (and, given no cross-user memory, likely will) re-invent a near-duplicate name — including a case/whitespace variant that `add_topic`'s exact-match get-or-create won't catch either — creating multiple pending rows for what a human would recognize as one topic.
+  evidence: This is the direct, spec-endorsed consequence of the spec's own explicit constraint ("`_topic_popularity`'s candidate list... filters to `status='approved'` only") — confirmed with the user via `bmad-spec`, not an implementation deviation. It mirrors the already-deferred 2026-07-28 entry below for Role-suggestion near-duplicate flooding (`PendingTaxonomySuggestion`); worth a joint fix (e.g. broaden de-dup context, or fuzzy-match at admin-review time) once the deferred admin approve/reject UI (CAP-4, entry above) exists to actually merge or reject duplicates.
+- source_spec: `_bmad-output/implementation-artifacts/spec-topic-suggestions.md`
+  summary: `services/sources.py::add_topic`'s select-then-insert-then-commit is now reachable from concurrent, user-facing "Save preferences" requests (via `services/preferences.py::set_preferences`) for the first time — two users (or a double-submit) picking the identical new topic name at the same moment can both pass the existence check before either commits, so the loser's commit raises an unhandled `IntegrityError` (`api/routers/me.py`'s `update_my_preferences` only catches `TopicCapExceededError`/`ValueError`), surfacing as a 500.
+  evidence: This is the exact pre-existing TOCTOU pattern already flagged in the 2026-07-26 entry below for `add_field` ("faithfully mirrors `add_topic`/`add_source`... worth fixing project-wide rather than in one story"), previously only reachable from single-threaded admin/seed paths. This spec's own Boundaries explicitly says new-Topic creation "reuses `add_topic`'s existing get-or-create-by-exact-name idempotency unchanged" — fixing the race here would be an unscoped deviation; the project-wide fix (e.g. `IntegrityError` retry, matching `services/profile.py::save_profile`'s existing retry-on-conflict pattern for "Other" Field/Role text) should land in the same project-wide pass as the `add_field` fix.
+- source_spec: `_bmad-output/implementation-artifacts/spec-topic-suggestions.md`
+  summary: `services/profile.py::_compute_and_store_suggestions` never de-duplicates `suggestions` (the existing-Topic ranking result from `suggest_topics`) before truncating to `TOPIC_SUGGESTION_CAP` and storing as `suggested_topic_ids` — if the ranking source ever returns a repeated `topic_id`, nothing collapses it before `TopicsStep.vue` renders one chip per id.
+  evidence: Pre-existing gap (predates this story — the ranking path itself is unchanged), confirmed by code review as not newly introduced, but this story's new merged-chip rendering path is what would first make a duplicate-id response visible as a Vue `v-for` duplicate-key rendering bug rather than a silent no-op. Low likelihood with the current prompt/candidate-filtering in `suggestions/llm.py`, but worth a defensive `dict.fromkeys`-style de-dup whenever `suggest_topics`'s contract is next touched.
+
+## Deferred from: spec-topic-suggestions token-budget split (2026-07-30)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-topic-suggestions.md`
+  summary: Admin approve/reject UI for pending Topics (new `admin_topics.py` router mirroring `admin.py`'s Source-approval shape, plus `TopicQueueView.vue` mirroring `TaxonomyQueueView.vue`, plus nav/router wiring) — CAP-4 of the topic-suggestions feature.
+  evidence: The full topic-suggestions spec measured ~3550 tokens, more than double the 1600-token soft ceiling. Split by the user's own choice: the primary user-facing capability (merged existing+invented Topic suggestions, immediate-but-pending creation on save, approved-only visibility to others) is safe and correct to ship without an admin UI — pending Topics simply accumulate until this follow-up ships, never leaking to other users in the meantime. This deferred piece is small and low-risk (near copy of the existing `admin.py`/`AdminView.vue` Source-approval pattern) and should become its own quick-dev spec once the primary piece is done.
+
 ## Deferred from: intent clarification for LLM-backed Role/Topic/Prompt suggestion wiring (2026-07-28)
 
 - source_spec: none

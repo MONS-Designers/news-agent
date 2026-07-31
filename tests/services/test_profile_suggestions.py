@@ -13,7 +13,7 @@ from newsagent.services import profile as profile_service
 from newsagent.services.profile import _compute_and_store_suggestions, _topic_popularity
 from newsagent.suggestions import SuggestionProviderError
 from newsagent.suggestions.base import SuggestionSource
-from newsagent.suggestions.types import PromptText, RoleOption
+from newsagent.suggestions.types import PromptText, RoleOption, TopicOption, TopicSuggestion
 
 
 @pytest.fixture
@@ -60,6 +60,26 @@ def test_topic_popularity_includes_zero_selection_topics(db: Session):
     assert popularity[space.id] == 0  # never selected, still present
 
 
+def test_topic_popularity_carries_name(db: Session):
+    ai = _topic(db, "AI")
+    by_id = {p.topic_id: p.name for p in _topic_popularity(db)}
+    assert by_id[ai.id] == "AI"
+
+
+def test_topic_popularity_excludes_pending_topics(db: Session):
+    """CAP-3: a still-pending Topic must never be offered as a candidate to
+    any user's suggestion computation."""
+    ai = _topic(db, "AI")
+    space = _topic(db, "Space")
+    space.status = "pending"
+    db.commit()
+
+    ids = {p.topic_id for p in _topic_popularity(db)}
+
+    assert ai.id in ids
+    assert space.id not in ids
+
+
 # --- _compute_and_store_suggestions ------------------------------------------
 
 
@@ -100,6 +120,9 @@ class _FailingSource(SuggestionSource):
     def _suggest_topics(self, *, field_name, role_name, interest_free_text, popularity):
         raise SuggestionProviderError("injected failure")
 
+    def _suggest_new_topics(self, *, field_name, role_name, interest_free_text, existing_topic_names):
+        raise SuggestionProviderError("injected failure")
+
 
 def test_failure_sets_failed_status_and_leaves_topic_ids_untouched(
     db: Session, monkeypatch: pytest.MonkeyPatch
@@ -119,6 +142,96 @@ def test_failure_sets_failed_status_and_leaves_topic_ids_untouched(
 
 def test_deleted_user_is_a_no_op(db: Session):
     _compute_and_store_suggestions(db, user_id=999999, expected_seq=1)  # must not raise
+
+
+# --- Merged existing + new-name suggestions (Real Topic Suggestions story) --
+
+
+class _StubSource(SuggestionSource):
+    """Configurable double for exercising _compute_and_store_suggestions's
+    merge/dedupe/cap logic without a real LLM."""
+
+    def __init__(
+        self,
+        *,
+        topic_ids: list[int] | None = None,
+        new_names: list[str] | None = None,
+        **kwargs: object,
+    ) -> None:
+        super().__init__(**kwargs)  # type: ignore[arg-type]
+        self._topic_ids = topic_ids or []
+        self._new_names = new_names or []
+
+    def _suggest_roles(self, field_name: str, *, existing_roles=()) -> list[RoleOption]:
+        return []
+
+    def _suggest_prompts(self, *, field_name=None, role_name=None, experience_bucket=None):
+        return []
+
+    def _suggest_topics(self, *, field_name, role_name, interest_free_text, popularity):
+        return [TopicSuggestion(topic_id=topic_id) for topic_id in self._topic_ids]
+
+    def _suggest_new_topics(self, *, field_name, role_name, interest_free_text, existing_topic_names):
+        return [TopicOption(name=name) for name in self._new_names]
+
+
+def test_merges_existing_and_new_topic_suggestions_under_cap(
+    db: Session, monkeypatch: pytest.MonkeyPatch
+):
+    ai = _topic(db, "AI")
+    space = _topic(db, "Space")
+    monkeypatch.setattr(
+        profile_service,
+        "get_suggestion_source",
+        lambda: _StubSource(topic_ids=[ai.id, space.id], new_names=["New A", "New B", "New C"]),
+    )
+    user = _user(db)
+    user.suggestion_request_seq = 1
+    db.commit()
+
+    _compute_and_store_suggestions(db, user.id, expected_seq=1)
+
+    assert user.suggested_topic_ids == [ai.id, space.id]
+    assert user.suggested_new_topic_names == ["New A", "New B", "New C"]
+
+
+def test_new_topic_name_deduped_against_approved_case_and_whitespace_insensitively(
+    db: Session, monkeypatch: pytest.MonkeyPatch
+):
+    """'ai' must not show as a separate pill next to the existing 'AI' Topic."""
+    monkeypatch.setattr(
+        profile_service,
+        "get_suggestion_source",
+        lambda: _StubSource(topic_ids=[], new_names=["ai", "  Space  "]),
+    )
+    user = _user(db)
+    user.suggestion_request_seq = 1
+    db.commit()
+
+    _compute_and_store_suggestions(db, user.id, expected_seq=1)
+
+    assert user.suggested_new_topic_names == []
+
+
+def test_merged_existing_and_new_total_capped_at_ten(db: Session, monkeypatch: pytest.MonkeyPatch):
+    db.add_all([Topic(name=f"Topic {i}") for i in range(10)])
+    db.commit()
+    all_ids = [topic_id for (topic_id,) in db.execute(select(Topic.id))]
+    assert len(all_ids) == 12  # AI, Space + 10 new
+
+    monkeypatch.setattr(
+        profile_service,
+        "get_suggestion_source",
+        lambda: _StubSource(topic_ids=all_ids, new_names=["New A", "New B", "New C"]),
+    )
+    user = _user(db)
+    user.suggestion_request_seq = 1
+    db.commit()
+
+    _compute_and_store_suggestions(db, user.id, expected_seq=1)
+
+    assert len(user.suggested_topic_ids) == 10
+    assert user.suggested_new_topic_names == []
 
 
 def test_ranking_matches_popularity_regardless_of_profile(db: Session):

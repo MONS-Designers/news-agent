@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from newsagent.models import Source, Topic
 from newsagent.models.source import STATUS_APPROVED, STATUS_PENDING
+from newsagent.models.topic import STATUS_APPROVED as TOPIC_STATUS_APPROVED
 
 # Curated starter feeds per topic — all seeded as approved (admin-curated).
 DEFAULT_SOURCES: dict[str, list[tuple[str, str]]] = {
@@ -29,12 +30,16 @@ DEFAULT_SOURCES: dict[str, list[tuple[str, str]]] = {
 }
 
 
-def add_topic(db: Session, name: str) -> tuple[Topic, bool]:
-    """Get-or-create a Topic by name. Returns (topic, created)."""
+def add_topic(db: Session, name: str, status: str = TOPIC_STATUS_APPROVED) -> tuple[Topic, bool]:
+    """Get-or-create a Topic by name. Returns (topic, created).
+
+    `status` defaults to approved (the admin/seed path); the new-topic-
+    suggestion save path passes `STATUS_PENDING` explicitly.
+    """
     existing = db.scalar(select(Topic).where(Topic.name == name))
     if existing is not None:
         return existing, False
-    topic = Topic(name=name)
+    topic = Topic(name=name, status=status)
     db.add(topic)
     db.commit()
     return topic, True

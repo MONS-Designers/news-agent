@@ -54,6 +54,52 @@ def test_put_over_cap_topic_ids_returns_structured_detail(
     assert response.json()["detail"] == {"error": "topic_cap_exceeded", "max_topics": 4}
 
 
+# --- New Topic names (Real Topic Suggestions story) --------------------------
+
+
+def test_put_preferences_with_new_topic_name_creates_pending_topic_and_subscribes(
+    as_user_with_db: TestClient, seeded_db: Session
+):
+    response = as_user_with_db.put(
+        "/me/preferences", json={"topic_ids": [], "new_topic_names": ["Quantum Computing"]}
+    )
+    assert response.status_code == 200
+    by_name = {item["name"]: item["subscribed"] for item in response.json()}
+    assert by_name["Quantum Computing"] is True
+
+    topic = seeded_db.scalar(select(Topic).where(Topic.name == "Quantum Computing"))
+    assert topic is not None
+    assert topic.status == "pending"
+
+    get_response = as_user_with_db.get("/me/preferences")
+    get_by_name = {item["name"]: item["subscribed"] for item in get_response.json()}
+    assert get_by_name["Quantum Computing"] is True
+
+
+def test_put_preferences_new_topic_name_over_cap_returns_structured_detail(
+    as_user_with_db: TestClient, seeded_db: Session
+):
+    ids = [t for (t,) in seeded_db.execute(select(Topic.id))]  # 3 seeded topics
+    assert len(ids) == 3
+
+    response = as_user_with_db.put(
+        "/me/preferences",
+        json={"topic_ids": ids, "new_topic_names": ["Quantum Computing", "Climate Tech"]},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == {"error": "topic_cap_exceeded", "max_topics": 4}
+
+
+def test_put_preferences_omitted_new_topic_names_defaults_to_empty(
+    as_user_with_db: TestClient,
+):
+    """Backward-compatible request shape: an existing caller that never learns
+    about new_topic_names must keep working unchanged."""
+    response = as_user_with_db.put("/me/preferences", json={"topic_ids": []})
+    assert response.status_code == 200
+
+
 def test_fields_unauthenticated_gets_401(client: TestClient):
     response = client.get("/me/fields")
     assert response.status_code == 401
@@ -341,7 +387,11 @@ def test_topic_suggestions_unauthenticated_gets_401(client: TestClient):
 def test_topic_suggestions_before_any_save_is_none(as_user_with_db: TestClient):
     response = as_user_with_db.get("/me/topic-suggestions")
     assert response.status_code == 200
-    assert response.json() == {"suggestion_status": "none", "suggested_topic_ids": None}
+    assert response.json() == {
+        "suggestion_status": "none",
+        "suggested_topic_ids": None,
+        "suggested_new_topic_names": None,
+    }
 
 
 def test_profile_save_triggers_background_computation_visible_via_get(

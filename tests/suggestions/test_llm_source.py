@@ -9,11 +9,17 @@ import pytest
 from newsagent.config import settings
 from newsagent.suggestions.errors import SuggestionProviderError, SuggestionTransportError
 from newsagent.suggestions.llm import LLMSuggestionSource
-from newsagent.suggestions.types import PromptText, RoleOption, TopicPopularity, TopicSuggestion
+from newsagent.suggestions.types import (
+    PromptText,
+    RoleOption,
+    TopicOption,
+    TopicPopularity,
+    TopicSuggestion,
+)
 
 POPULARITY = [
-    TopicPopularity(topic_id=1, selection_count=5),
-    TopicPopularity(topic_id=2, selection_count=20),
+    TopicPopularity(topic_id=1, name="AI", selection_count=5),
+    TopicPopularity(topic_id=2, name="Cybersecurity", selection_count=20),
 ]
 
 
@@ -134,6 +140,55 @@ def test_suggest_topics_non_list_field_maps_to_provider_error():
     with pytest.raises(SuggestionProviderError):
         source.suggest_topics(
             field_name="Tech", role_name=None, interest_free_text=None, popularity=POPULARITY
+        )
+
+
+def test_suggest_new_topics_parses_response():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return _content_response(json.dumps({"topics": ["Quantum Computing", "Climate Tech"]}))
+
+    source = _source_with_handler(handler)
+    result = source.suggest_new_topics(
+        field_name="Tech",
+        role_name="Developer Relations",
+        interest_free_text="curious about ML",
+        existing_topic_names=["AI", "Cybersecurity"],
+    )
+    assert result == [TopicOption(name="Quantum Computing"), TopicOption(name="Climate Tech")]
+
+
+def test_suggest_new_topics_includes_existing_topic_names_in_the_prompt():
+    """existing_topic_names is context for the model, not something enforced
+    client-side — this just proves it reaches the request body."""
+    captured: dict[str, str] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["body"] = request.content.decode()
+        return _content_response(json.dumps({"topics": ["Quantum Computing"]}))
+
+    source = _source_with_handler(handler)
+    source.suggest_new_topics(
+        field_name="Tech",
+        role_name=None,
+        interest_free_text=None,
+        existing_topic_names=["AI", "Cybersecurity"],
+    )
+
+    assert "AI" in captured["body"]
+    assert "Cybersecurity" in captured["body"]
+
+
+def test_suggest_new_topics_non_list_field_maps_to_provider_error():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return _content_response(json.dumps({"topics": "Quantum Computing"}))
+
+    source = _source_with_handler(handler)
+    with pytest.raises(SuggestionProviderError):
+        source.suggest_new_topics(
+            field_name="Tech",
+            role_name=None,
+            interest_free_text=None,
+            existing_topic_names=[],
         )
 
 

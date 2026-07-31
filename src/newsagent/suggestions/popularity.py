@@ -9,7 +9,13 @@ assumptions) — only `suggest_topics` is real.
 from collections.abc import Sequence
 
 from newsagent.suggestions.base import SuggestionSource
-from newsagent.suggestions.types import PromptText, RoleOption, TopicPopularity, TopicSuggestion
+from newsagent.suggestions.types import (
+    PromptText,
+    RoleOption,
+    TopicOption,
+    TopicPopularity,
+    TopicSuggestion,
+)
 
 
 class PopularitySuggestionSource(SuggestionSource):
@@ -42,3 +48,13 @@ class PopularitySuggestionSource(SuggestionSource):
         # from a real query) yields a deterministic result.
         ranked = sorted(popularity, key=lambda p: p.selection_count, reverse=True)
         return [TopicSuggestion(topic_id=p.topic_id) for p in ranked]
+
+    def _suggest_new_topics(
+        self,
+        *,
+        field_name: str | None,
+        role_name: str | None,
+        interest_free_text: str | None,
+        existing_topic_names: Sequence[str],
+    ) -> list[TopicOption]:
+        return []

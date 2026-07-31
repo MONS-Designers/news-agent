@@ -57,6 +57,7 @@ export interface ProfileUpdate {
 export interface TopicSuggestions {
   suggestion_status: "none" | "pending" | "ready" | "failed";
   suggested_topic_ids: number[] | null;
+  suggested_new_topic_names: string[] | null;
 }
 
 export class ApiError extends Error {
@@ -119,11 +120,14 @@ export async function listMyPreferences(): Promise<TopicPreference[]> {
   return request("/me/preferences");
 }
 
-export async function updateMyPreferences(topicIds: number[]): Promise<TopicPreference[]> {
+export async function updateMyPreferences(
+  topicIds: number[],
+  newTopicNames: string[] = [],
+): Promise<TopicPreference[]> {
   return request("/me/preferences", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ topic_ids: topicIds }),
+    body: JSON.stringify({ topic_ids: topicIds, new_topic_names: newTopicNames }),
   });
 }
 

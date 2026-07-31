@@ -32,7 +32,7 @@ def update_my_preferences(
     db: Session = Depends(get_db),
 ) -> list[preferences.TopicChoice]:
     try:
-        return preferences.set_preferences(db, user, body.topic_ids)
+        return preferences.set_preferences(db, user, body.topic_ids, body.new_topic_names)
     except preferences.TopicCapExceededError as error:
         raise HTTPException(status_code=400, detail=error.detail) from error
     except ValueError as error:
