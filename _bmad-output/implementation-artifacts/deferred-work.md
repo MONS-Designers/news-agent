@@ -67,3 +67,15 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-32-33-llm-provider-adapters.md`
   summary: `newsagent.suggestions` has no `Refusal`-equivalent outcome, so `LLMSuggestionSource` has no cheap way to decline degenerate input (blank `field_name`, empty `popularity`) before hitting the real network/paid endpoint.
   evidence: `suggestions/types.py` and `suggestions/base.py` were designed before any adapter made a real network call — `PopularitySuggestionSource` never needed to decline anything, so the gap was free until now. Adding it is an interface change (`SuggestionSource`/`SuggestionSuggestion` contract) out of scope for this story; a future story should decide whether to mirror `llm/`'s `Refusal` type or take a different approach.
+
+## Deferred from: code review of spec-gh-25-weighted-digest-ranking (2026-07-31)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-gh-25-weighted-digest-ranking.md`
+  summary: The 5 ranking weights (`relevance_weight`/`recency_weight`/`interest_weight`/`interestingness_weight`/`personalization_weight`) have no startup validation that either weight trio sums to 1.0, despite the adjacent config comment asserting they do.
+  evidence: A misconfigured `.env` (e.g. an operator tuning one weight without adjusting the others) silently produces a `final_score` outside its documented ~0-1 range with no error anywhere — surfaced by adversarial review of the ranking engine. Fixing it (a Pydantic `model_validator`) is a config-layer change orthogonal to this story's ranking logic; no other `Settings` field in `config.py` has cross-field validation today, so this is a broader config-robustness decision, not a one-off patch.
+- source_spec: `_bmad-output/implementation-artifacts/spec-gh-25-weighted-digest-ranking.md`
+  summary: `ranking.topic_affinity` re-scans and re-joins a user's entire past-sent-digest history (`Digest`→`DigestArticle`→`Article`→`Source`, lazy-loaded per row, no `selectinload`) on every single `build_digests` call, with no time-window or caching.
+  evidence: Surfaced by adversarial review as an N+1 query pattern. Harmless at current MVP scale (2 dogfood users, short history), but cost grows unbounded with each additional sent digest and each additional user — worth an eager-load/time-window pass before scaling beyond dogfooding, not before.
+- source_spec: `_bmad-output/implementation-artifacts/spec-gh-25-weighted-digest-ranking.md`
+  summary: Articles that keep losing the top-N ranking never reach a terminal state — they stay "undelivered" indefinitely and get re-scored on every future run, so the candidate backlog only grows over the life of the deployment with no staleness cutoff or pruning policy.
+  evidence: This is a new, real consequence of GH #25's cap (before this story, every undelivered article was attached and thus left the backlog every run); GH #25's own issue text is silent on backlog management, so no pruning policy could be inferred without guessing. Worth a deliberate policy decision (e.g. drop candidates past some age from ranking) once real usage data shows whether backlog growth is actually a problem.

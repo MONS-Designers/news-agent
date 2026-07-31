@@ -102,12 +102,13 @@ def test_total_reading_time_sums_displayed_articles(db: Session):
     assert "6 דקות קריאה" in html  # 3 articles x 2 min
 
 
-def test_display_capped_at_five_articles(db: Session):
+def test_render_does_not_recap_or_drop_articles(db: Session):
+    # Selection/capping happens at build time (#25) — render must show
+    # digest.articles as-is, however many there are, with nothing dropped.
     articles = [add_article(db, url_suffix=str(i), minutes=1) for i in range(8)]
     digest = build_digest(db, articles)
     html = render_digest_html(digest)
-    # Only 5 shown → total reading time capped at 5, not 8
-    assert "5 דקות קריאה" in html
+    assert "8 דקות קריאה" in html
 
 
 def test_tracking_pixel_and_preferences_present(db: Session):
@@ -157,23 +158,3 @@ def test_no_image_element_when_absent(db: Session):
     # The lead image carries the title as its alt; the tracking pixel uses alt="".
     # No title-alt image → the article degraded to a text-only card.
     assert 'alt="כותרת בעברית"' not in html
-
-
-def test_selection_is_topic_diverse(db: Session):
-    # 6 AI + 1 Space; diverse round-robin must surface Space within the top 5.
-    space_topic = Topic(name="Space")
-    db.add(space_topic)
-    db.flush()
-    db.add(Source(id=2, topic_id=space_topic.id, name="NASA", url="feed://sp", status="approved"))
-    db.flush()
-    ai = [add_article(db, url_suffix=f"ai{i}") for i in range(6)]
-    space = Article(
-        source_id=2, title="Space story", url="https://example.com/space",
-        title_he="כותרת חלל", bullets_he=["נקודת חלל"], reading_time_minutes=2,
-        interestingness=0.5, summary_status="summarized", relevance_status="relevant",
-    )
-    db.add(space)
-    db.flush()
-    digest = build_digest(db, ai + [space])
-    html = render_digest_html(digest)
-    assert "חלל" in html  # the lone Space article is not crowded out

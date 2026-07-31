@@ -17,6 +17,20 @@ class Settings(BaseSettings):
     # Relevance verdict threshold (0.7 = the contract's "clearly on-topic" anchor)
     relevance_threshold: float = 0.7
 
+    # Weighted digest ranking (issue #25): final_score = relevance_weight*relevance
+    # + recency_weight*recency + interest_weight*interest. Weight trio sums to 1.0.
+    relevance_weight: float = 0.40
+    recency_weight: float = 0.25
+    interest_weight: float = 0.35
+    # interest = interestingness_weight*llm_interestingness + personalization_weight*affinity.
+    interestingness_weight: float = 0.60
+    personalization_weight: float = 0.40
+    # Recency decay half-life: an article this many hours old scores half of a
+    # brand-new one.
+    recency_half_life_hours: float = 24.0
+    # Top-N articles selected per user's digest per run; the rest stay undelivered.
+    digest_max_articles: int = 5
+
     # Which email sender adapter the pipeline uses (see newsagent.mail.factory)
     email_sender: str = "console"
     # When set, the console sender also writes each email's HTML here
