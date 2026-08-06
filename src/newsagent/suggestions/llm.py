@@ -6,6 +6,7 @@ import httpx
 
 from newsagent.config import settings
 from newsagent.http_llm_client import send_chat_completion
+from newsagent.llm_json import strip_code_fence
 from newsagent.suggestions.base import SuggestionSource
 from newsagent.suggestions.errors import (
     SuggestionInputError,
@@ -60,7 +61,7 @@ class LLMSuggestionSource(SuggestionSource):
                 messages=messages,
                 client=self._client,
             )
-            data = json.loads(content)
+            data = json.loads(strip_code_fence(content))
             return build(data)
         except httpx.HTTPStatusError as error:
             status = error.response.status_code

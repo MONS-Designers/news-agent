@@ -6,6 +6,7 @@ neither adapter shares a client or a base_url with the other.
 """
 
 import json
+import logging
 from collections.abc import Callable, Sequence
 from typing import TypeVar
 
@@ -16,10 +17,30 @@ from newsagent.http_llm_client import send_chat_completion
 from newsagent.llm.base import LLMProvider
 from newsagent.llm.errors import LLMInputError, LLMProviderError, LLMTransportError
 from newsagent.llm.types import ArticleInput, DigestVoice, Refusal, RelevanceScore, SummaryResult
+from newsagent.llm_json import strip_code_fence
+
+logger = logging.getLogger(__name__)
 
 _MIN_TEXT_LENGTH = 40
 
+# Head shows markdown fencing or leading prose; tail shows truncation. A middle
+# slice would show neither, which is why this is not a plain [:N].
+# 500 each way: measured real summarize responses run 531-721 chars, so a
+# smaller window clips exactly the payloads worth replaying offline.
+_CONTENT_LOG_CHARS = 500
+
 T = TypeVar("T")
+
+
+def _clip(text: object) -> str:
+    """Bounded, both-ends view of a possibly huge model response. Accepts any
+    object because `content` is whatever the provider put in the envelope —
+    None and dicts both occur in practice."""
+    if not isinstance(text, str):
+        return repr(text)
+    if len(text) <= _CONTENT_LOG_CHARS * 2:
+        return repr(text)
+    return f"{text[:_CONTENT_LOG_CHARS]!r} ... {text[-_CONTENT_LOG_CHARS:]!r}"
 
 
 def _unit_float(value: object, field: str) -> float:
@@ -47,10 +68,13 @@ class ExternalLLMProvider(LLMProvider):
     # -- shared request/parse/error-mapping ----------------------------------
 
     def _request(self, system: str, user: str, build: Callable[[dict], T]) -> T:
-        """Call the model and hand the parsed JSON body to `build`. `build`
-        runs inside the same try as the network call so a malformed/missing
-        field while constructing the typed result maps to LLMProviderError
-        too, not just a raw json.loads failure."""
+        """Call the model and hand the parsed JSON body to `build`.
+
+        The three failure stages — envelope extraction, JSON parsing, and typed-
+        result construction — get their own `except` so a log line can say which
+        one failed. They still all raise LLMProviderError with the same message,
+        so callers and retry semantics are unchanged (GH #38 is diagnosis only).
+        """
         messages = [
             {"role": "system", "content": system},
             {"role": "user", "content": user},
@@ -63,8 +87,6 @@ class ExternalLLMProvider(LLMProvider):
                 messages=messages,
                 client=self._client,
             )
-            data = json.loads(content)
-            return build(data)
         except httpx.HTTPStatusError as error:
             status = error.response.status_code
             if status in (401, 403):
@@ -77,6 +99,49 @@ class ExternalLLMProvider(LLMProvider):
         except (httpx.TimeoutException, httpx.TransportError) as error:
             raise LLMTransportError("external LLM request failed") from error
         except (json.JSONDecodeError, KeyError, IndexError, TypeError, ValueError) as error:
+            # The body itself was already logged by http_llm_client, which is
+            # the only layer that still had it.
+            logger.warning(
+                "malformed output (stage=envelope, model=%s): %s: %s",
+                self._model,
+                type(error).__name__,
+                error,
+            )
+            raise LLMProviderError("external LLM returned malformed output") from error
+
+        try:
+            data = json.loads(strip_code_fence(content))
+        except (TypeError, ValueError) as error:
+            # TypeError matters as much as JSONDecodeError here: OpenAI-compatible
+            # endpoints return "content": null for tool calls, filtered completions,
+            # and reasoning models that put their answer in a sibling field. Catching
+            # only JSONDecodeError lets that escape the LLMError hierarchy, past
+            # summarize_relevant_articles' `except LLMError`, aborting the whole
+            # stage mid-loop instead of marking one article failed.
+            position = f", at char {error.pos}: {error.msg}" if isinstance(
+                error, json.JSONDecodeError
+            ) else f": {type(error).__name__}: {error}"
+            logger.warning(
+                "malformed output (stage=json, model=%s, type=%s, len=%s%s): %s",
+                self._model,
+                type(content).__name__,
+                len(content) if isinstance(content, str) else "n/a",
+                position,
+                _clip(content),
+            )
+            raise LLMProviderError("external LLM returned malformed output") from error
+
+        try:
+            return build(data)
+        except (KeyError, IndexError, TypeError, ValueError) as error:
+            logger.warning(
+                "malformed output (stage=schema, model=%s, len=%s): %s: %s -- %s",
+                self._model,
+                len(content) if isinstance(content, str) else "n/a",
+                type(error).__name__,
+                error,
+                _clip(content),
+            )
             raise LLMProviderError("external LLM returned malformed output") from error
 
     # -- junk/empty pre-checks, no network call ------------------------------

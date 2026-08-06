@@ -1,5 +1,14 @@
 # Deferred Work
 
+## Deferred from: intent clarification for GH #38 (2026-08-06)
+
+- source_spec: none
+  summary: Articles whose summarize call fails deterministically are retried on every subsequent `summarize` run forever — `LLMProviderError` is non-transient, so the article is marked `summary_status = "error"` and re-picked by `_SUMMARIZABLE` in `pipeline/summarize.py` on the next run, burning LLM spend indefinitely with no attempt counter, terminal state, or alert.
+  evidence: Raised in GH #38's own "Operational concern" section, but deliberately split out of that issue's scope by the user: #38's stated first step is diagnostic logging only, and the right retry policy depends on what the logging reveals (a transient formatting wobble deserves a retry; a deterministic schema failure for a specific article does not). Needs a real design decision — attempt counter on `Article`, a terminal `summary_status`, or a dead-letter view for the admin — rather than a quick guard.
+- source_spec: none
+  summary: The actual fix for the ~41% malformed-output rate from `z-ai/glm-5.2` (markdown-fence stripping, OpenRouter `response_format: json_object`, a JSON-repair pass, or prompt tightening) is not yet chosen.
+  evidence: Split from GH #38 by the user's explicit decision to scope this story to diagnostics only. The issue itself argues the fix cannot be responsibly selected before the raw model output is visible — each candidate mitigation targets a different failure mode, and picking one blind risks shipping a no-op. Becomes actionable once a live run with the new logging produces real failure samples.
+
 ## Deferred from: spec-gh-39-swappable-log-destination (2026-08-02)
 
 - source_spec: `_bmad-output/implementation-artifacts/spec-gh-39-swappable-log-destination.md`
