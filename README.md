@@ -39,9 +39,35 @@ alembic upgrade head
 Configuration is read from environment variables (or a local `.env` file, not committed) with the
 `NEWSAGENT_` prefix. Defaults work out of the box for local dev:
 
-| Variable                 | Default                    | Purpose                 |
-| ------------------------ | -------------------------- | ----------------------- |
-| `NEWSAGENT_DATABASE_URL` | `sqlite:///./newsagent.db` | SQLAlchemy database URL |
+| Variable                      | Default                    | Purpose                                            |
+| ----------------------------- | -------------------------- | -------------------------------------------------- |
+| `NEWSAGENT_DATABASE_URL`      | `sqlite:///./newsagent.db` | SQLAlchemy database URL                            |
+| `NEWSAGENT_LOG_DESTINATION`   | `stderr`                   | Where log records go: `stderr`, `stdout`, or `file` |
+| `NEWSAGENT_LOG_LEVEL`         | `WARNING`                  | Root log level (`DEBUG`, `INFO`, `WARNING`, ...)   |
+| `NEWSAGENT_LOG_FILE`          | _(unset)_                  | Log file path — required when destination is `file` |
+
+Logging is wired at every entrypoint — the CLI, the API process, and `newsagent.llm.demo` — so
+the same settings apply however you run it. With `file`, the parent directory is created if
+missing, and the API's own uvicorn startup/error/access lines are captured alongside
+`newsagent.*` records. `httpx`/`httpcore` stay at WARNING so `DEBUG` shows application records
+rather than transport traces.
+
+`NEWSAGENT_LOG_LEVEL` is the single source of truth for verbosity and takes precedence over
+uvicorn's own `--log-level`. `--no-access-log` is still honored — it says "don't produce these
+records", not "how verbose". Note the default level is `WARNING`, so a deployment that wants
+uvicorn's startup and request lines must set `NEWSAGENT_LOG_LEVEL=INFO`.
+
+To capture a pipeline run for debugging (PowerShell):
+
+```powershell
+$env:NEWSAGENT_LOG_DESTINATION="file"; $env:NEWSAGENT_LOG_FILE="./logs/newsagent.log"; $env:NEWSAGENT_LOG_LEVEL="DEBUG"; python -m newsagent.cli summarize
+```
+
+The equivalent in bash:
+
+```bash
+NEWSAGENT_LOG_DESTINATION=file NEWSAGENT_LOG_FILE=./logs/newsagent.log NEWSAGENT_LOG_LEVEL=DEBUG python -m newsagent.cli summarize
+```
 
 ## Running locally
 

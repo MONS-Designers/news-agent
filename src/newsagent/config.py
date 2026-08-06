@@ -36,6 +36,13 @@ class Settings(BaseSettings):
     # When set, the console sender also writes each email's HTML here
     email_outbox_dir: str = ""
 
+    # Where log records go (see newsagent.logging_setup): stderr | stdout | file.
+    # The defaults reproduce Python's last-resort behavior — WARNING+ to stderr.
+    log_destination: str = "stderr"
+    log_level: str = "WARNING"
+    # Required when log_destination="file"; ignored otherwise.
+    log_file: str = ""
+
     # Google OAuth (set real values in .env — never commit them)
     google_client_id: str = ""
     google_client_secret: str = ""

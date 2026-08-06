@@ -10,12 +10,14 @@ import argparse
 
 from newsagent.db import SessionLocal
 from newsagent.llm import get_llm_provider
+from newsagent.logging_setup import configure_logging
 from newsagent.mail import get_email_sender
 from newsagent.pipeline import digest, fetcher, relevance, send, summarize
 from newsagent.services import identity, preferences, sources, taxonomy
 
 
 def main(argv: list[str] | None = None) -> int:
+    configure_logging()
     parser = argparse.ArgumentParser(prog="newsagent")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
