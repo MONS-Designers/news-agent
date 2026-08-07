@@ -26,10 +26,11 @@ class Settings(BaseSettings):
     interestingness_weight: float = 0.60
     personalization_weight: float = 0.40
     # Recency decay half-life: an article this many hours old scores half of a
-    # brand-new one.
-    recency_half_life_hours: float = 24.0
+    # brand-new one. Tuned to the weekly send cadence — 84h (half a week) keeps
+    # a Monday article competitive against a Sunday one instead of burying it.
+    recency_half_life_hours: float = 84.0
     # Top-N articles selected per user's digest per run; the rest stay undelivered.
-    digest_max_articles: int = 5
+    digest_max_articles: int = 7
 
     # Which email sender adapter the pipeline uses (see newsagent.mail.factory)
     email_sender: str = "console"

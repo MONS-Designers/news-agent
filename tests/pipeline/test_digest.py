@@ -135,7 +135,7 @@ def test_same_day_rerun_never_exceeds_cap(db: Session):
 
 
 def test_cap_selects_top_n_and_leaves_rest_undelivered(db: Session):
-    """8 undelivered candidates, cap = digest_max_articles (5 by default):
+    """8 undelivered candidates, cap = digest_max_articles (7 by default):
     exactly the cap gets attached this run, and the leftover stay undelivered
     for a future run (GH #25)."""
     articles = [add_article(db, source_id=1, url_suffix=str(i)) for i in range(8)]

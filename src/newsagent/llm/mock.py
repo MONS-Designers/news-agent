@@ -138,7 +138,7 @@ class MockLLMProvider(LLMProvider):
             return Refusal(reason="no headlines to compose a voice from")
 
         intro_he = (
-            f"[דמה] בוקר טוב! ליקטתי עבורך {len(headlines)} כתבות נבחרות להיום. "
+            f"[דמה] בוקר טוב! ליקטתי עבורך {len(headlines)} כתבות נבחרות לשבוע החולף. "
             "קריאה נעימה ☕"
         )
         # Stable joke pick from the day's headlines, so the same set → same joke.

@@ -1,5 +1,11 @@
 # Deferred Work
 
+## Escalated by the weekly-cadence decision (2026-08-07)
+
+- source_spec: none
+  summary: **GH #37 (no topic-diversity guarantee in ranking) is escalated from "nice to have" to an MVP blocker by the move from a daily to a weekly digest.** `pipeline/ranking.py::select_top` ranks purely on `final_score` with no per-topic floor, so a user subscribed to 4 topics can receive a digest where 7 of 7 articles come from one topic and three subscribed topics are silently absent — for a whole week rather than a day.
+  evidence: The change of cadence changes the odds, not the code. Daily, ~1 day of candidates competed for 5 slots and a crowded-out topic reappeared the next morning; weekly, ~7 days of candidates compete for 7 slots (`digest_max_articles=7`), so a high-volume topic has roughly 7x the candidates to fill the same shortlist with, and a crowded-out topic is invisible until the *next week*. `recency_half_life_hours=84` makes it worse in one specific way: a topic whose sources publish in bursts near the send date now dominates the recency term for every one of its articles at once. The user explicitly asked for this to be recorded so it is not missed. Fix belongs in `select_top` (e.g. reserve at least one slot per subscribed topic that has any candidate, then fill the remainder by score) — a contained change, but a real product decision about the score-vs-coverage tradeoff, so it should be spec'd rather than patched.
+
 ## Deferred from: GH #40 / #41 live verification (2026-08-06)
 
 - source_spec: none

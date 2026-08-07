@@ -83,7 +83,12 @@ def select_top(
     same-day rerun has already attached some of today's digest, so the total
     per digest never exceeds `digest_max_articles`. Callers are responsible
     for leaving the rest unattached (no DigestArticle row) so they remain
-    undelivered."""
+    undelivered.
+
+    Known gap (GH #37, MVP blocker since the weekly cadence): ranking is purely
+    by score with no per-topic floor, so one high-volume topic can take every
+    slot and a subscribed topic can be absent from the digest entirely — for a
+    whole week, now that a week of candidates competes for these slots."""
     if limit is None:
         limit = settings.digest_max_articles
     if not candidates or limit <= 0:

@@ -3,7 +3,7 @@
     <div>
       <h1 class="text-2xl font-semibold tracking-tight">My topic preferences</h1>
       <p class="mt-1 text-sm text-neutral-500">
-        Choose which topics appear in your daily digest.
+        Choose which topics appear in your weekly digest.
       </p>
     </div>
 

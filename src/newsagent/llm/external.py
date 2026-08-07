@@ -186,7 +186,7 @@ class ExternalLLMProvider(LLMProvider):
             return refusal
 
         system = (
-            "You summarize news articles into Hebrew for a daily digest. The "
+            "You summarize news articles into Hebrew for a weekly digest. The "
             "source article may be in any language. Respond with STRICT JSON "
             "only, no markdown fencing, no extra keys, matching exactly this "
             "schema:\n"
@@ -228,9 +228,9 @@ class ExternalLLMProvider(LLMProvider):
             return Refusal(reason="no headlines to compose a voice from")
 
         system = (
-            "You write the editorial voice for a Hebrew daily news digest: a "
+            "You write the editorial voice for a Hebrew weekly news digest: a "
             "warm one-line Hebrew opening and a light Hebrew joke tied to the "
-            "day's news. Respond with STRICT JSON only, no markdown fencing, "
+            "week's news. Respond with STRICT JSON only, no markdown fencing, "
             'no extra keys: {"intro_he": <string>, "dad_joke_he": <string>}.'
         )
         headlines_block = "\n".join(f"- {headline}" for headline in headlines)

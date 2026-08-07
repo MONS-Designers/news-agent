@@ -29,7 +29,7 @@ def send_pending_digests(db: Session, sender: EmailSender) -> SendReport:
     digests = db.scalars(select(Digest).where(Digest.sent_at.is_(None))).all()
     for digest in digests:
         html = render_digest_html(digest)
-        subject = f"הדייג'סט היומי שלך — {digest.date.isoformat()}"
+        subject = f"הדייג'סט השבועי שלך — {digest.date.isoformat()}"
         try:
             sender.send(digest.user.email, subject, html)
         except EmailSendError as error:

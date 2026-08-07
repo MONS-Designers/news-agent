@@ -12,7 +12,7 @@
       <h1 class="title">One digest.<br />Everything that matters to you.</h1>
       <p class="subtitle">
         An AI that reads the news so you don't have to — distilled into one focused digest,
-        delivered daily, built around what you actually care about.
+        delivered weekly, built around what you actually care about.
       </p>
       <button type="button" class="cta" @click="goToPreferences">
         Set up your digest
@@ -64,7 +64,7 @@ const steps = [
   },
   {
     title: "You get one digest",
-    body: "A single, focused email each day. No feed to scroll, no app to open.",
+    body: "A single, focused email each week. No feed to scroll, no app to open.",
   },
 ];
 

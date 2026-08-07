@@ -1,11 +1,15 @@
 """Digest builder stage: for each user, gather summarized articles
 in their subscribed topics that were never delivered to them before, and build
-(or extend) today's Digest.
+(or extend) the Digest for `for_date` — the weekly send date.
 
-Selection is "not yet sent", not "today's articles": a DigestArticle row is
-itself the record of delivery, so nothing repeats across days and nothing is
-lost if a day is skipped. One digest per user per date (unique constraint);
-re-running a day appends only newly arrived articles; no empty digests.
+Selection is "not yet sent", not "articles from this week": a DigestArticle row
+is itself the record of delivery, so nothing repeats across runs and nothing is
+lost if a week is skipped. One digest per user per date (unique constraint);
+re-running the same date appends only newly arrived articles; no empty digests.
+
+Cadence note: fetch/filter/summarize run daily so nothing scrolls off an RSS
+feed unseen, while this stage and `send` run weekly — so a week's worth of
+summarized candidates competes for `digest_max_articles` slots here.
 """
 
 import logging
