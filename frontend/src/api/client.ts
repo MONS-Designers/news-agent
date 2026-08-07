@@ -55,7 +55,10 @@ export interface ProfileUpdate {
 }
 
 export interface TopicSuggestions {
-  suggestion_status: "none" | "pending" | "ready" | "failed";
+  // "pending_slow" is non-terminal like "pending" — the backend is still
+  // working, but one of its two concurrent calls already failed and it is
+  // waiting out the other's retries (GH #36). Keep polling through it.
+  suggestion_status: "none" | "pending" | "pending_slow" | "ready" | "failed";
   suggested_topic_ids: number[] | null;
   suggested_new_topic_names: string[] | null;
 }

@@ -10,7 +10,9 @@
       </p>
     </div>
 
-    <p v-if="loading" class="placeholder">Finding suggestions for you…</p>
+    <p v-if="loading" class="placeholder" role="status" aria-live="polite">
+      {{ extendedWait ? "Still trying — this one's taking longer than usual…" : "Finding suggestions for you…" }}
+    </p>
     <p v-else-if="loadError" class="form-error">Couldn't load topics. Try reloading the page.</p>
 
     <template v-else>
@@ -64,16 +66,20 @@ const emit = defineEmits<{ back: []; saved: [] }>();
 const MAX_TOPICS = 4;
 
 const POLL_INTERVAL_MS = 400;
-// ~45s budget. This story added a second sequential LLM call
-// (suggest_new_topics after suggest_topics) to the same background
-// computation this polls for — measured ~25s combined against a real
-// OpenRouter model, well past the previous single-call ~8s budget. A
-// too-short budget doesn't error, it silently falls back to "current
-// subscriptions", which looks indistinguishable from the feature not
-// working at all.
+// ~45s budget. The background computation this polls for makes two LLM calls
+// (suggest_topics and suggest_new_topics). They now run concurrently (GH #36),
+// so the normal wait is the slower of the two — ~14s against a real OpenRouter
+// model — but a run that retries a failed call can still outlast this budget.
+// A too-short budget doesn't error, it silently falls back to "current
+// subscriptions", which looks indistinguishable from the feature not working
+// at all.
 const MAX_POLL_ATTEMPTS = 112;
 
 const loading = ref(true);
+// Set while the backend reports "pending_slow" — one of its two concurrent
+// LLM calls failed and it's waiting out the other's retries (GH #36). Only
+// swaps the loading copy; polling and the fallback are unchanged.
+const extendedWait = ref(false);
 const loadError = ref(false);
 const saving = ref(false);
 const saveMessage = ref("");
@@ -115,6 +121,7 @@ async function pollForSuggestions() {
     if (result.suggestion_status === "ready" || result.suggestion_status === "failed") {
       return result;
     }
+    extendedWait.value = result.suggestion_status === "pending_slow";
     await sleep(POLL_INTERVAL_MS);
   }
   // Exhausted the polling budget — treat like a failure so the fallback below

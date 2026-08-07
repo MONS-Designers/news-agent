@@ -3,7 +3,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from newsagent.models import Field, PendingTaxonomySuggestion, Role, Topic
+from newsagent.models import Field, PendingTaxonomySuggestion, Role, Topic, User
+from newsagent.models.user import SUGGESTION_STATUS_PENDING_SLOW
 from newsagent.services import taxonomy
 from newsagent.suggestions.types import RoleOption
 
@@ -449,6 +450,23 @@ def test_profile_save_triggers_background_computation_visible_via_get(
     body = get_response.json()
     assert body["suggestion_status"] == "ready"
     assert body["suggested_topic_ids"]  # non-empty — the 3 seeded topics
+
+
+def test_topic_suggestions_surfaces_pending_slow(
+    as_user_with_db: TestClient, seeded_db: Session
+):
+    """The extended-wait notice (GH #36) is only useful if the value actually
+    reaches the wizard. This passes today because the response field is a bare
+    `str`; it exists so narrowing that field to a Literal/Enum — which the
+    frontend's own status union invites — can't silently drop the new value."""
+    user = seeded_db.scalar(select(User))
+    user.suggestion_status = SUGGESTION_STATUS_PENDING_SLOW
+    seeded_db.commit()
+
+    response = as_user_with_db.get("/me/topic-suggestions")
+
+    assert response.status_code == 200
+    assert response.json()["suggestion_status"] == "pending_slow"
 
 
 # --- Prompt suggestions (Role and Prompt Suggestions story) -----------------

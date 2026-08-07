@@ -1,5 +1,20 @@
 # Deferred Work
 
+## Deferred from: code review of spec-gh-36-parallel-topic-suggestions (2026-08-07)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-gh-36-parallel-topic-suggestions.md`
+  summary: A total provider outage now costs up to 6 LLM requests per suggestion run instead of up to 3, because both calls always dispatch where the sequential version short-circuited the second when the first exhausted its retries.
+  evidence: Surfaced by edge-case review as a direct, unavoidable consequence of GH #36's design — you cannot skip call B on call A's failure when they run concurrently, and the user explicitly chose not to cancel the surviving call. Harmless at the MVP's 2 dogfood users, but it doubles the worst-case burn rate on a paid endpoint, which belongs with Moshe's LLM cost control in news-agent-infra rather than as an app-level change. Worth a deliberate look before public signup, alongside the executor-sizing question the spec put under "Ask First".
+- source_spec: `_bmad-output/implementation-artifacts/spec-gh-36-parallel-topic-suggestions.md`
+  summary: `TopicsStep.vue::load` runs `pollForSuggestions()` and `listMyPreferences()` under one `Promise.all` with no cancellation, so if the preferences fetch rejects the poll loop keeps running (and now keeps writing `extendedWait`) for the rest of its ~45s budget behind an already-rendered error state.
+  evidence: Pre-existing structure — the orphaned loop predates GH #36, which only adds a reactive write inside it. Currently invisible: the template renders the placeholder only while `loading` is true, and the `catch` sets `loading = false`, so the stray writes reach nothing. Recorded because the next change to this component's loading states could make it visible, and the durable fix (an `AbortController` or a cancellation flag cleared on unmount) is a component-wide concern rather than a one-line guard.
+- source_spec: `_bmad-output/implementation-artifacts/spec-gh-36-parallel-topic-suggestions.md`
+  summary: `_FailsLastSource` in `tests/services/test_profile_suggestions.py` depends on an unenforced happens-before — its event fires just before the sibling returns, and only a documented `time.sleep(0.05)` separates "sibling already done" from "sibling still running".
+  evidence: Raised by both review passes. Adversarial review tried to break it and could not: 10 runs with the sleep neutralized and 15 runs under four CPU-burning threads with `sys.setswitchinterval(1e-6)` all passed, so this is latent fragility rather than a demonstrated flake. Not fixable within the current fixture shape — a source object cannot observe its own `Future`, so deterministic ordering would have to be driven from the test via a done-callback, which is a bigger rewrite than the scenario justifies today.
+- source_spec: `_bmad-output/implementation-artifacts/spec-gh-36-parallel-topic-suggestions.md`
+  summary: Each in-flight profile save now holds three threads (the anyio BackgroundTask worker plus a fresh two-worker `ThreadPoolExecutor`), with nothing capping how many saves run at once.
+  evidence: Surfaced by adversarial review. Harmless at the MVP's 2 seeded users, and the executor is correctly scoped to a `with` block so threads are reclaimed per run. It becomes a real capacity question the moment public signup lands, at which point a shared/bounded pool beats per-call executors. Deliberately not resolved in GH #36: the spec lists making the executor size configurable under "Ask First", and picking a pooling strategy without real concurrency numbers would be guessing.
+
 ## Escalated by the weekly-cadence decision (2026-08-07)
 
 - source_spec: none

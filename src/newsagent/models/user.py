@@ -17,6 +17,12 @@ SUGGESTION_STATUS_PENDING = "pending"
 SUGGESTION_STATUS_READY = "ready"
 SUGGESTION_STATUS_FAILED = "failed"
 
+# Non-terminal, like "pending" — the run is still working, but one of its two
+# concurrent LLM calls has already failed and we are waiting out the survivor's
+# retries (GH #36). Pollers must keep polling through it; every run that writes
+# it still settles on "ready" or "failed".
+SUGGESTION_STATUS_PENDING_SLOW = "pending_slow"
+
 
 class User(Base):
     __tablename__ = "users"
