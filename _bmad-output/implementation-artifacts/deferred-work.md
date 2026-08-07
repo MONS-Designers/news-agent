@@ -1,5 +1,14 @@
 # Deferred Work
 
+## Deferred from: GH #40 / #41 live verification (2026-08-06)
+
+- source_spec: none
+  summary: After the markdown-fence fix (#40) the summarize failure rate against `z-ai/glm-5.2` measured 3/20 (15%) on the previously-failing subset, down from 41% — but the remainder is two distinct causes, not one: unescaped ASCII quotes inside Hebrew acronyms (מכ"ם, צה"ל) terminating the JSON string mid-word, and the model simply truncating its object after the first field.
+  evidence: Measured on 2026-08-06 with #38's stage-labelled diagnostics. `response_format: {"type": "json_object"}` was implemented, verified as supported by OpenRouter, measured, and **reverted** — it left the rate unchanged at 3/20 and introduced a 67,440-character runaway response (~120x the tokens, and therefore the cost, of the 547-char failure it replaced). Full data in GH #41, closed as not-planned. The next candidate is schema-level constraint (`json_schema` / structured outputs) plus a `max_tokens` cap so no single call can cost 120x, rather than syntax-level constraint.
+- source_spec: none
+  summary: Articles 169 and 171 failed identically in both live runs, confirming a deterministic, content-specific failure component — so the deferred retry-policy work needs a terminal state, not just a retry budget.
+  evidence: Both the #40 and #41 verification runs failed on the same two article ids while other articles' outcomes varied between runs. This settles a question the earlier retry-policy entry (also in this file, from GH #38 intent clarification) could not answer: the failures are *not* purely random, so re-attempting forever will never clear these particular articles. Combined with the ~50% random component measured for fencing, the right policy is probably a small attempt budget plus a terminal `summary_status`, not unlimited retries.
+
 ## Deferred from: intent clarification for GH #38 (2026-08-06)
 
 - source_spec: none
