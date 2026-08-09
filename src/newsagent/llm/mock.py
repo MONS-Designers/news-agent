@@ -94,10 +94,9 @@ class MockLLMProvider(LLMProvider):
             return Refusal(reason="empty topic")
         text_tokens = set(_tokens(f"{article.title} {article.text}"))
         score = len(topic_tokens & text_tokens) / len(topic_tokens)
-        return RelevanceScore(
-            score=score,
-            usage=Usage(input_units=len(_tokens(article.text)), output_units=1),
-        )
+        usage = Usage(input_units=len(_tokens(article.text)), output_units=1)
+        self._record_usage(usage)
+        return RelevanceScore(score=score, usage=usage)
 
     def _summarize(self, article: ArticleInput) -> SummaryResult | Refusal:
         self._maybe_fail()
@@ -122,6 +121,8 @@ class MockLLMProvider(LLMProvider):
         # Deterministic interestingness in [0, 1] from a stable hash of the title.
         interestingness = (int(hashlib.sha1(article.title.encode()).hexdigest(), 16) % 1000) / 1000
 
+        usage = Usage(input_units=len(words), output_units=len(summary_he.split()))
+        self._record_usage(usage)
         return SummaryResult(
             summary_he=summary_he,
             title_he=f"[תרגום דמה] {article.title}",
@@ -129,7 +130,7 @@ class MockLLMProvider(LLMProvider):
             reading_time_minutes=max(1, round(len(words) / _WORDS_PER_MINUTE)),
             bullets_he=bullets_he,
             interestingness=interestingness,
-            usage=Usage(input_units=len(words), output_units=len(summary_he.split())),
+            usage=usage,
         )
 
     def _compose_digest_voice(self, headlines: Sequence[str]) -> DigestVoice | Refusal:
@@ -144,8 +145,6 @@ class MockLLMProvider(LLMProvider):
         # Stable joke pick from the day's headlines, so the same set → same joke.
         index = int(hashlib.sha1(" ".join(headlines).encode()).hexdigest(), 16) % len(_DAD_JOKES)
         dad_joke_he = f"[דמה] {_DAD_JOKES[index]}"
-        return DigestVoice(
-            intro_he=intro_he,
-            dad_joke_he=dad_joke_he,
-            usage=Usage(input_units=len(headlines), output_units=2),
-        )
+        usage = Usage(input_units=len(headlines), output_units=2)
+        self._record_usage(usage)
+        return DigestVoice(intro_he=intro_he, dad_joke_he=dad_joke_he, usage=usage)

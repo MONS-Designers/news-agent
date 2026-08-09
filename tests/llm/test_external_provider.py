@@ -325,3 +325,117 @@ def test_non_string_content_stays_inside_the_llm_error_hierarchy(content, caplog
 
     assert "stage=json" in caplog.text
     assert type(content).__name__ in caplog.text, "the log must name the type it got"
+
+
+def test_usage_is_attached_to_the_result_in_tokens():
+    """GH #19: the provider-reported counts must reach the pipeline reports,
+    tagged as tokens so they never mix with the mock provider's word counts."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "choices": [{"message": {"content": json.dumps({"score": 0.5})}}],
+                "usage": {"prompt_tokens": 900, "completion_tokens": 12},
+            },
+        )
+
+    result = _provider_with_handler(handler).score_relevance(ON_TOPIC_ARTICLE, TOPIC)
+
+    assert result.usage is not None
+    assert (result.usage.input_units, result.usage.output_units) == (900, 12)
+    assert result.usage.unit == "tokens"
+
+
+def test_result_is_unchanged_when_the_backend_reports_no_usage():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200, json={"choices": [{"message": {"content": json.dumps({"score": 0.5})}}]}
+        )
+
+    result = _provider_with_handler(handler).score_relevance(ON_TOPIC_ARTICLE, TOPIC)
+
+    assert result.score == 0.5
+    assert result.usage is None
+
+
+def test_json_stage_failure_still_records_usage_for_draining():
+    """GH #19: the fix's core acceptance criterion. HTTP 200 with a valid
+    usage block, but content that fails json.loads (GH #38's stage=json) —
+    the call was billed and must be counted, not silently zero."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "choices": [{"message": {"content": "not json at all"}}],
+                "usage": {"prompt_tokens": 640, "completion_tokens": 88},
+            },
+        )
+
+    provider = _provider_with_handler(handler)
+    with pytest.raises(LLMProviderError):
+        provider.summarize(ON_TOPIC_ARTICLE)
+
+    drained = provider.drain_usage()
+    assert len(drained) == 1
+    assert (drained[0].input_units, drained[0].output_units) == (640, 88)
+    assert drained[0].unit == "tokens"
+
+
+def test_schema_stage_failure_still_records_usage_for_draining():
+    """Same acceptance criterion, for a call that parsed as JSON but failed
+    the schema build (GH #38's stage=schema)."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        content = json.dumps({"unexpected": "shape"})
+        return httpx.Response(
+            200,
+            json={
+                "choices": [{"message": {"content": content}}],
+                "usage": {"prompt_tokens": 300, "completion_tokens": 40},
+            },
+        )
+
+    provider = _provider_with_handler(handler)
+    with pytest.raises(LLMProviderError):
+        provider.score_relevance(ON_TOPIC_ARTICLE, TOPIC)
+
+    drained = provider.drain_usage()
+    assert (drained[0].input_units, drained[0].output_units) == (300, 40)
+
+
+def test_successful_call_does_not_double_count_usage():
+    """The success path attaches Usage to the result AND records it once for
+    draining — these must be the same single billed call, not two counts."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "choices": [{"message": {"content": json.dumps({"score": 0.5})}}],
+                "usage": {"prompt_tokens": 100, "completion_tokens": 5},
+            },
+        )
+
+    provider = _provider_with_handler(handler)
+    result = provider.score_relevance(ON_TOPIC_ARTICLE, TOPIC)
+
+    assert result.usage is not None
+    drained = provider.drain_usage()
+    assert len(drained) == 1
+    assert (drained[0].input_units, drained[0].output_units) == (100, 5)
+
+
+def test_auth_failure_records_no_usage():
+    """A 401/403 never reaches a JSON body with a usage block — nothing was
+    billed, so drain_usage() must stay empty."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(401, json={"error": "unauthorized"})
+
+    provider = _provider_with_handler(handler)
+    with pytest.raises(LLMProviderError):
+        provider.score_relevance(ON_TOPIC_ARTICLE, TOPIC)
+
+    assert provider.drain_usage() == []

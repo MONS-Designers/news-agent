@@ -54,14 +54,14 @@ class LLMSuggestionSource(SuggestionSource):
             {"role": "user", "content": user},
         ]
         try:
-            content = send_chat_completion(
+            completion = send_chat_completion(
                 base_url=self._base_url,
                 auth_token=self._auth_token,
                 model=self._model,
                 messages=messages,
                 client=self._client,
             )
-            data = json.loads(strip_code_fence(content))
+            data = json.loads(strip_code_fence(completion.content))
             return build(data)
         except httpx.HTTPStatusError as error:
             status = error.response.status_code

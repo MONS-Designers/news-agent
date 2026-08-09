@@ -5,6 +5,7 @@ kept fully separate from `local_llm_*` (used by `suggestions/llm.py`, AD-3):
 neither adapter shares a client or a base_url with the other.
 """
 
+import dataclasses
 import json
 import logging
 from collections.abc import Callable, Sequence
@@ -16,7 +17,14 @@ from newsagent.config import settings
 from newsagent.http_llm_client import send_chat_completion
 from newsagent.llm.base import LLMProvider
 from newsagent.llm.errors import LLMInputError, LLMProviderError, LLMTransportError
-from newsagent.llm.types import ArticleInput, DigestVoice, Refusal, RelevanceScore, SummaryResult
+from newsagent.llm.types import (
+    ArticleInput,
+    DigestVoice,
+    Refusal,
+    RelevanceScore,
+    SummaryResult,
+    Usage,
+)
 from newsagent.llm_json import strip_code_fence
 
 logger = logging.getLogger(__name__)
@@ -79,12 +87,25 @@ class ExternalLLMProvider(LLMProvider):
             {"role": "system", "content": system},
             {"role": "user", "content": user},
         ]
+        def _on_usage(prompt_tokens: int | None, completion_tokens: int | None) -> None:
+            # Fires inside send_chat_completion the moment a usage block is
+            # seen — before content is even extracted — so a call that billed
+            # tokens but then failed at any of the three stages below still
+            # gets counted. This is the ONLY place usage is recorded for this
+            # attempt; the success path's `dataclasses.replace(... usage=...)`
+            # below is a separate, per-result attachment, not a second count.
+            self._record_usage(
+                Usage(input_units=prompt_tokens or 0, output_units=completion_tokens or 0,
+                      unit="tokens")
+            )
+
         try:
-            content = send_chat_completion(
+            completion = send_chat_completion(
                 base_url=self._base_url,
                 auth_token=self._auth_token,
                 model=self._model,
                 messages=messages,
+                on_usage=_on_usage,
                 client=self._client,
             )
         except httpx.HTTPStatusError as error:
@@ -109,6 +130,7 @@ class ExternalLLMProvider(LLMProvider):
             )
             raise LLMProviderError("external LLM returned malformed output") from error
 
+        content = completion.content
         try:
             data = json.loads(strip_code_fence(content))
         except (TypeError, ValueError) as error:
@@ -132,7 +154,7 @@ class ExternalLLMProvider(LLMProvider):
             raise LLMProviderError("external LLM returned malformed output") from error
 
         try:
-            return build(data)
+            result = build(data)
         except (KeyError, IndexError, TypeError, ValueError) as error:
             logger.warning(
                 "malformed output (stage=schema, model=%s, len=%s): %s: %s -- %s",
@@ -143,6 +165,24 @@ class ExternalLLMProvider(LLMProvider):
                 _clip(content),
             )
             raise LLMProviderError("external LLM returned malformed output") from error
+
+        # Attached here rather than inside each `build`: usage comes from the
+        # response envelope, not from the model's JSON, so the builders stay
+        # concerned only with the content contract. unit="tokens" because the
+        # neutral Usage type deliberately does not assume an LLM is behind it.
+        if completion.prompt_tokens is None and completion.completion_tokens is None:
+            return result
+        # Every T here (RelevanceScore, SummaryResult, DigestVoice) is a frozen
+        # dataclass carrying `usage`, but they share no base class for the
+        # TypeVar to be bound to — hence the ignore below.
+        return dataclasses.replace(  # type: ignore[type-var]
+            result,
+            usage=Usage(
+                input_units=completion.prompt_tokens or 0,
+                output_units=completion.completion_tokens or 0,
+                unit="tokens",
+            ),
+        )
 
     # -- junk/empty pre-checks, no network call ------------------------------
 

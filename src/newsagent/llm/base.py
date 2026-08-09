@@ -15,7 +15,14 @@ from collections.abc import Callable, Sequence
 from typing import TypeVar
 
 from newsagent.llm.errors import LLMError
-from newsagent.llm.types import ArticleInput, DigestVoice, Refusal, RelevanceScore, SummaryResult
+from newsagent.llm.types import (
+    ArticleInput,
+    DigestVoice,
+    Refusal,
+    RelevanceScore,
+    SummaryResult,
+    Usage,
+)
 
 T = TypeVar("T")
 
@@ -31,6 +38,7 @@ class LLMProvider(ABC):
         self._max_attempts = max_attempts
         self._backoff_seconds = backoff_seconds
         self._sleep = sleep
+        self._usage_log: list[Usage] = []
 
     # -- public contract -----------------------------------------------------
 
@@ -61,6 +69,23 @@ class LLMProvider(ABC):
             self.score_relevance(article, topic, preference_history=preference_history)
             for article in articles
         ]
+
+    # -- usage accounting ------------------------------------------------------
+
+    def _record_usage(self, usage: Usage | None) -> None:
+        """Called by an adapter for every billed attempt — including ones that
+        go on to fail — so cost is never invisible just because a call didn't
+        return a result. GH #19."""
+        if usage is not None:
+            self._usage_log.append(usage)
+
+    def drain_usage(self) -> list[Usage]:
+        """Every Usage recorded since the last drain, across every attempt for
+        the call just made — success or failure, including retries. Callers
+        (the pipeline stages) drain once per article so failures still get
+        counted instead of silently reading as zero."""
+        usage_log, self._usage_log = self._usage_log, []
+        return usage_log
 
     # -- adapter surface -----------------------------------------------------
 
