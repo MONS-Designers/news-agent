@@ -12,8 +12,9 @@ from newsagent.db import SessionLocal
 from newsagent.llm import get_llm_provider
 from newsagent.logging_setup import configure_logging
 from newsagent.mail import get_email_sender
+from newsagent.models.pipeline_run import RUN_TYPE_FILTER, RUN_TYPE_SUMMARIZE
 from newsagent.pipeline import digest, fetcher, relevance, send, summarize
-from newsagent.services import identity, preferences, sources, taxonomy
+from newsagent.services import identity, pipeline_runs, preferences, sources, taxonomy
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -83,6 +84,15 @@ def main(argv: list[str] | None = None) -> int:
                 f"Usage: {filter_report.usage_input_units} in / "
                 f"{filter_report.usage_output_units} out units"
             )
+            pipeline_runs.record_run(
+                db,
+                run_type=RUN_TYPE_FILTER,
+                succeeded=filter_report.scored,
+                refused=filter_report.refused,
+                errors=filter_report.errors,
+                usage_input_units=filter_report.usage_input_units,
+                usage_output_units=filter_report.usage_output_units,
+            )
         elif args.command == "summarize":
             summary_report = summarize.summarize_relevant_articles(db, get_llm_provider())
             print(
@@ -92,6 +102,15 @@ def main(argv: list[str] | None = None) -> int:
             print(
                 f"Usage: {summary_report.usage_input_units} in / "
                 f"{summary_report.usage_output_units} out units"
+            )
+            pipeline_runs.record_run(
+                db,
+                run_type=RUN_TYPE_SUMMARIZE,
+                succeeded=summary_report.summarized,
+                refused=summary_report.refused,
+                errors=summary_report.errors,
+                usage_input_units=summary_report.usage_input_units,
+                usage_output_units=summary_report.usage_output_units,
             )
         elif args.command == "subscribe":
             try:

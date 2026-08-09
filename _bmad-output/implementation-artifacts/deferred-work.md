@@ -1,5 +1,11 @@
 # Deferred Work
 
+## Deferred from: code review of spec-gh-19-usage-run-log (2026-08-09)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-gh-19-usage-run-log.md`
+  summary: No test drives a real `filter`/`summarize` CLI run end-to-end through `cli.py` into a `pipeline_runs` row, so a transposition bug (e.g. swapping `refused`/`errors` at a call site) or a regression in the "billed-but-failed" acceptance criterion specifically would pass every existing test.
+  evidence: Surfaced independently by both review passes. `src/newsagent/cli.py` has zero test coverage today for any command — not `filter`, `summarize`, or anything else predating this story — so closing this gap means standing up CLI test infrastructure (argv/DB/LLM-provider fixtures) that doesn't exist anywhere in the codebase yet, which is a separate effort from this small story. `tests/services/test_pipeline_runs.py` covers `record_run()`'s persistence contract directly (including a zero-article-run case), which is the part this story owns; the field-mapping-is-correct guarantee still rests on code review alone.
+
 ## Deferred from: code review of spec-gh-36-parallel-topic-suggestions (2026-08-07)
 
 - source_spec: `_bmad-output/implementation-artifacts/spec-gh-36-parallel-topic-suggestions.md`
