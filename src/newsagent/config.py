@@ -37,6 +37,13 @@ class Settings(BaseSettings):
     # When set, the console sender also writes each email's HTML here
     email_outbox_dir: str = ""
 
+    # SMTP sender (email_sender="smtp") — real delivery, no vendor SDK.
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_from_address: str = ""
+    smtp_use_tls: bool = True
     # Where log records go (see newsagent.logging_setup): stderr | stdout | file.
     # The defaults reproduce Python's last-resort behavior — WARNING+ to stderr.
     log_destination: str = "stderr"
