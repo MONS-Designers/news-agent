@@ -1,50 +1,45 @@
 <template>
   <div>
-    <div class="suggestbar">
-      <div class="block-head">
-        <span class="step-num">3</span>
-        <span class="step-label">Suggested topics</span>
+    <div class="mb-4 flex items-center justify-between">
+      <div class="flex items-center gap-2.5">
+        <span
+          class="flex h-[22px] w-[22px] items-center justify-center rounded-md bg-hd-accent-2/16 text-[11px] font-bold text-hd-accent"
+          >3</span
+        >
+        <span class="text-[11px] font-bold uppercase tracking-[2px] text-hd-label">Suggested topics</span>
       </div>
-      <p v-if="!loading && !loadError" class="counter">
-        Selected <b>{{ pickedChips.length }}</b> / {{ MAX_TOPICS }}
+      <p v-if="!loading && !loadError" class="text-xs text-hd-muted">
+        Selected <b class="text-hd-accent">{{ pickedChips.length }}</b> / {{ MAX_TOPICS }}
       </p>
     </div>
 
-    <p v-if="loading" class="placeholder" role="status" aria-live="polite">
+    <p v-if="loading" class="text-[13px] text-hd-muted" role="status" aria-live="polite">
       {{ extendedWait ? "Still trying — this one's taking longer than usual…" : "Finding suggestions for you…" }}
     </p>
-    <p v-else-if="loadError" class="form-error">Couldn't load topics. Try reloading the page.</p>
+    <p v-else-if="loadError" class="text-xs text-hd-subtitle">Couldn't load topics. Try reloading the page.</p>
 
     <template v-else>
-      <div class="topic-grid" role="group" aria-label="Suggested topics">
+      <div class="flex flex-wrap gap-2.5" role="group" aria-label="Suggested topics">
         <button
           v-for="chip in allChips"
           :key="chipKey(chip)"
           type="button"
-          class="topic"
-          :class="{ picked: isPicked(chip), faint: !isPicked(chip) }"
+          :class="topicClasses(isPicked(chip))"
           :aria-pressed="isPicked(chip)"
           @click="toggleChip(chip)"
         >
           {{ chip.name }}
-          <span v-if="isPicked(chip)" class="x" aria-hidden="true">✕</span>
+          <span v-if="isPicked(chip)" class="ml-1 text-[11px] opacity-60" aria-hidden="true">✕</span>
         </button>
       </div>
-      <p class="hint">{{ capHintMessage || "Tap a faint topic to select it." }}</p>
+      <p class="mt-3.5 text-xs text-hd-muted">{{ capHintMessage || "Tap a faint topic to select it." }}</p>
     </template>
 
-    <div class="nav-row">
-      <button type="button" class="btn ghost" :disabled="saving" @click="emit('back')">
-        ← Back
-      </button>
-      <div class="nav-right">
-        <p v-if="saveMessage" class="save-message">{{ saveMessage }}</p>
-        <button
-          type="button"
-          class="btn primary"
-          :disabled="saving || loading || loadError"
-          @click="onSave"
-        >
+    <div class="mt-7 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3.5">
+      <button type="button" :class="BTN_GHOST" :disabled="saving" @click="emit('back')">← Back</button>
+      <div class="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:gap-3.5">
+        <p v-if="saveMessage" class="text-xs text-hd-subtitle">{{ saveMessage }}</p>
+        <button type="button" :class="BTN_PRIMARY" :disabled="saving || loading || loadError" @click="onSave">
           {{ saving ? "Saving…" : "Save preferences" }}
         </button>
       </div>
@@ -95,6 +90,23 @@ type Pick = { kind: "existing"; topicId: number } | { kind: "new"; name: string 
 
 const allChips = ref<SuggestionChip[]>([]);
 const pickedChips = ref<Pick[]>([]);
+
+const TOPIC_BASE =
+  "inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-full border px-4 py-[9px] text-[13.5px] [font-family:inherit] motion-reduce:transition-none [transition:border-color_0.18s_ease,background_0.18s_ease,transform_0.18s_ease] active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-hd-accent-2 focus-visible:outline-offset-2";
+const TOPIC_PICKED =
+  "border-hd-accent-2/50 bg-gradient-to-b from-hd-accent-2/22 to-hd-accent-2/[0.09] text-white";
+// Hover gated behind (hover:hover) so a tap doesn't leave a faint pill stuck
+// looking hovered on touch devices (see ChipRow.vue's CHIP_UNSELECTED).
+const TOPIC_FAINT =
+  "border-dashed border-white/[0.09] bg-white/[0.02] text-hd-subtitle opacity-45 [@media(hover:hover)]:hover:border-white/[0.22]";
+function topicClasses(picked: boolean): string {
+  return `${TOPIC_BASE} ${picked ? TOPIC_PICKED : TOPIC_FAINT}`;
+}
+
+const BTN_BASE =
+  "inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-[10px] border-0 text-[13.5px] font-semibold [font-family:inherit] [transition:transform_0.18s_ease] motion-reduce:transition-none active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-hd-accent-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:active:scale-100";
+const BTN_PRIMARY = `${BTN_BASE} px-[22px] py-[11px] bg-gradient-to-b from-[#7b86ff] to-[#5c68e8] text-white shadow-[0_10px_24px_-10px_rgba(109,123,255,0.6)] disabled:opacity-35 disabled:shadow-none`;
+const BTN_GHOST = `${BTN_BASE} px-2 py-[11px] bg-transparent text-hd-label [@media(hover:hover)]:[&:hover:not(:disabled)]:text-hd-chip disabled:opacity-35`;
 
 function chipKey(chip: SuggestionChip | Pick): string {
   return chip.kind === "existing" ? `existing:${chip.topicId}` : `new:${chip.name}`;
@@ -248,163 +260,3 @@ watch(
   { immediate: true },
 );
 </script>
-
-<style scoped>
-.block-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 0;
-}
-.step-num {
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
-  background: rgba(109, 123, 255, 0.16);
-  color: #a9b1ff;
-  font-size: 11px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.step-label {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  color: #6b7288;
-}
-
-.suggestbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16px;
-}
-.counter {
-  font-size: 12px;
-  color: #565f74;
-  margin: 0;
-}
-.counter b {
-  color: #a9b1ff;
-}
-
-.placeholder {
-  color: #565f74;
-  font-size: 13px;
-  margin: 0;
-}
-.form-error {
-  color: #8b93a7;
-  font-size: 12px;
-  margin: 0;
-}
-
-.topic-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-.topic {
-  padding: 9px 16px;
-  border-radius: 9999px;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  background: rgba(255, 255, 255, 0.02);
-  color: #8b93a7;
-  font-size: 13.5px;
-  cursor: pointer;
-  font-family: inherit;
-  transition:
-    border-color 0.18s ease,
-    background 0.18s ease;
-}
-.topic:hover {
-  border-color: rgba(255, 255, 255, 0.22);
-}
-.topic:focus-visible {
-  outline: 2px solid #6d7bff;
-  outline-offset: 2px;
-}
-.topic.picked {
-  background: linear-gradient(180deg, rgba(109, 123, 255, 0.22), rgba(109, 123, 255, 0.09));
-  border-color: rgba(109, 123, 255, 0.5);
-  color: #fff;
-}
-.topic.faint {
-  opacity: 0.45;
-  border-style: dashed;
-}
-.topic .x {
-  opacity: 0.6;
-  font-size: 11px;
-  margin-left: 4px;
-}
-
-.hint {
-  font-size: 12px;
-  color: #565f74;
-  margin: 14px 0 0;
-}
-
-.nav-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 28px;
-}
-.nav-right {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-.save-message {
-  color: #8b93a7;
-  font-size: 12px;
-  margin: 0;
-}
-
-.btn {
-  padding: 11px 22px;
-  border-radius: 10px;
-  font-size: 13.5px;
-  font-weight: 600;
-  cursor: pointer;
-  border: none;
-  font-family: inherit;
-}
-.btn:focus-visible {
-  outline: 2px solid #6d7bff;
-  outline-offset: 2px;
-}
-.btn:disabled {
-  cursor: not-allowed;
-}
-.btn.primary {
-  background: linear-gradient(180deg, #7b86ff, #5c68e8);
-  color: #fff;
-  box-shadow: 0 10px 24px -10px rgba(109, 123, 255, 0.6);
-}
-.btn.primary:disabled {
-  opacity: 0.35;
-  box-shadow: none;
-}
-.btn.ghost {
-  padding: 11px 8px;
-  background: transparent;
-  color: #6b7288;
-}
-.btn.ghost:hover:not(:disabled) {
-  color: #c4cadb;
-}
-.btn.ghost:disabled {
-  opacity: 0.35;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .topic {
-    transition: none;
-  }
-}
-</style>

@@ -1,19 +1,21 @@
 <template>
   <div>
-    <div class="block-head">
-      <span class="step-num">{{ stepNum }}</span>
-      <span class="step-label">{{ label }}</span>
+    <div class="mb-4 flex items-center gap-2.5">
+      <span
+        class="flex h-[22px] w-[22px] items-center justify-center rounded-md bg-hd-accent-2/16 text-[11px] font-bold text-hd-accent"
+        >{{ stepNum }}</span
+      >
+      <span class="text-[11px] font-bold uppercase tracking-[2px] text-hd-label">{{ label }}</span>
     </div>
 
-    <p v-if="placeholderText" class="row-placeholder">{{ placeholderText }}</p>
+    <p v-if="placeholderText" class="text-[13.5px] text-hd-muted">{{ placeholderText }}</p>
 
-    <div v-else class="chip-row" role="group" :aria-label="label">
+    <div v-else class="flex flex-wrap gap-2.5" role="group" :aria-label="label">
       <button
         v-for="option in options"
         :key="option.id ?? option.name"
         type="button"
-        class="chip"
-        :class="{ selected: isChipSelected(option) }"
+        :class="chipClasses(isChipSelected(option))"
         :aria-pressed="isChipSelected(option)"
         @click="selectChip(option)"
       >
@@ -21,8 +23,7 @@
       </button>
       <button
         type="button"
-        class="chip chip-other"
-        :class="{ selected: otherButtonActive }"
+        :class="chipClasses(otherButtonActive, { dashed: !otherButtonActive })"
         :aria-pressed="otherButtonActive"
         @click="selectOther"
       >
@@ -34,7 +35,7 @@
       v-if="otherButtonActive && !placeholderText"
       v-model="otherText"
       type="text"
-      class="other-input"
+      class="mt-3 w-full rounded-[10px] border border-hd-accent-2/40 bg-hd-accent-2/[0.06] px-3.5 py-[11px] text-[13.5px] text-hd-fg [font-family:inherit] placeholder:text-hd-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-hd-accent-2 focus-visible:outline-offset-2"
       :maxlength="MAX_NAME_LENGTH"
       :placeholder="otherPlaceholder"
       :aria-label="`Your ${label.toLowerCase()}, if not listed above`"
@@ -108,110 +109,24 @@ function selectOther() {
   selectedName.value = null;
   isOther.value = true;
 }
+
+const CHIP_BASE =
+  "inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-[10px] border px-4 py-[11px] text-[13.5px] [font-family:inherit] motion-reduce:transition-none [transition:border-color_0.18s_ease,background_0.18s_ease,transform_0.18s_ease] focus-visible:outline focus-visible:outline-2 focus-visible:outline-hd-accent-2 focus-visible:outline-offset-2 active:scale-[0.97]";
+// Hover styles are gated behind `hover:hover` so tapping on a touchscreen never
+// leaves a chip stuck in its hover-lit state (the classic mobile Safari/Chrome
+// sticky-:hover bug) — only pointers that can sustain hover (a mouse) get it.
+const CHIP_UNSELECTED =
+  "border-white/[0.09] bg-white/[0.02] [@media(hover:hover)]:hover:border-white/[0.22] [@media(hover:hover)]:hover:bg-white/[0.05] motion-safe:[@media(hover:hover)]:hover:-translate-y-px";
+const CHIP_SELECTED =
+  "border-hd-accent-2/55 bg-gradient-to-b from-hd-accent-2/22 to-hd-accent-2/10 text-white shadow-[0_0_0_1px_rgba(109,123,255,0.25),0_8px_24px_-8px_rgba(109,123,255,0.45)]";
+
+/** Shared chip styling; `dashed` marks the "Other" button's idle (not-yet-active) state. */
+function chipClasses(selected: boolean, opts: { dashed?: boolean } = {}): string {
+  const isDashed = !!opts.dashed && !selected;
+  const textColor = selected ? "" : isDashed ? "text-hd-subtitle" : "text-hd-chip";
+  const borderStyle = isDashed ? "border-dashed" : "";
+  return [CHIP_BASE, selected ? CHIP_SELECTED : CHIP_UNSELECTED, textColor, borderStyle]
+    .filter(Boolean)
+    .join(" ");
+}
 </script>
-
-<style scoped>
-.block-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 0 0 16px;
-}
-.step-num {
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
-  background: rgba(109, 123, 255, 0.16);
-  color: #a9b1ff;
-  font-size: 11px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.step-label {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  color: #6b7288;
-}
-
-.row-placeholder {
-  font-size: 13.5px;
-  color: #565f74;
-  margin: 0;
-}
-
-.chip-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-.chip {
-  padding: 11px 16px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  background: rgba(255, 255, 255, 0.02);
-  color: #c4cadb;
-  font-size: 13.5px;
-  cursor: pointer;
-  font-family: inherit;
-  transition:
-    border-color 0.18s ease,
-    background 0.18s ease,
-    transform 0.18s ease;
-}
-.chip:hover {
-  border-color: rgba(255, 255, 255, 0.22);
-  background: rgba(255, 255, 255, 0.05);
-  transform: translateY(-1px);
-}
-.chip:focus-visible {
-  outline: 2px solid #6d7bff;
-  outline-offset: 2px;
-}
-.chip.selected {
-  background: linear-gradient(180deg, rgba(109, 123, 255, 0.22), rgba(109, 123, 255, 0.1));
-  border-color: rgba(109, 123, 255, 0.55);
-  color: #fff;
-  box-shadow:
-    0 0 0 1px rgba(109, 123, 255, 0.25),
-    0 8px 24px -8px rgba(109, 123, 255, 0.45);
-}
-.chip-other {
-  border-style: dashed;
-  color: #8b93a7;
-}
-.chip-other.selected {
-  border-style: solid;
-}
-
-.other-input {
-  margin-top: 12px;
-  width: 100%;
-  padding: 11px 14px;
-  border-radius: 10px;
-  border: 1px solid rgba(109, 123, 255, 0.4);
-  background: rgba(109, 123, 255, 0.06);
-  color: #eef1f8;
-  font-size: 13.5px;
-  font-family: inherit;
-}
-.other-input:focus-visible {
-  outline: 2px solid #6d7bff;
-  outline-offset: 2px;
-}
-.other-input::placeholder {
-  color: #565f74;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .chip {
-    transition: none;
-  }
-  .chip:hover {
-    transform: none;
-  }
-}
-</style>

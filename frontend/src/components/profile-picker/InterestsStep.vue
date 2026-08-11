@@ -1,16 +1,24 @@
 <template>
   <div>
-    <div class="block-head">
-      <span class="step-num">2</span>
-      <span class="step-label">Interests (optional)</span>
+    <div class="mb-4 flex items-center gap-2.5">
+      <span
+        class="flex h-[22px] w-[22px] items-center justify-center rounded-md bg-hd-accent-2/16 text-[11px] font-bold text-hd-accent"
+        >2</span
+      >
+      <span class="text-[11px] font-bold uppercase tracking-[2px] text-hd-label">Interests (optional)</span>
     </div>
 
-    <div v-if="promptSuggestions.length" class="prompt-chips" role="group" aria-label="Example prompts">
+    <div
+      v-if="promptSuggestions.length"
+      class="mb-3 flex flex-wrap gap-2"
+      role="group"
+      aria-label="Example prompts"
+    >
       <button
         v-for="(prompt, index) in promptSuggestions"
         :key="`${index}-${prompt}`"
         type="button"
-        class="prompt-chip"
+        class="inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-full border border-white/[0.09] bg-white/[0.02] px-3 py-[7px] text-[12.5px] text-hd-subtitle [font-family:inherit] [transition:border-color_0.18s_ease,color_0.18s_ease,transform_0.18s_ease] motion-reduce:transition-none [@media(hover:hover)]:hover:border-white/[0.22] [@media(hover:hover)]:hover:text-hd-chip active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-hd-accent-2 focus-visible:outline-offset-2"
         @click="interestFreeText = prompt"
       >
         {{ prompt }}
@@ -19,22 +27,18 @@
 
     <textarea
       v-model="interestFreeText"
-      class="interest-textarea"
+      class="min-h-[110px] w-full resize-y rounded-xl border border-white/[0.09] bg-white/[0.02] p-3.5 text-[13.5px] leading-[1.55] text-hd-fg [font-family:inherit] placeholder:text-hd-muted focus-visible:border-hd-accent-2/35 focus-visible:outline-none"
       placeholder="Type freely — we'll use this to sharpen your suggestions..."
       rows="4"
       aria-label="Your interests, in your own words"
     ></textarea>
 
-    <div class="nav-row">
-      <button type="button" class="btn ghost" :disabled="saving" @click="emit('back')">
-        ← Back
-      </button>
-      <div class="nav-right">
-        <p v-if="saveError" class="form-error">{{ saveError }}</p>
-        <button type="button" class="btn ghost" :disabled="saving" @click="advance">
-          Skip for now →
-        </button>
-        <button type="button" class="btn primary" :disabled="saving" @click="advance">
+    <div class="mt-7 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3.5">
+      <button type="button" :class="BTN_GHOST" :disabled="saving" @click="emit('back')">← Back</button>
+      <div class="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:gap-3.5">
+        <p v-if="saveError" class="text-xs text-hd-subtitle">{{ saveError }}</p>
+        <button type="button" :class="BTN_GHOST" :disabled="saving" @click="advance">Skip for now →</button>
+        <button type="button" :class="BTN_PRIMARY" :disabled="saving" @click="advance">
           {{ saving ? "Saving…" : "Continue" }}
         </button>
       </div>
@@ -53,6 +57,11 @@ const interestFreeText = ref("");
 const saving = ref(false);
 const saveError = ref("");
 const promptSuggestions = ref<string[]>([]);
+
+const BTN_BASE =
+  "inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-[10px] border-0 text-[13.5px] font-semibold [font-family:inherit] [transition:transform_0.18s_ease] motion-reduce:transition-none active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-hd-accent-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:active:scale-100";
+const BTN_PRIMARY = `${BTN_BASE} px-[22px] py-[11px] bg-gradient-to-b from-[#7b86ff] to-[#5c68e8] text-white shadow-[0_10px_24px_-10px_rgba(109,123,255,0.6)] disabled:opacity-35 disabled:shadow-none`;
+const BTN_GHOST = `${BTN_BASE} px-2 py-[11px] bg-transparent text-hd-label [@media(hover:hover)]:[&:hover:not(:disabled)]:text-hd-chip disabled:opacity-35`;
 
 let initialText = "";
 
@@ -109,134 +118,3 @@ async function advance() {
   }
 }
 </script>
-
-<style scoped>
-/* Mirrors ChipRow.vue's .block-head/.step-num/.step-label — scoped styles
-   don't cross components, so this is intentionally duplicated. */
-.block-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 0 0 16px;
-}
-.step-num {
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
-  background: rgba(109, 123, 255, 0.16);
-  color: #a9b1ff;
-  font-size: 11px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.step-label {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  color: #6b7288;
-}
-
-.prompt-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-.prompt-chip {
-  padding: 7px 12px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  background: rgba(255, 255, 255, 0.02);
-  color: #8b93a7;
-  font-size: 12.5px;
-  cursor: pointer;
-  font-family: inherit;
-}
-.prompt-chip:hover {
-  border-color: rgba(255, 255, 255, 0.22);
-  color: #c4cadb;
-}
-.prompt-chip:focus-visible {
-  outline: 2px solid #6d7bff;
-  outline-offset: 2px;
-}
-
-.interest-textarea {
-  width: 100%;
-  min-height: 110px;
-  padding: 14px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  background: rgba(255, 255, 255, 0.02);
-  color: #eef1f8;
-  font-size: 13.5px;
-  font-family: inherit;
-  line-height: 1.55;
-  resize: vertical;
-}
-.interest-textarea:focus-visible {
-  outline: none;
-  border-color: rgba(109, 123, 255, 0.35);
-}
-.interest-textarea::placeholder {
-  color: #565f74;
-}
-
-.nav-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 28px;
-}
-.nav-right {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
-.form-error {
-  color: #8b93a7;
-  font-size: 12px;
-  margin: 0;
-}
-
-.btn {
-  padding: 11px 22px;
-  border-radius: 10px;
-  font-size: 13.5px;
-  font-weight: 600;
-  cursor: pointer;
-  border: none;
-  font-family: inherit;
-}
-.btn:focus-visible {
-  outline: 2px solid #6d7bff;
-  outline-offset: 2px;
-}
-.btn:disabled {
-  cursor: not-allowed;
-}
-.btn.primary {
-  background: linear-gradient(180deg, #7b86ff, #5c68e8);
-  color: #fff;
-  box-shadow: 0 10px 24px -10px rgba(109, 123, 255, 0.6);
-}
-.btn.primary:disabled {
-  opacity: 0.35;
-  box-shadow: none;
-}
-.btn.ghost {
-  padding: 11px 8px;
-  background: transparent;
-  color: #6b7288;
-}
-.btn.ghost:hover:not(:disabled) {
-  color: #c4cadb;
-}
-.btn.ghost:disabled {
-  opacity: 0.35;
-}
-</style>

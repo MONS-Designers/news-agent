@@ -1,30 +1,39 @@
 <template>
-  <div class="picker-shell">
-    <div class="depth-field" aria-hidden="true">
-      <div ref="orbA" class="orb orb-a"></div>
-      <div ref="orbB" class="orb orb-b"></div>
-      <div ref="orbC" class="orb orb-c"></div>
+  <div class="relative overflow-hidden rounded-2xl bg-hd-bg p-4 font-hd text-hd-fg sm:p-[30px]">
+    <div class="pointer-events-none absolute inset-0 z-0 overflow-hidden" aria-hidden="true">
+      <div
+        ref="orbA"
+        class="absolute h-[460px] w-[460px] top-[-120px] left-[-80px] rounded-full bg-[radial-gradient(circle,#4b3fae,transparent_70%)] opacity-35 blur-[70px] will-change-transform"
+      ></div>
+      <div
+        ref="orbB"
+        class="absolute h-[380px] w-[380px] top-[40%] right-[-100px] rounded-full bg-[radial-gradient(circle,#1f6f78,transparent_70%)] opacity-35 blur-[70px] will-change-transform"
+      ></div>
+      <div
+        ref="orbC"
+        class="absolute h-[340px] w-[340px] bottom-[-140px] left-[30%] rounded-full bg-[radial-gradient(circle,#7a3b6e,transparent_70%)] opacity-35 blur-[70px] will-change-transform"
+      ></div>
     </div>
-    <div class="grain" aria-hidden="true"></div>
+    <div
+      class="pointer-events-none absolute inset-0 z-[1] bg-[radial-gradient(rgba(255,255,255,0.045)_1px,transparent_1px)] bg-[length:26px_26px] opacity-35"
+      aria-hidden="true"
+    ></div>
 
-    <div class="content">
-      <p class="kicker">Preferences</p>
-      <h2 class="title">Set up your profile</h2>
-      <p class="subtitle">Three quick steps. Change any of it later — this never locks in.</p>
+    <div class="relative z-[2]">
+      <p class="mb-2.5 text-[11px] font-bold uppercase tracking-[3px] text-hd-kicker">Preferences</p>
+      <h2 class="mb-2.5 text-[30px] font-[650] tracking-[-0.5px] text-hd-title">Set up your profile</h2>
+      <p class="mb-7 max-w-[52ch] text-sm leading-[1.55] text-hd-subtitle">
+        Three quick steps. Change any of it later — this never locks in.
+      </p>
 
-      <ol class="stepper" aria-label="Setup progress">
-        <li
-          v-for="step in steps"
-          :key="step.n"
-          class="step"
-          :class="{ active: step.n === currentStep, done: step.n < currentStep }"
-        >
-          <span class="step-dot">{{ step.n }}</span>
-          <span class="step-label">{{ step.label }}</span>
+      <ol class="mb-7 flex list-none items-center gap-2 p-0" aria-label="Setup progress">
+        <li v-for="step in steps" :key="step.n" class="flex min-w-0 flex-1 items-center gap-2">
+          <span :class="stepDotClasses(step.n)">{{ step.n }}</span>
+          <span :class="stepLabelClasses(step.n)">{{ step.label }}</span>
         </li>
       </ol>
 
-      <div class="panel">
+      <div class="rounded-2xl border border-white/[0.09] bg-white/[0.035] p-4 backdrop-blur-[18px] sm:p-[30px]">
         <!--
           v-show, not v-if/v-else: these panels must never be unmounted, or
           AboutYouStep's Field/Role/Experience selections would be destroyed
@@ -34,13 +43,13 @@
           replay is handled separately, below, so it no longer depends on
           destroying the DOM to work.
         -->
-        <div ref="step1El" v-show="currentStep === 1" class="stagger">
+        <div ref="step1El" v-show="currentStep === 1" :class="STAGGER">
           <AboutYouStep @continue="currentStep = 2" />
         </div>
-        <div ref="step2El" v-show="currentStep === 2" class="stagger">
+        <div ref="step2El" v-show="currentStep === 2" :class="STAGGER">
           <InterestsStep :active="currentStep === 2" @continue="currentStep = 3" @back="currentStep = 1" />
         </div>
-        <div ref="step3El" v-show="currentStep === 3" class="stagger">
+        <div ref="step3El" v-show="currentStep === 3" :class="STAGGER">
           <TopicsStep
             :active="currentStep === 3"
             @back="currentStep = 2"
@@ -67,6 +76,29 @@ const steps = [
 ];
 
 const currentStep = ref(1);
+
+const STAGGER =
+  "translate-y-3.5 opacity-0 animate-fade-up motion-reduce:translate-y-0 motion-reduce:animate-none motion-reduce:opacity-100";
+
+const STEP_DOT_BASE =
+  "flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full border text-[11px] font-bold [transition:all_0.35s_ease] motion-reduce:transition-none";
+const STEP_LABEL_BASE = "text-[11px] [transition:color_0.35s_ease] motion-reduce:transition-none sm:whitespace-nowrap";
+
+function stepDotClasses(n: number): string {
+  if (n === currentStep.value) {
+    return `${STEP_DOT_BASE} border-hd-accent-2 bg-hd-accent-2/25 text-white shadow-[0_0_0_4px_rgba(109,123,255,0.12)]`;
+  }
+  if (n < currentStep.value) {
+    return `${STEP_DOT_BASE} border-hd-accent-2 bg-hd-accent-2 text-white`;
+  }
+  return `${STEP_DOT_BASE} border-white/[0.15] bg-white/[0.02] text-hd-muted`;
+}
+
+function stepLabelClasses(n: number): string {
+  if (n === currentStep.value) return `${STEP_LABEL_BASE} text-hd-chip`;
+  if (n < currentStep.value) return `${STEP_LABEL_BASE} text-hd-subtitle`;
+  return `${STEP_LABEL_BASE} text-hd-muted`;
+}
 
 const step1El = ref<HTMLElement | null>(null);
 const step2El = ref<HTMLElement | null>(null);
@@ -109,9 +141,18 @@ function onMouseMove(event: MouseEvent) {
   applyOrbTransforms();
 }
 
+// requestAnimationFrame-throttled: raw scroll events can fire far more often
+// than once per frame (especially with momentum scrolling on mobile), and
+// recomputing 3 transforms per event is wasted work the browser never gets
+// to paint anyway.
+let scrollRafId: number | null = null;
 function onScroll() {
-  scrollY = window.scrollY;
-  applyOrbTransforms();
+  if (scrollRafId !== null) return;
+  scrollRafId = requestAnimationFrame(() => {
+    scrollY = window.scrollY;
+    applyOrbTransforms();
+    scrollRafId = null;
+  });
 }
 
 let motionQuery: MediaQueryList | null = null;
@@ -121,6 +162,27 @@ function handleMotionChange(event: MediaQueryListEvent | MediaQueryList) {
     [orbA.value, orbB.value, orbC.value].forEach((orb) => {
       if (orb) orb.style.transform = "translate(0, 0)";
     });
+  }
+}
+
+// The mouse half of the parallax is meaningless without a persistent pointer
+// (a tap has no "position to hover from") — only attach/detach it for
+// devices that actually have one, reactively, so a 2-in-1 switching between
+// touch and a plugged-in mouse still gets the right behavior. Scroll-position
+// parallax is unaffected and keeps working on touch devices.
+let hoverQuery: MediaQueryList | null = null;
+let mouseListenerAttached = false;
+function handleHoverChange(event: MediaQueryListEvent | MediaQueryList) {
+  const canHover = event.matches;
+  if (canHover && !mouseListenerAttached) {
+    window.addEventListener("mousemove", onMouseMove);
+    mouseListenerAttached = true;
+  } else if (!canHover && mouseListenerAttached) {
+    window.removeEventListener("mousemove", onMouseMove);
+    mouseListenerAttached = false;
+    mouseX = 0;
+    mouseY = 0;
+    applyOrbTransforms();
   }
 }
 
@@ -146,190 +208,18 @@ onMounted(() => {
   handleMotionChange(motionQuery);
   motionQuery.addEventListener("change", handleMotionChange);
 
-  window.addEventListener("mousemove", onMouseMove);
+  hoverQuery = window.matchMedia("(hover: hover) and (pointer: fine)");
+  handleHoverChange(hoverQuery);
+  hoverQuery.addEventListener("change", handleHoverChange);
+
   window.addEventListener("scroll", onScroll, { passive: true });
 });
 
 onBeforeUnmount(() => {
-  window.removeEventListener("mousemove", onMouseMove);
+  if (mouseListenerAttached) window.removeEventListener("mousemove", onMouseMove);
   window.removeEventListener("scroll", onScroll);
+  if (scrollRafId !== null) cancelAnimationFrame(scrollRafId);
   motionQuery?.removeEventListener("change", handleMotionChange);
+  hoverQuery?.removeEventListener("change", handleHoverChange);
 });
 </script>
-
-<style scoped>
-/*
-  Hybrid Depth tokens, per DESIGN.md. This section is the first custom visual
-  identity in the live app — deliberately scoped to this component only, not
-  a global restyle (the rest of PreferencesView keeps its plain Tailwind look).
-*/
-.picker-shell {
-  position: relative;
-  background: #0a0d16;
-  color: #eef1f8;
-  border-radius: 16px;
-  padding: 30px;
-  overflow: hidden;
-  font-family:
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    Inter,
-    Arial,
-    sans-serif;
-}
-
-.depth-field {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  pointer-events: none;
-  z-index: 0;
-}
-.orb {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(70px);
-  opacity: 0.35;
-  will-change: transform;
-}
-.orb-a {
-  width: 460px;
-  height: 460px;
-  top: -120px;
-  left: -80px;
-  background: radial-gradient(circle, #4b3fae, transparent 70%);
-}
-.orb-b {
-  width: 380px;
-  height: 380px;
-  top: 40%;
-  right: -100px;
-  background: radial-gradient(circle, #1f6f78, transparent 70%);
-}
-.orb-c {
-  width: 340px;
-  height: 340px;
-  bottom: -140px;
-  left: 30%;
-  background: radial-gradient(circle, #7a3b6e, transparent 70%);
-}
-
-.grain {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  opacity: 0.35;
-  background-image: radial-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px);
-  background-size: 26px 26px;
-}
-
-.content {
-  position: relative;
-  z-index: 2;
-}
-
-.kicker {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 3px;
-  text-transform: uppercase;
-  color: #6d7bff;
-  margin: 0 0 10px;
-}
-.title {
-  font-size: 30px;
-  font-weight: 650;
-  letter-spacing: -0.5px;
-  margin: 0 0 10px;
-  color: #f4f6fb;
-}
-.subtitle {
-  font-size: 14px;
-  color: #8b93a7;
-  line-height: 1.55;
-  margin: 0 0 28px;
-  max-width: 52ch;
-}
-
-.stepper {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  list-style: none;
-  margin: 0 0 28px;
-  padding: 0;
-}
-.step {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1;
-}
-.step-dot {
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: 700;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  color: #565f74;
-  background: rgba(255, 255, 255, 0.02);
-  transition: all 0.35s ease;
-}
-.step-label {
-  font-size: 11px;
-  color: #565f74;
-  white-space: nowrap;
-  transition: color 0.35s ease;
-}
-.step.active .step-dot {
-  border-color: #6d7bff;
-  color: #fff;
-  background: rgba(109, 123, 255, 0.25);
-  box-shadow: 0 0 0 4px rgba(109, 123, 255, 0.12);
-}
-.step.active .step-label {
-  color: #c4cadb;
-}
-.step.done .step-dot {
-  border-color: #6d7bff;
-  background: #6d7bff;
-  color: #fff;
-}
-.step.done .step-label {
-  color: #8b93a7;
-}
-
-.panel {
-  background: rgba(255, 255, 255, 0.035);
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  border-radius: 16px;
-  padding: 30px;
-  backdrop-filter: blur(18px);
-}
-
-.stagger {
-  opacity: 0;
-  transform: translateY(14px);
-  animation: fadeUp 0.5s ease forwards;
-}
-@keyframes fadeUp {
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .stagger {
-    animation: none;
-    opacity: 1;
-    transform: none;
-  }
-}
-</style>

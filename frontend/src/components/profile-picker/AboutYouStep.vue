@@ -11,7 +11,7 @@
       v-model:other-text="fieldOtherText"
     />
 
-    <div class="row-gap">
+    <div class="mt-7">
       <ChipRow
         step-num="2"
         label="Role"
@@ -24,23 +24,28 @@
       />
     </div>
 
-    <fieldset class="row-gap exp-fieldset">
-      <legend class="block-head">
-        <span class="step-num">3</span>
-        <span class="step-label">Experience</span>
+    <fieldset class="mt-7 border-0 p-0">
+      <legend class="mb-4 flex items-center gap-2.5 p-0">
+        <span
+          class="flex h-[22px] w-[22px] items-center justify-center rounded-md bg-hd-accent-2/16 text-[11px] font-bold text-hd-accent"
+          >3</span
+        >
+        <span class="text-[11px] font-bold uppercase tracking-[2px] text-hd-label">Experience</span>
       </legend>
-      <div class="seg-row">
+      <div class="flex gap-0.5 rounded-[10px] border border-white/[0.08] bg-white/[0.03] p-[3px]">
         <label
           v-for="bucket in EXPERIENCE_BUCKETS"
           :key="bucket.value"
-          class="seg"
-          :class="{ selected: experienceBucket === bucket.value }"
+          :class="[
+            'relative flex min-h-[44px] flex-1 cursor-pointer items-center justify-center rounded-lg py-[9px] text-center text-[13px] motion-reduce:transition-none [transition:all_0.18s_ease] focus-within:outline focus-within:outline-2 focus-within:outline-hd-accent-2 focus-within:outline-offset-2',
+            experienceBucket === bucket.value ? 'bg-hd-accent-2/18 text-white' : 'text-hd-subtitle',
+          ]"
         >
           <input
             v-model="experienceBucket"
             type="radio"
             name="experience-bucket"
-            class="seg-radio"
+            class="sr-only"
             :value="bucket.value"
           />
           {{ bucket.label }}
@@ -48,13 +53,13 @@
       </div>
     </fieldset>
 
-    <p v-if="loadError" class="form-error">Couldn't load options. Try reloading the page.</p>
+    <p v-if="loadError" class="mt-3 text-xs text-hd-subtitle">Couldn't load options. Try reloading the page.</p>
 
-    <div class="nav-row">
-      <p v-if="saveError" class="form-error save-error">{{ saveError }}</p>
+    <div class="mt-7 flex items-center justify-end gap-3.5">
+      <p v-if="saveError" class="text-xs text-hd-subtitle">{{ saveError }}</p>
       <button
         type="button"
-        class="btn primary"
+        class="inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-[10px] border-0 bg-gradient-to-b from-[#7b86ff] to-[#5c68e8] px-[22px] py-[11px] text-[13.5px] font-semibold text-white [font-family:inherit] [transition:transform_0.18s_ease] motion-reduce:transition-none shadow-[0_10px_24px_-10px_rgba(109,123,255,0.6)] active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-hd-accent-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-35 disabled:shadow-none disabled:active:scale-100"
         :class="{ disabled: !canContinue }"
         :disabled="!canContinue || saving"
         @click="onContinue"
@@ -263,135 +268,3 @@ onMounted(async () => {
   }
 });
 </script>
-
-<style scoped>
-.row-gap {
-  margin-top: 28px;
-}
-
-/* Mirrors ChipRow.vue's .block-head/.step-num/.step-label — scoped styles
-   don't cross components, so this is intentionally duplicated rather than a
-   ChipRow API change (Experience isn't a chip row, it doesn't belong there). */
-.exp-fieldset {
-  border: none;
-  padding: 0;
-  margin: 28px 0 0;
-}
-.block-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 0 0 16px;
-  padding: 0;
-}
-.step-num {
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
-  background: rgba(109, 123, 255, 0.16);
-  color: #a9b1ff;
-  font-size: 11px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.step-label {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  color: #6b7288;
-}
-
-.seg-row {
-  display: flex;
-  gap: 2px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
-  padding: 3px;
-}
-.seg {
-  position: relative;
-  flex: 1;
-  text-align: center;
-  padding: 9px 0;
-  border-radius: 8px;
-  font-size: 13px;
-  color: #8b93a7;
-  cursor: pointer;
-  transition: all 0.18s ease;
-}
-.seg.selected {
-  background: rgba(109, 123, 255, 0.18);
-  color: #fff;
-}
-.seg:focus-within {
-  outline: 2px solid #6d7bff;
-  outline-offset: 2px;
-}
-@media (prefers-reduced-motion: reduce) {
-  .seg {
-    transition: none;
-  }
-}
-
-/* Visually hidden but focusable — real radio semantics (arrow-key movement
-   within the group, single tab stop) come from these inputs; display:none
-   would drop them from the tab order entirely. */
-.seg-radio {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  padding: 0;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
-.form-error {
-  color: #8b93a7;
-  font-size: 12px;
-  margin: 12px 0 0;
-}
-.save-error {
-  margin: 0;
-}
-
-.nav-row {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 14px;
-  margin-top: 28px;
-}
-
-.btn {
-  padding: 11px 22px;
-  border-radius: 10px;
-  font-size: 13.5px;
-  font-weight: 600;
-  cursor: pointer;
-  border: none;
-  font-family: inherit;
-}
-.btn:focus-visible {
-  outline: 2px solid #6d7bff;
-  outline-offset: 2px;
-}
-.btn.primary {
-  background: linear-gradient(180deg, #7b86ff, #5c68e8);
-  color: #fff;
-  box-shadow: 0 10px 24px -10px rgba(109, 123, 255, 0.6);
-}
-/* Native :disabled, so the gate also removes it from the tab order — the old
-   pointer-events:none left keyboard users pressing Enter into silence. */
-.btn.primary:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-  box-shadow: none;
-}
-</style>
