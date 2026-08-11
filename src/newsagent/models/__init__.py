@@ -11,6 +11,7 @@ from newsagent.models.source import Source
 from newsagent.models.topic import Topic
 from newsagent.models.user import User
 from newsagent.models.user_topic_preference import UserTopicPreference
+from newsagent.models.waitlist import Waitlist
 
 __all__ = [
     "Base",
@@ -26,4 +27,5 @@ __all__ = [
     "Role",
     "PendingTaxonomySuggestion",
     "PipelineRun",
+    "Waitlist",
 ]

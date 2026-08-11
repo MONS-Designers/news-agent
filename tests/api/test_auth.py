@@ -1,5 +1,5 @@
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
 from newsagent.api.auth import resolve_identity
@@ -32,5 +32,25 @@ def test_user_email_resolves_with_user_id(db: Session):
     assert identity.user_id is not None
 
 
-def test_unknown_email_resolves_to_none(db: Session):
-    assert resolve_identity(db, "stranger@example.com") is None
+def test_unknown_email_self_registers_when_cap_allows(db: Session):
+    identity = resolve_identity(db, "stranger@example.com", name="Stranger", cap=10)
+    assert identity is not None
+    assert identity.is_admin is False
+    assert identity.user_id is not None
+    created = db.scalar(select(User).where(User.email == "stranger@example.com"))
+    assert created is not None
+    assert created.name == "Stranger"
+
+
+def test_unknown_email_resolves_to_none_when_cap_is_full(db: Session):
+    # The cap counts the `users` table only (self-registered friends), not
+    # admins — db already has 1 User row from the fixture, so cap=1 is full.
+    assert resolve_identity(db, "stranger@example.com", cap=1) is None
+    assert db.scalar(select(User).where(User.email == "stranger@example.com")) is None
+
+
+def test_existing_email_ignores_cap(db: Session):
+    # A cap of 0 must never affect an email that already has a row (NFR4).
+    identity = resolve_identity(db, "user@example.com", cap=0)
+    assert identity is not None
+    assert identity.is_admin is False

@@ -7,35 +7,46 @@
     </div>
     <div class="grain" aria-hidden="true"></div>
 
-    <section class="hero">
+    <section v-if="capacityFull" class="hero">
       <p class="kicker">NewsAgent · AI Digest</p>
-      <h1 class="title">One digest.<br />Everything that matters to you.</h1>
+      <h1 class="title">We're at capacity right now.</h1>
       <p class="subtitle">
-        An AI that reads the news so you don't have to — distilled into one focused digest,
-        delivered weekly, built around what you actually care about.
+        NewsAgent is limited to a small group of early users while we dial things in. We saved
+        your email — you'll be invited as soon as a spot opens up.
       </p>
-      <button type="button" class="cta" @click="goToPreferences">
-        Set up your digest
-        <span class="cta-arrow" aria-hidden="true">→</span>
-      </button>
     </section>
 
-    <section class="steps" ref="stepsSection">
-      <article
-        v-for="(step, index) in steps"
-        :key="step.title"
-        class="step-card"
-        :class="{ revealed: revealed }"
-        :style="{ transitionDelay: `${index * 90}ms` }"
-        @mousemove="onCardTilt($event, index)"
-        @mouseleave="onCardLeave(index)"
-        :ref="(el) => setCardRef(el as HTMLElement | null, index)"
-      >
-        <span class="step-num">{{ index + 1 }}</span>
-        <h2 class="step-title">{{ step.title }}</h2>
-        <p class="step-body">{{ step.body }}</p>
-      </article>
-    </section>
+    <template v-else>
+      <section class="hero">
+        <p class="kicker">NewsAgent · AI Digest</p>
+        <h1 class="title">One digest.<br />Everything that matters to you.</h1>
+        <p class="subtitle">
+          An AI that reads the news so you don't have to — distilled into one focused digest,
+          delivered weekly, built around what you actually care about.
+        </p>
+        <button type="button" class="cta" @click="goToPreferences">
+          Set up your digest
+          <span class="cta-arrow" aria-hidden="true">→</span>
+        </button>
+      </section>
+
+      <section class="steps" ref="stepsSection">
+        <article
+          v-for="(step, index) in steps"
+          :key="step.title"
+          class="step-card"
+          :class="{ revealed: revealed }"
+          :style="{ transitionDelay: `${index * 90}ms` }"
+          @mousemove="onCardTilt($event, index)"
+          @mouseleave="onCardLeave(index)"
+          :ref="(el) => setCardRef(el as HTMLElement | null, index)"
+        >
+          <span class="step-num">{{ index + 1 }}</span>
+          <h2 class="step-title">{{ step.title }}</h2>
+          <p class="step-body">{{ step.body }}</p>
+        </article>
+      </section>
+    </template>
 
     <footer class="foot">
       <p class="foot-text">Delivered by email. Nothing else to check.</p>
@@ -44,10 +55,13 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from "vue";
-import { useRouter } from "vue-router";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { useRoute, useRouter } from "vue-router";
 
 const router = useRouter();
+const route = useRoute();
+
+const capacityFull = computed(() => route.query.error === "capacity_full");
 
 function goToPreferences() {
   router.push("/preferences");

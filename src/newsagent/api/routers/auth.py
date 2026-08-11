@@ -7,6 +7,7 @@ from newsagent.api import auth
 from newsagent.api.deps import get_db
 from newsagent.api.schemas import IdentityOut
 from newsagent.config import settings
+from newsagent.services.waitlist import capture_to_waitlist
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -43,11 +44,14 @@ async def callback(request: Request, db: Session = Depends(get_db)) -> RedirectR
     email = userinfo.get("email") if userinfo else None
     if not email:
         return RedirectResponse(f"{settings.frontend_url}/?error=oauth_failed")
+    name = userinfo.get("name") if userinfo else None
 
-    identity = auth.resolve_identity(db, email)
+    identity = auth.resolve_identity(db, email, name=name, cap=settings.max_users)
     if identity is None:
-        # Authenticated with Google but not seeded as admin or user — reject.
-        return RedirectResponse(f"{settings.frontend_url}/?error=unauthorized")
+        # Brand-new email, but the registration cap is already full — leave a
+        # real trace (FR11) instead of a dead-end sign-in attempt.
+        capture_to_waitlist(db, email, name)
+        return RedirectResponse(f"{settings.frontend_url}/?error=capacity_full")
 
     auth.save_identity(request, identity)
     destination = "/admin" if identity.is_admin else "/preferences"

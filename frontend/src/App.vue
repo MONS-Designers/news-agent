@@ -78,7 +78,10 @@ const ERROR_MESSAGES: Record<string, string> = {
 
 onMounted(async () => {
   const error = new URLSearchParams(window.location.search).get("error");
-  if (error) {
+  // capacity_full gets its own dedicated screen in HomeView.vue (UX-DR5),
+  // not the generic banner — showing both would be a redundant, weaker
+  // version of the same message.
+  if (error && error !== "capacity_full") {
     errorBanner.value = ERROR_MESSAGES[error] ?? "Sign-in error.";
   }
   await ensureMe();

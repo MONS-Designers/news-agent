@@ -44,6 +44,11 @@ class Settings(BaseSettings):
     # Required when log_destination="file"; ignored otherwise.
     log_file: str = ""
 
+    # Self-registration hard cap (FR2) — total User rows, admin-seeded or
+    # self-registered. Enforced atomically at the DB level (FR3), not by an
+    # application-level count check.
+    max_users: int = 10
+
     # Google OAuth (set real values in .env — never commit them)
     google_client_id: str = ""
     google_client_secret: str = ""

@@ -1,5 +1,11 @@
 # Deferred Work
 
+## Deferred from: live manual testing of Story A.1 (2026-08-11)
+
+- source_spec: `_bmad-output/planning-artifacts/epics-launch-readiness.md` (Epic A, Story A.1)
+  summary: Google sign-in intermittently fails on the first attempt with an OAuth-related error, then succeeds immediately on retry with no other change. Confirmed by the user as pre-existing — reproduced before any of Story A.1's self-registration changes landed, so it is not caused by `resolve_identity`'s new registration logic.
+  evidence: Not reproducible in this session (no real Google OAuth credentials available to the agent, and the dev backend runs with `--reload` watching `src/`, which was itself a live confound during this exact testing window — ruled out by the user as the explanation, since the bug predates this session). Not found in any prior deferred-work entry or GitHub issue. Root cause unconfirmed; candidates worth checking first: (1) Authlib's OIDC discovery-document fetch (`https://accounts.google.com/.well-known/openid-configuration`) happening lazily on first use rather than at startup, so the very first callback after a process (re)start races a slow/cold fetch; (2) `SessionMiddleware` in `api/main.py` uses Starlette's defaults with no explicit `same_site`/`https_only`, and the OAuth `state`/nonce round-trips through it between `/auth/login` and `/auth/callback` — worth confirming the cookie is actually present on the callback request during a live failure; (3) a transient network/timeout on the token-exchange call itself. Needs a live repro with request/cookie logging around `routers/auth.py::callback` (both the `except OAuthError` branch and the `if not email` branch) to distinguish these before attempting a fix.
+
 ## Deferred from: code review of spec-gh-19-usage-run-log (2026-08-09)
 
 - source_spec: `_bmad-output/implementation-artifacts/spec-gh-19-usage-run-log.md`

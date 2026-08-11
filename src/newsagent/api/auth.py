@@ -1,8 +1,7 @@
 """Session-based auth: identity resolution and route-guard dependencies.
 
 The session cookie (signed by SessionMiddleware) stores the authenticated
-Google email plus what it maps to in our DB: admin, user, or both. OAuth only
-authenticates — it never creates rows.
+Google email plus what it maps to in our DB: admin, user, or both.
 """
 
 from dataclasses import dataclass
@@ -13,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from newsagent.api.deps import get_db
 from newsagent.models import Admin, User
+from newsagent.services.identity import register_user_if_capacity
 
 SESSION_KEY = "identity"
 
@@ -24,16 +24,25 @@ class Identity:
     user_id: int | None
 
 
-def resolve_identity(db: Session, email: str) -> Identity | None:
-    """Map a verified Google email to our seeded Admin/User rows.
+def resolve_identity(db: Session, email: str, name: str | None = None, cap: int = 10) -> Identity | None:
+    """Map a verified Google email to our seeded Admin/User rows — or, for a
+    brand-new email with room under the registration cap, create one (FR1).
 
-    Returns None when the email matches neither — the caller rejects the login.
+    Returns None only when the email is brand-new *and* the cap is already
+    full — the caller then routes to the waitlist (FR11) instead of signing
+    anyone in. This is the only place a User row is created from an
+    unauthenticated-until-this-point request; reached only after Google's
+    OAuth callback has already verified the email.
     """
     admin = db.scalar(select(Admin).where(Admin.email == email))
     user = db.scalar(select(User).where(User.email == email))
-    if admin is None and user is None:
+    if admin is not None or user is not None:
+        return Identity(email=email, is_admin=admin is not None, user_id=user.id if user else None)
+
+    created = register_user_if_capacity(db, email, name, cap)
+    if created is None:
         return None
-    return Identity(email=email, is_admin=admin is not None, user_id=user.id if user else None)
+    return Identity(email=email, is_admin=False, user_id=created.id)
 
 
 def load_identity(request: Request) -> Identity | None:
