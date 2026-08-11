@@ -7,6 +7,7 @@ from newsagent.api import auth
 from newsagent.api.deps import get_db
 from newsagent.api.schemas import IdentityOut
 from newsagent.config import settings
+from newsagent.models import User
 from newsagent.services.waitlist import capture_to_waitlist
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -33,6 +34,18 @@ async def login(request: Request) -> RedirectResponse:
     return response
 
 
+def _redirect_destination(db: Session, identity: auth.Identity) -> str:
+    """Where to send a just-signed-in identity. A freshly self-registered
+    user (no profile yet) lands on the home page's first-run state (UX-DR6)
+    rather than straight into the wizard, so they get a welcome/context beat
+    first; everyone else goes to their usual landing spot.
+    """
+    if identity.is_admin:
+        return "/admin"
+    user = db.get(User, identity.user_id) if identity.user_id is not None else None
+    return "/" if user is not None and user.field_name is None else "/preferences"
+
+
 @router.get("/callback")
 async def callback(request: Request, db: Session = Depends(get_db)) -> RedirectResponse:
     try:
@@ -54,7 +67,7 @@ async def callback(request: Request, db: Session = Depends(get_db)) -> RedirectR
         return RedirectResponse(f"{settings.frontend_url}/?error=capacity_full")
 
     auth.save_identity(request, identity)
-    destination = "/admin" if identity.is_admin else "/preferences"
+    destination = _redirect_destination(db, identity)
     return RedirectResponse(f"{settings.frontend_url}{destination}")
 
 

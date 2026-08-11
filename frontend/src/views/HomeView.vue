@@ -19,11 +19,20 @@
     <template v-else>
       <section class="hero">
         <p class="kicker">NewsAgent · AI Digest</p>
-        <h1 class="title">One digest.<br />Everything that matters to you.</h1>
-        <p class="subtitle">
-          An AI that reads the news so you don't have to — distilled into one focused digest,
-          delivered weekly, built around what you actually care about.
-        </p>
+        <template v-if="firstRun">
+          <h1 class="title">You're in.<br />Let's set up your digest.</h1>
+          <p class="subtitle">
+            One more step — tell us your field and interests, and we'll start building your first
+            weekly digest around what actually matters to you.
+          </p>
+        </template>
+        <template v-else>
+          <h1 class="title">One digest.<br />Everything that matters to you.</h1>
+          <p class="subtitle">
+            An AI that reads the news so you don't have to — distilled into one focused digest,
+            delivered weekly, built around what you actually care about.
+          </p>
+        </template>
         <button type="button" class="cta" @click="goToPreferences">
           Set up your digest
           <span class="cta-arrow" aria-hidden="true">→</span>
@@ -57,11 +66,30 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { getMyProfile } from "@/api/client";
+import { ensureMe } from "@/auth";
 
 const router = useRouter();
 const route = useRoute();
 
 const capacityFull = computed(() => route.query.error === "capacity_full");
+
+// A freshly self-registered user (no profile yet, no digest history) sees a
+// welcome/first-run beat here instead of the generic anonymous pitch
+// (UX-DR6) — distinct from PreferencesView.vue's returning-user summary,
+// which is a different screen entirely.
+const firstRun = ref(false);
+
+async function checkFirstRun() {
+  const identity = await ensureMe();
+  if (!identity || identity.user_id === null) return; // anonymous or admin-only
+  try {
+    const profile = await getMyProfile();
+    firstRun.value = profile.field_name === null;
+  } catch {
+    // Best-effort — on failure, just show the default (non-first-run) content.
+  }
+}
 
 function goToPreferences() {
   router.push("/preferences");
@@ -161,6 +189,8 @@ function onCardLeave(index: number) {
 }
 
 onMounted(() => {
+  void checkFirstRun();
+
   motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
   handleMotionChange(motionQuery);
   motionQuery.addEventListener("change", handleMotionChange);
