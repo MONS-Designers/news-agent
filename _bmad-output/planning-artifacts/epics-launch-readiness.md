@@ -53,6 +53,8 @@ FR8: An article whose summarize call fails is retried a bounded number of times 
 FR9: Token usage for every LLM call is recorded per pipeline run and is readable after the run without re-reading raw logs.
 FR10: Topic-suggestion computation runs its two independent LLM calls concurrently rather than sequentially.
 FR11: A visitor who authenticates with Google after the cap is full has their email (and any name Google provides) captured in a waitlist, rather than being shown a message with nothing recorded. Added 2026-08-07 — Nomi rejected a message-only capacity screen as "letting them log in for free with nothing to show for it."
+FR12: Every article and preferences link inside a sent digest is wrapped so that a click is recorded (which digest, which link, when) before the recipient is redirected to the real, unchanged destination. Added 2026-08-11, surfaced during Story B.1's live-inbox verification — Nomi asked "is there a way to check if the user clicked the links?" and confirmed no such mechanism exists today.
+FR13: Digest engagement (whether a digest was opened, and which links in it were clicked) is viewable without a manual DB query — some operator-facing screen or report surfaces it. Added 2026-08-11, same session — open-tracking (`Digest.opened_at`) already exists and is even fed into ranking, but nothing lets an operator actually see the data.
 
 ### NonFunctional Requirements
 
@@ -74,6 +76,7 @@ NFR6: Full-text fetching must respect the source site — a per-request timeout,
 - The LLM base class already exposes `_record_usage`, and reports already carry `usage_input_units` / `usage_output_units`. FR9 is persistence and reporting, not new instrumentation.
 - The select-then-insert TOCTOU pattern is already documented three times in `deferred-work.md` (`add_topic`, `add_field`, `add_source`). FR3 makes it reachable from the open internet for the first time, which is why FR3 states atomicity rather than inheriting the existing pattern.
 - `services/profile.py::_compute_and_store_suggestions` is being changed under `GH #36` in a parallel work stream, including a new `pending_slow` suggestion status. FR10 must be reconciled with that work rather than duplicating it.
+- `api/routers/tracking.py` already implements the open-tracking pixel (`GET /t/{token}.gif`, unauthenticated, token-as-credential) and sets `Digest.opened_at` on first hit; `pipeline/ranking.py` already reads `opened_at` as a ranking signal. FR13 is about exposing this existing data, not rebuilding the pixel mechanism. FR12 (click tracking) is genuinely new — no redirect/click mechanism exists anywhere in the codebase today; the natural design mirrors the existing pixel's shape (unguessable per-link token, unauthenticated redirect endpoint).
 
 ### UX Design Requirements
 
@@ -104,6 +107,8 @@ FR8: Epic C - Terminal state for deterministically-failing summarize
 FR9: Epic C - Per-run LLM token usage accounting
 FR10: Epic E - Concurrent suggestion-source calls (tracks GH #36, in flight)
 FR11: Epic A - Waitlist capture when the cap is full
+FR12: Epic B - Click tracking for digest links
+FR13: Epic B - Digest engagement (opens + clicks) viewable, not just DB-queryable
 
 NFR1: Epic E - Profile picker usable at 320px+
 NFR2: Epic E - Topic suggestions ready within 8s
@@ -144,8 +149,10 @@ is a deliberate fast-follow, not built here.
 ### Epic B: The digest actually lands in an inbox
 A user's weekly digest is delivered through a real email provider, configured the same
 way every other swappable adapter in this codebase is configured — no code change
-outside `mail/`. Standalone: one new adapter class plus one factory branch.
-**Covers:** FR4, NFR5
+outside `mail/`. Standalone: one new adapter class plus one factory branch. Story B.2
+(click tracking + an engagement view) was added 2026-08-11 during B.1's live-inbox
+verification and is not required for B.1 to ship.
+**Covers:** FR4, FR12, FR13, NFR5
 
 ### Epic C: The pipeline stops paying for what already failed
 An article whose summarize call fails deterministically is retried a bounded number of
@@ -352,7 +359,9 @@ So that I'm not looking at a blank returning-user summary with no history to sum
 
 A user's weekly digest is delivered through a real email provider, configured the same
 way every other swappable adapter in this codebase is configured — no code change
-outside `mail/`. Standalone: one new adapter class plus one factory branch.
+outside `mail/`. Standalone: one new adapter class plus one factory branch. Story B.2
+(click tracking + an engagement view) was added 2026-08-11 during B.1's live-inbox
+verification — genuinely useful, but not required for B.1 to ship.
 
 ### Story B.1: Real email delivery adapter
 
@@ -380,6 +389,44 @@ So that the product works end-to-end instead of writing HTML to a local folder.
 **Given** the console sender remains available
 **When** `NEWSAGENT_EMAIL_SENDER=console`
 **Then** behavior is completely unchanged — the new adapter is additive, not a replacement of the existing dev path
+
+### Story B.2: Know if anyone's reading the digest
+
+As the operator running NewsAgent,
+I want to see whether users open their digest and click through to articles,
+So that I can tell whether the product is actually being used, not just sent.
+
+**Acceptance Criteria:**
+
+**Given** the existing open-tracking pixel (`GET /t/{token}.gif`, `Digest.opened_at`)
+**When** this story is scoped
+**Then** it is reused as-is — this story is about exposing that data and adding click
+tracking, not rebuilding the open-tracking mechanism itself
+
+**Given** a sent digest contains links to articles and to preferences
+**When** the recipient clicks any of those links
+**Then** the click is recorded (which digest, which link, when) before redirecting them
+to the real, unchanged destination — the same shape as the existing pixel: an
+unguessable per-link token, an unauthenticated redirect endpoint, no visible difference
+to the recipient
+
+**Given** an operator wants to know whether digests are being read
+**When** they check
+**Then** they see, per digest (or aggregated per user/run), whether it was opened and
+which links were clicked — without writing a manual DB query. Exact surface (a CLI
+report mirroring GH #19's `usage-report`, or a small admin screen) is an open
+implementation decision, not fixed by this story
+
+**Given** `pipeline/ranking.py` already reads `Digest.opened_at` as a signal
+**When** this story ships
+**Then** that usage is unaffected — no change to the ranking/affinity calculation
+
+**Given** "how much of the digest was read" (scroll depth, time spent) was also asked
+about live
+**When** this story is scoped
+**Then** it is explicitly out of scope — a single open pixel is binary (opened /
+not-opened) by nature; scroll/attention tracking would need different instrumentation
+entirely and is not part of this story
 
 ## Epic C: The pipeline stops paying for what already failed
 
