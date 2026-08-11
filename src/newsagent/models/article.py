@@ -33,6 +33,11 @@ class Article(Base):
     title_he: Mapped[str | None] = mapped_column(String, nullable=True)
     source_language: Mapped[str | None] = mapped_column(String, nullable=True)
     reading_time_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Bounded-retry counter (Epic C, Story C.1): incremented on every failed
+    # summarize attempt; summary_status becomes the terminal "failed" once this
+    # reaches settings.max_summarize_attempts, so a deterministically-failing
+    # article stops being billed for forever.
+    summarize_attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     # Key points for the email body; each may carry **markdown** keyword emphasis.
     bullets_he: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
     # General "worth-reading" signal (0-1), distinct from relevance; feeds ranking.

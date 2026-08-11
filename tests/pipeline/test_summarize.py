@@ -2,6 +2,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
+from newsagent.config import settings
 from newsagent.llm.errors import LLMProviderError
 from newsagent.llm.mock import MockLLMProvider
 from newsagent.llm.types import ArticleInput, Refusal, SummaryResult, Usage
@@ -10,6 +11,7 @@ from newsagent.models.base import Base
 from newsagent.pipeline.summarize import (
     SUMMARY_DONE,
     SUMMARY_ERROR,
+    SUMMARY_FAILED,
     SUMMARY_PENDING,
     SUMMARY_REFUSED,
     summarize_relevant_articles,
@@ -41,6 +43,7 @@ def add_article(
     summary_status: str = SUMMARY_PENDING,
     text: str = LONG_TEXT,
     url_suffix: str = "1",
+    summarize_attempts: int = 0,
 ) -> Article:
     article = Article(
         source_id=1,
@@ -49,6 +52,7 @@ def add_article(
         rss_summary=text,
         relevance_status=relevance_status,
         summary_status=summary_status,
+        summarize_attempts=summarize_attempts,
     )
     db.add(article)
     db.commit()
@@ -141,3 +145,62 @@ def test_a_billed_but_failed_call_still_counts_toward_usage(db: Session):
     report = summarize_relevant_articles(db, BillsThenFailsProvider())
     assert report.errors == 1
     assert (report.usage_input_units, report.usage_output_units) == (1200, 340)
+
+
+def test_failure_increments_attempts_and_stays_error_below_max(
+    db: Session, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setattr(settings, "max_summarize_attempts", 3)
+    article = add_article(db)
+    report = summarize_relevant_articles(db, MockLLMProvider(fail_permanent=True))
+    assert report.errors == 1
+    assert article.summarize_attempts == 1
+    assert article.summary_status == SUMMARY_ERROR
+
+
+def test_terminal_failed_state_reached_at_configured_max(
+    db: Session, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setattr(settings, "max_summarize_attempts", 2)
+    article = add_article(db)
+    provider = MockLLMProvider(fail_permanent=True)
+
+    summarize_relevant_articles(db, provider)
+    assert article.summary_status == SUMMARY_ERROR  # 1st failure: still retried
+
+    summarize_relevant_articles(db, provider)
+    assert article.summarize_attempts == 2
+    assert article.summary_status == SUMMARY_FAILED  # 2nd failure: terminal
+
+
+def test_failed_articles_are_never_reselected_or_billed(db: Session):
+    add_article(db, summary_status=SUMMARY_FAILED, summarize_attempts=3)
+    report = summarize_relevant_articles(db, MockLLMProvider(fail_permanent=True))
+    assert report.summarized == 0
+    assert report.errors == 0
+    assert report.usage_input_units == 0
+
+
+def test_success_after_prior_failures_still_reaches_done(
+    db: Session, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setattr(settings, "max_summarize_attempts", 3)
+    article = add_article(db, summary_status=SUMMARY_ERROR, summarize_attempts=2)
+    report = summarize_relevant_articles(db, MockLLMProvider())
+    assert report.summarized == 1
+    assert article.summary_status == SUMMARY_DONE
+
+
+def test_empty_summary_also_counts_toward_terminal_state(
+    db: Session, monkeypatch: pytest.MonkeyPatch
+):
+    """The empty-summary-without-refusal branch is a provider bug indistinguishable
+    from a deterministic LLMError from the retry-bound's point of view — it must
+    count toward the same terminal state, or a provider that always returns an
+    empty string would retry an article forever."""
+    monkeypatch.setattr(settings, "max_summarize_attempts", 1)
+    article = add_article(db)
+    report = summarize_relevant_articles(db, EmptySummaryProvider())
+    assert report.errors == 1
+    assert article.summarize_attempts == 1
+    assert article.summary_status == SUMMARY_FAILED

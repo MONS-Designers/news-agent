@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from newsagent.config import settings
 from newsagent.llm.base import LLMProvider
 from newsagent.llm.errors import LLMError
 from newsagent.llm.types import ArticleInput, Refusal
@@ -26,6 +27,9 @@ SUMMARY_PENDING = "pending"
 SUMMARY_DONE = "summarized"
 SUMMARY_REFUSED = "refused"
 SUMMARY_ERROR = "error"
+# Terminal like refused — reached once summarize_attempts hits the configured
+# max (Epic C, Story C.1). Deliberately excluded from _SUMMARIZABLE below.
+SUMMARY_FAILED = "failed"
 
 _SUMMARIZABLE = (SUMMARY_PENDING, SUMMARY_ERROR)
 
@@ -47,6 +51,21 @@ def _accumulate_usage(report: SummarizeReport, provider: LLMProvider) -> None:
         report.usage_output_units += usage.output_units
 
 
+def _record_failure(article: Article, report: SummarizeReport) -> None:
+    """Increment the bounded-retry counter for a failed attempt (LLMError, or
+    the empty-summary-without-refusal provider bug below — both are "the call
+    didn't produce a usable result"). Once the counter reaches the configured
+    max, the article's status becomes the terminal "failed" instead of
+    "error" so _SUMMARIZABLE stops selecting it — never retried, never billed
+    for again."""
+    article.summarize_attempts += 1
+    if article.summarize_attempts >= settings.max_summarize_attempts:
+        article.summary_status = SUMMARY_FAILED
+    else:
+        article.summary_status = SUMMARY_ERROR
+    report.errors += 1
+
+
 def summarize_relevant_articles(db: Session, provider: LLMProvider) -> SummarizeReport:
     report = SummarizeReport()
 
@@ -65,8 +84,7 @@ def summarize_relevant_articles(db: Session, provider: LLMProvider) -> Summarize
         try:
             result = provider.summarize(article_input)
         except LLMError as error:
-            article.summary_status = SUMMARY_ERROR
-            report.errors += 1
+            _record_failure(article, report)
             logger.warning("Summarize failed for article %s: %s", article.id, error)
             _accumulate_usage(report, provider)
             db.commit()
@@ -77,8 +95,7 @@ def summarize_relevant_articles(db: Session, provider: LLMProvider) -> Summarize
             report.refused += 1
         elif not result.summary_he.strip():
             # An empty summary without a Refusal is a provider bug, not a value.
-            article.summary_status = SUMMARY_ERROR
-            report.errors += 1
+            _record_failure(article, report)
             logger.warning("Empty summary for article %s — treating as error", article.id)
         else:
             article.summary_he = result.summary_he

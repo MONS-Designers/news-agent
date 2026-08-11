@@ -40,6 +40,10 @@ def main(argv: list[str] | None = None) -> int:
     subscribe_cmd.add_argument("email")
     subscribe_cmd.add_argument("topic")
 
+    subparsers.add_parser(
+        "usage-report", help="Print LLM token usage totals per stage and per day"
+    )
+
     subparsers.add_parser("build-digests", help="Build today's digests for all users")
     subparsers.add_parser("send-digests", help="Render and send all digests not yet sent")
 
@@ -112,6 +116,23 @@ def main(argv: list[str] | None = None) -> int:
                 usage_input_units=summary_report.usage_input_units,
                 usage_output_units=summary_report.usage_output_units,
             )
+        elif args.command == "usage-report":
+            usage = pipeline_runs.build_usage_report(db)
+            if not usage.by_stage:
+                print("No pipeline runs recorded yet.")
+            else:
+                print("Usage by stage:")
+                for stage in usage.by_stage:
+                    print(
+                        f"  {stage.run_type}: {stage.usage_input_units} in / "
+                        f"{stage.usage_output_units} out units"
+                    )
+                print("Usage by day:")
+                for day in usage.by_day:
+                    print(
+                        f"  {day.day}: {day.usage_input_units} in / "
+                        f"{day.usage_output_units} out units"
+                    )
         elif args.command == "subscribe":
             try:
                 _, created = preferences.subscribe(db, args.email, args.topic)

@@ -17,6 +17,11 @@ class Settings(BaseSettings):
     # Relevance verdict threshold (0.7 = the contract's "clearly on-topic" anchor)
     relevance_threshold: float = 0.7
 
+    # Bounded retries before a failing article's summary_status becomes the
+    # terminal "failed" (Epic C, Story C.1). Matches LLMProvider's own internal
+    # retry default (newsagent.llm.base) — consistency, not a separate tuning.
+    max_summarize_attempts: int = 3
+
     # Weighted digest ranking (issue #25): final_score = relevance_weight*relevance
     # + recency_weight*recency + interest_weight*interest. Weight trio sums to 1.0.
     relevance_weight: float = 0.40
