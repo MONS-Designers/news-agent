@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory, RouteRecordRaw } from "vue-router";
 import AdminView from "@/views/AdminView.vue";
+import HomeView from "@/views/HomeView.vue";
 import PreferencesView from "@/views/PreferencesView.vue";
 import TaxonomyQueueView from "@/views/TaxonomyQueueView.vue";
 import { ensureMe } from "@/auth";
@@ -24,7 +25,8 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: "/",
-    redirect: "/preferences",
+    name: "Home",
+    component: HomeView,
   },
 ];
 

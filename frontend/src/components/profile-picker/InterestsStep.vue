@@ -43,9 +43,10 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
-import { getPromptSuggestions, updateMyProfile } from "@/api/client";
+import { watch, ref, onMounted } from "vue";
+import { getMyProfile, getPromptSuggestions, updateMyProfile } from "@/api/client";
 
+const props = defineProps<{ active: boolean }>();
 const emit = defineEmits<{ continue: []; back: [] }>();
 
 const interestFreeText = ref("");
@@ -53,24 +54,44 @@ const saving = ref(false);
 const saveError = ref("");
 const promptSuggestions = ref<string[]>([]);
 
-// Illustrative only (FR-5) — clicking one just fills the textarea, still
-// freely editable; a fetch failure just means no hints show, same as the
-// pre-LLM behavior, so there's no error branch here.
+let initialText = "";
+
 onMounted(async () => {
   try {
-    promptSuggestions.value = (await getPromptSuggestions()).slice(0, 3);
+    const profile = await getMyProfile();
+    interestFreeText.value = profile.interest_free_text ?? "";
+    initialText = interestFreeText.value;
   } catch {
-    promptSuggestions.value = [];
+    // Best-effort pre-fill only — a failure here just means the textarea
+    // starts blank, same as today's behavior, not a blocking error.
   }
 });
 
+// Illustrative only (FR-5) — clicking one just fills the textarea, still
+// freely editable; a fetch failure just means no hints show, same as the
+// pre-LLM behavior, so there's no error branch here. Prompts are fetched
+// based on the user's saved profile from Step 1, so wait until this step
+// is active (meaning Step 1 has been saved) before fetching.
+watch(
+  () => props.active,
+  async (newActive: boolean) => {
+    if (!newActive) return;
+    try {
+      promptSuggestions.value = (await getPromptSuggestions()).slice(0, 3);
+    } catch {
+      promptSuggestions.value = [];
+    }
+  }
+);
+
 /** Continue and Skip do the same thing here — Step 2 is never gated (PRD
- * FR-4). Both save whatever text exists (nothing to save if blank, so no API
- * call is made) and advance; they only differ in label. */
+ * FR-4). Both save whatever text exists (nothing to save if blank or
+ * unchanged since load, so no API call — and no suggestion recompute — is
+ * made in those cases) and advance; they only differ in label. */
 async function advance() {
   if (saving.value) return;
   const text = interestFreeText.value.trim();
-  if (!text) {
+  if (!text || text === initialText) {
     emit("continue");
     return;
   }
@@ -79,6 +100,7 @@ async function advance() {
   saveError.value = "";
   try {
     await updateMyProfile({ interestFreeText: text });
+    initialText = text;
     emit("continue");
   } catch {
     saveError.value = "Couldn't save. Check your connection and try again.";

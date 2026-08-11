@@ -11,3 +11,4 @@ class TopicPreferenceOut(BaseModel):
 
 class PreferenceUpdateIn(BaseModel):
     topic_ids: list[int]
+    new_topic_names: list[str] = []

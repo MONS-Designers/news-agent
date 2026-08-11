@@ -52,6 +52,14 @@ class FilterReport:
         return sum(1 for s in self.scores if 0.3 < s < 0.7)
 
 
+def _accumulate_usage(report: FilterReport, provider: LLMProvider) -> None:
+    """Drain whatever the provider billed for the article just processed —
+    success or failure — so a malformed-output error doesn't read as free."""
+    for usage in provider.drain_usage():
+        report.usage_input_units += usage.input_units
+        report.usage_output_units += usage.output_units
+
+
 def filter_pending_articles(
     db: Session,
     provider: LLMProvider,
@@ -79,6 +87,7 @@ def filter_pending_articles(
             article.relevance_status = STATUS_ERROR
             report.errors += 1
             logger.warning("Scoring failed for article %s: %s", article.id, error)
+            _accumulate_usage(report, provider)
             db.commit()
             continue
 
@@ -95,9 +104,7 @@ def filter_pending_articles(
                 report.relevant += 1
             else:
                 report.irrelevant += 1
-            if result.usage is not None:
-                report.usage_input_units += result.usage.input_units
-                report.usage_output_units += result.usage.output_units
+        _accumulate_usage(report, provider)
         db.commit()
 
     if report.scores:

@@ -3,7 +3,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from newsagent.models import Field, PendingTaxonomySuggestion, Role, Topic
+from newsagent.models import Field, PendingTaxonomySuggestion, Role, Topic, User
+from newsagent.models.user import SUGGESTION_STATUS_PENDING_SLOW
 from newsagent.services import taxonomy
 from newsagent.suggestions.types import RoleOption
 
@@ -54,6 +55,52 @@ def test_put_over_cap_topic_ids_returns_structured_detail(
     assert response.json()["detail"] == {"error": "topic_cap_exceeded", "max_topics": 4}
 
 
+# --- New Topic names (Real Topic Suggestions story) --------------------------
+
+
+def test_put_preferences_with_new_topic_name_creates_pending_topic_and_subscribes(
+    as_user_with_db: TestClient, seeded_db: Session
+):
+    response = as_user_with_db.put(
+        "/me/preferences", json={"topic_ids": [], "new_topic_names": ["Quantum Computing"]}
+    )
+    assert response.status_code == 200
+    by_name = {item["name"]: item["subscribed"] for item in response.json()}
+    assert by_name["Quantum Computing"] is True
+
+    topic = seeded_db.scalar(select(Topic).where(Topic.name == "Quantum Computing"))
+    assert topic is not None
+    assert topic.status == "pending"
+
+    get_response = as_user_with_db.get("/me/preferences")
+    get_by_name = {item["name"]: item["subscribed"] for item in get_response.json()}
+    assert get_by_name["Quantum Computing"] is True
+
+
+def test_put_preferences_new_topic_name_over_cap_returns_structured_detail(
+    as_user_with_db: TestClient, seeded_db: Session
+):
+    ids = [t for (t,) in seeded_db.execute(select(Topic.id))]  # 3 seeded topics
+    assert len(ids) == 3
+
+    response = as_user_with_db.put(
+        "/me/preferences",
+        json={"topic_ids": ids, "new_topic_names": ["Quantum Computing", "Climate Tech"]},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == {"error": "topic_cap_exceeded", "max_topics": 4}
+
+
+def test_put_preferences_omitted_new_topic_names_defaults_to_empty(
+    as_user_with_db: TestClient,
+):
+    """Backward-compatible request shape: an existing caller that never learns
+    about new_topic_names must keep working unchanged."""
+    response = as_user_with_db.put("/me/preferences", json={"topic_ids": []})
+    assert response.status_code == 200
+
+
 def test_fields_unauthenticated_gets_401(client: TestClient):
     response = client.get("/me/fields")
     assert response.status_code == 401
@@ -71,6 +118,33 @@ def test_get_fields_returns_seeded_fields(as_user_with_db: TestClient, seeded_db
 def test_put_profile_unauthenticated_gets_401(client: TestClient):
     response = client.put("/me/profile", json={"field_name": "Tech", "field_is_other": False})
     assert response.status_code == 401
+
+
+def test_get_profile_unauthenticated_gets_401(client: TestClient):
+    response = client.get("/me/profile")
+    assert response.status_code == 401
+
+
+def test_get_profile_before_any_save_is_all_none(as_user_with_db: TestClient):
+    response = as_user_with_db.get("/me/profile")
+    assert response.status_code == 200
+    assert response.json() == {
+        "field_name": None,
+        "role_name": None,
+        "experience_bucket": None,
+        "interest_free_text": None,
+    }
+
+
+def test_get_profile_reflects_a_prior_save(as_user_with_db: TestClient, seeded_db: Session):
+    seeded_db.add(Field(name="Tech"))
+    seeded_db.commit()
+    as_user_with_db.put("/me/profile", json={"field_name": "Tech", "field_is_other": False})
+
+    response = as_user_with_db.get("/me/profile")
+
+    assert response.status_code == 200
+    assert response.json()["field_name"] == "Tech"
 
 
 def test_put_profile_curated_field_saves_field_name(as_user_with_db: TestClient, seeded_db: Session):
@@ -341,7 +415,11 @@ def test_topic_suggestions_unauthenticated_gets_401(client: TestClient):
 def test_topic_suggestions_before_any_save_is_none(as_user_with_db: TestClient):
     response = as_user_with_db.get("/me/topic-suggestions")
     assert response.status_code == 200
-    assert response.json() == {"suggestion_status": "none", "suggested_topic_ids": None}
+    assert response.json() == {
+        "suggestion_status": "none",
+        "suggested_topic_ids": None,
+        "suggested_new_topic_names": None,
+    }
 
 
 def test_profile_save_triggers_background_computation_visible_via_get(
@@ -372,6 +450,23 @@ def test_profile_save_triggers_background_computation_visible_via_get(
     body = get_response.json()
     assert body["suggestion_status"] == "ready"
     assert body["suggested_topic_ids"]  # non-empty — the 3 seeded topics
+
+
+def test_topic_suggestions_surfaces_pending_slow(
+    as_user_with_db: TestClient, seeded_db: Session
+):
+    """The extended-wait notice (GH #36) is only useful if the value actually
+    reaches the wizard. This passes today because the response field is a bare
+    `str`; it exists so narrowing that field to a Literal/Enum — which the
+    frontend's own status union invites — can't silently drop the new value."""
+    user = seeded_db.scalar(select(User))
+    user.suggestion_status = SUGGESTION_STATUS_PENDING_SLOW
+    seeded_db.commit()
+
+    response = as_user_with_db.get("/me/topic-suggestions")
+
+    assert response.status_code == 200
+    assert response.json()["suggestion_status"] == "pending_slow"
 
 
 # --- Prompt suggestions (Role and Prompt Suggestions story) -----------------

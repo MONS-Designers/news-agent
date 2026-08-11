@@ -17,6 +17,12 @@ SUGGESTION_STATUS_PENDING = "pending"
 SUGGESTION_STATUS_READY = "ready"
 SUGGESTION_STATUS_FAILED = "failed"
 
+# Non-terminal, like "pending" — the run is still working, but one of its two
+# concurrent LLM calls has already failed and we are waiting out the survivor's
+# retries (GH #36). Pollers must keep polling through it; every run that writes
+# it still settles on "ready" or "failed".
+SUGGESTION_STATUS_PENDING_SLOW = "pending_slow"
+
 
 class User(Base):
     __tablename__ = "users"
@@ -44,6 +50,7 @@ class User(Base):
         String, default=SUGGESTION_STATUS_NONE, server_default=SUGGESTION_STATUS_NONE
     )
     suggested_topic_ids: Mapped[list[int] | None] = mapped_column(JSON, nullable=True)
+    suggested_new_topic_names: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
     suggestion_request_seq: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
     topic_preferences: Mapped[list["UserTopicPreference"]] = relationship(back_populates="user")

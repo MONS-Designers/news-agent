@@ -1,18 +1,10 @@
 <template>
   <div class="space-y-6">
-    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <h1 class="text-2xl font-semibold tracking-tight">My topic preferences</h1>
-        <p class="mt-1 text-sm text-neutral-500">
-          Choose which topics appear in your daily digest.
-        </p>
-      </div>
-      <button
-        @click="loadPreferences"
-        class="inline-flex items-center justify-center rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900"
-      >
-        Reload
-      </button>
+    <div>
+      <h1 class="text-2xl font-semibold tracking-tight">My topic preferences</h1>
+      <p class="mt-1 text-sm text-neutral-500">
+        Choose which topics appear in your weekly digest.
+      </p>
     </div>
 
     <div v-if="loading" class="text-sm text-neutral-500">Loading…</div>
@@ -24,67 +16,90 @@
       {{ errorMessage }}
     </div>
 
-    <template v-else>
-      <ProfilePickerShell @topics-saved="refreshPreferencesQuietly" />
-
-      <template v-if="preferences.length > 0">
-        <ul class="space-y-3">
-          <li
-            v-for="pref in preferences"
-            :key="pref.topic_id"
-            class="flex items-center justify-between gap-4 rounded-xl border border-neutral-200 bg-white p-4 shadow-sm"
-          >
-            <p class="font-medium">{{ pref.name }}</p>
-            <label class="inline-flex cursor-pointer items-center gap-2 text-sm text-neutral-600">
-              <input
-                type="checkbox"
-                v-model="pref.subscribed"
-                class="size-4 rounded border-neutral-300 text-neutral-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900"
-              />
-              Subscribed
-            </label>
-          </li>
-        </ul>
-
-        <div class="flex items-center gap-3">
-          <button
-            @click="savePreferences"
-            :disabled="saving"
-            class="inline-flex items-center justify-center rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900 disabled:opacity-50"
-          >
-            {{ saving ? "Saving…" : "Save" }}
-          </button>
-          <p v-if="saveMessage" class="text-sm text-neutral-500">{{ saveMessage }}</p>
+    <div v-else-if="showSummary" class="space-y-5 rounded-xl border border-neutral-200 p-5">
+      <dl class="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+        <div>
+          <dt class="text-neutral-500">Field</dt>
+          <dd class="font-medium">{{ profile?.field_name }}</dd>
         </div>
-      </template>
+        <div>
+          <dt class="text-neutral-500">Role</dt>
+          <dd class="font-medium">{{ profile?.role_name }}</dd>
+        </div>
+        <div>
+          <dt class="text-neutral-500">Experience</dt>
+          <dd class="font-medium">{{ experienceLabel }}</dd>
+        </div>
+        <div v-if="profile?.interest_free_text" class="col-span-2">
+          <dt class="text-neutral-500">Interests</dt>
+          <dd class="font-medium">{{ profile.interest_free_text }}</dd>
+        </div>
+      </dl>
 
-      <div
-        v-else
-        class="rounded-xl border border-dashed border-neutral-300 bg-white p-8 text-center text-sm text-neutral-500"
-      >
-        No topics available.
+      <div>
+        <p class="mb-1.5 text-sm text-neutral-500">Subscribed topics</p>
+        <div class="flex flex-wrap gap-2">
+          <span
+            v-for="topic in subscribedTopics"
+            :key="topic.topic_id"
+            class="rounded-full bg-neutral-100 px-3 py-1 text-xs font-medium text-neutral-700"
+          >
+            {{ topic.name }}
+          </span>
+          <span v-if="subscribedTopics.length === 0" class="text-xs text-neutral-400">None yet</span>
+        </div>
       </div>
-    </template>
+
+      <button
+        type="button"
+        class="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800"
+        @click="editing = true"
+      >
+        Edit profile
+      </button>
+    </div>
+
+    <ProfilePickerShell v-else @topics-saved="refreshPreferencesQuietly" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
-import { ApiError, listMyPreferences, updateMyPreferences, type TopicPreference } from "@/api/client";
+import { computed, onMounted, ref } from "vue";
+import { ApiError, getMyProfile, listMyPreferences, type Profile, type TopicPreference } from "@/api/client";
 import ProfilePickerShell from "@/components/profile-picker/ProfilePickerShell.vue";
 
 const preferences = ref<TopicPreference[]>([]);
+const profile = ref<Profile | null>(null);
 const loading = ref(false);
-const saving = ref(false);
 const errorMessage = ref("");
-const saveMessage = ref("");
+
+// A returning user with a completed profile sees a read-only summary first,
+// not the wizard — editing (and the suggestion-recompute logic it can
+// trigger) only happens when they explicitly choose to.
+const editing = ref(false);
+const showSummary = computed(() => !editing.value && !!profile.value?.field_name);
+
+// Mirrors AboutYouStep.vue's EXPERIENCE_BUCKETS display labels.
+const EXPERIENCE_LABELS: Record<string, string> = {
+  "0-2": "0–2 yrs",
+  "3-5": "3–5 yrs",
+  "6-10": "6–10 yrs",
+  "10+": "10+ yrs",
+};
+const experienceLabel = computed(() => {
+  const bucket = profile.value?.experience_bucket;
+  return bucket ? (EXPERIENCE_LABELS[bucket] ?? bucket) : "—";
+});
+
+const subscribedTopics = computed(() => preferences.value.filter((topic) => topic.subscribed));
 
 async function loadPreferences() {
   loading.value = true;
   errorMessage.value = "";
-  saveMessage.value = "";
   try {
-    preferences.value = await listMyPreferences();
+    const [prefs, prof] = await Promise.all([listMyPreferences(), getMyProfile()]);
+    preferences.value = prefs;
+    profile.value = prof;
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) {
       errorMessage.value = "Sign in with Google to view your preferences.";
@@ -102,27 +117,13 @@ async function refreshPreferencesQuietly() {
   // Unlike loadPreferences, does not touch `loading` — that flag gates
   // ProfilePickerShell behind v-if, so toggling it here would destroy and
   // recreate the whole guided flow (resetting it to Step 1) right after the
-  // user just finished it. This just re-syncs the raw grid below.
+  // user just finished it. This just re-syncs the preferences ref.
   try {
     preferences.value = await listMyPreferences();
   } catch {
     // Best-effort background refresh — the guided flow's own save already
     // succeeded and showed its own feedback; a failed refresh here shouldn't
     // interrupt anything.
-  }
-}
-
-async function savePreferences() {
-  saving.value = true;
-  saveMessage.value = "";
-  try {
-    const topicIds = preferences.value.filter((p) => p.subscribed).map((p) => p.topic_id);
-    preferences.value = await updateMyPreferences(topicIds);
-    saveMessage.value = "Saved.";
-  } catch {
-    saveMessage.value = "Failed to save preferences.";
-  } finally {
-    saving.value = false;
   }
 }
 

@@ -16,13 +16,13 @@ directories automatically.
 
 ## What NewsAgent is
 
-A daily digest agent for Hebrew-speaking readers: pulls articles from RSS/web sources (any
+A news digest agent for Hebrew-speaking readers: pulls articles from RSS/web sources (any
 source language), summarizes and translates to Hebrew, categorizes by topic, and delivers as a
-daily email. Output language is Hebrew; source language is irrelevant.
+weekly email. Output language is Hebrew; source language is irrelevant.
 
-## Current MVP scope (per news-agent/README.md, 2026-07-17)
+## Current MVP scope (per news-agent/README.md, 2026-07-17; cadence updated 2026-08-07)
 
-Email digest only, for 2 seeded dogfood users — **not** self-registered
+**Weekly** email digest only, for 2 seeded dogfood users — **not** self-registered
 Admin approves RSS sources and sets user topic preferences via a small web UI
 Public signup and WhatsApp delivery are explicitly out of scope for MVP
 
@@ -33,6 +33,8 @@ Sources: RSS preferred, free/web search not excluded, English sources fine
 Architecture: fetching happens server-side, on the user's behalf — client stays thin
   (registration touchpoint + mailbox only)
 Delivery: daily email for MVP; WhatsApp is phase 2; a pull-model website was rejected
+  — **superseded 2026-08-07: the MVP cadence is weekly, not daily.** WhatsApp-as-phase-2
+  and the rejection of a pull-model website still stand.
 Open technical risk (unresolved, carried to build): how the agent judges source quality when
   discovering sources from a user's stated interests (vs. picking a random low-quality blog)
 

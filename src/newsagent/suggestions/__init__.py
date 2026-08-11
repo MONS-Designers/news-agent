@@ -7,7 +7,13 @@ from newsagent.suggestions.errors import (
 )
 from newsagent.suggestions.factory import get_suggestion_source
 from newsagent.suggestions.popularity import PopularitySuggestionSource
-from newsagent.suggestions.types import PromptText, RoleOption, TopicPopularity, TopicSuggestion
+from newsagent.suggestions.types import (
+    PromptText,
+    RoleOption,
+    TopicOption,
+    TopicPopularity,
+    TopicSuggestion,
+)
 
 __all__ = [
     "PopularitySuggestionSource",
@@ -18,6 +24,7 @@ __all__ = [
     "SuggestionProviderError",
     "SuggestionSource",
     "SuggestionTransportError",
+    "TopicOption",
     "TopicPopularity",
     "TopicSuggestion",
     "get_suggestion_source",

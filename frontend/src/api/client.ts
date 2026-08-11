@@ -55,8 +55,12 @@ export interface ProfileUpdate {
 }
 
 export interface TopicSuggestions {
-  suggestion_status: "none" | "pending" | "ready" | "failed";
+  // "pending_slow" is non-terminal like "pending" — the backend is still
+  // working, but one of its two concurrent calls already failed and it is
+  // waiting out the other's retries (GH #36). Keep polling through it.
+  suggestion_status: "none" | "pending" | "pending_slow" | "ready" | "failed";
   suggested_topic_ids: number[] | null;
+  suggested_new_topic_names: string[] | null;
 }
 
 export class ApiError extends Error {
@@ -119,11 +123,14 @@ export async function listMyPreferences(): Promise<TopicPreference[]> {
   return request("/me/preferences");
 }
 
-export async function updateMyPreferences(topicIds: number[]): Promise<TopicPreference[]> {
+export async function updateMyPreferences(
+  topicIds: number[],
+  newTopicNames: string[] = [],
+): Promise<TopicPreference[]> {
   return request("/me/preferences", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ topic_ids: topicIds }),
+    body: JSON.stringify({ topic_ids: topicIds, new_topic_names: newTopicNames }),
   });
 }
 
@@ -155,6 +162,10 @@ export async function getPromptSuggestions(): Promise<string[]> {
 
 export async function getTopicSuggestions(): Promise<TopicSuggestions> {
   return request("/me/topic-suggestions");
+}
+
+export async function getMyProfile(): Promise<Profile> {
+  return request("/me/profile");
 }
 
 export async function updateMyProfile(update: ProfileUpdate): Promise<Profile> {

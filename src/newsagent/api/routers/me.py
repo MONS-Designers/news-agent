@@ -32,7 +32,7 @@ def update_my_preferences(
     db: Session = Depends(get_db),
 ) -> list[preferences.TopicChoice]:
     try:
-        return preferences.set_preferences(db, user, body.topic_ids)
+        return preferences.set_preferences(db, user, body.topic_ids, body.new_topic_names)
     except preferences.TopicCapExceededError as error:
         raise HTTPException(status_code=400, detail=error.detail) from error
     except ValueError as error:
@@ -52,6 +52,11 @@ def list_my_roles(
     if field is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Field not found")
     return taxonomy.suggest_roles_for_field(db, field)
+
+
+@router.get("/profile", response_model=ProfileOut)
+def get_my_profile(user: User = Depends(require_user)) -> User:
+    return user
 
 
 @router.put("/profile", response_model=ProfileOut)

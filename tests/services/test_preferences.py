@@ -73,6 +73,33 @@ def test_list_topic_choices_marks_subscribed_vs_not(multi_topic_db: Session):
     assert by_name == {"AI": True, "Cybersecurity": False, "Space": False}
 
 
+def test_list_topic_choices_hides_other_users_pending_topic(multi_topic_db: Session):
+    """A pending Topic created by one user must not leak into a different
+    user's preferences grid — status only gates visibility to *other* users,
+    and this grid is also what Step 3's failed-suggestion fallback renders."""
+    multi_topic_db.add(User(email="creator@example.com"))
+    multi_topic_db.commit()
+    creator = multi_topic_db.scalar(select(User).where(User.email == "creator@example.com"))
+    set_preferences(multi_topic_db, creator, [], new_topic_names=["Quantum Computing"])
+
+    other = _user(multi_topic_db)
+    choices = list_topic_choices(multi_topic_db, other)
+
+    assert "Quantum Computing" not in {c.name for c in choices}
+
+
+def test_list_topic_choices_shows_own_pending_topic(multi_topic_db: Session):
+    """The reverse of the above: the creator's own pick stays visible to them."""
+    user = _user(multi_topic_db)
+    set_preferences(multi_topic_db, user, [], new_topic_names=["Quantum Computing"])
+    multi_topic_db.refresh(user)
+
+    choices = list_topic_choices(multi_topic_db, user)
+
+    by_name = {c.name: c.subscribed for c in choices}
+    assert by_name["Quantum Computing"] is True
+
+
 def test_set_preferences_adds_and_removes(multi_topic_db: Session):
     user = _user(multi_topic_db)
     subscribe(multi_topic_db, "user@example.com", "AI")
@@ -151,6 +178,119 @@ def test_set_preferences_zero_ids_still_succeeds(five_topic_db: Session):
     user = _user(five_topic_db)
     choices = set_preferences(five_topic_db, user, [])
     assert all(not c.subscribed for c in choices)
+
+
+def test_set_preferences_creates_pending_topic_from_new_name(multi_topic_db: Session):
+    user = _user(multi_topic_db)
+
+    choices = set_preferences(multi_topic_db, user, [], new_topic_names=["Quantum Computing"])
+
+    topic = multi_topic_db.scalar(select(Topic).where(Topic.name == "Quantum Computing"))
+    assert topic is not None
+    assert topic.status == "pending"
+    by_name = {c.name: c.subscribed for c in choices}
+    assert by_name["Quantum Computing"] is True
+
+
+def test_set_preferences_new_name_reuses_existing_topic(multi_topic_db: Session):
+    """get-or-create by exact name (whitespace-strip only) — a new-name pick
+    that matches an existing Topic must not create a duplicate row."""
+    user = _user(multi_topic_db)
+    ai_id = _topic_id(multi_topic_db, "AI")
+
+    set_preferences(multi_topic_db, user, [], new_topic_names=["AI"])
+
+    ai_topics = multi_topic_db.scalars(select(Topic).where(Topic.name == "AI")).all()
+    assert len(ai_topics) == 1
+    assert {p.topic_id for p in user.topic_preferences} == {ai_id}
+
+
+def test_set_preferences_blank_new_name_is_skipped(multi_topic_db: Session):
+    user = _user(multi_topic_db)
+
+    choices = set_preferences(multi_topic_db, user, [], new_topic_names=["   "])
+
+    assert all(not c.subscribed for c in choices)
+    assert multi_topic_db.scalar(select(Topic).where(Topic.name == "")) is None
+
+
+def test_set_preferences_new_name_over_cap_raises(five_topic_db: Session):
+    user = _user(five_topic_db)
+    ids = [t for (t,) in five_topic_db.execute(select(Topic.id))][:MAX_TOPICS]
+
+    with pytest.raises(TopicCapExceededError):
+        set_preferences(five_topic_db, user, ids, new_topic_names=["Quantum Computing"])
+
+
+def test_set_preferences_three_ids_plus_two_new_names_over_cap_raises(five_topic_db: Session):
+    """I/O matrix: 3 existing ids + 2 new names, all distinct -> cap exceeded."""
+    user = _user(five_topic_db)
+    ids = [t for (t,) in five_topic_db.execute(select(Topic.id))][:3]
+
+    with pytest.raises(TopicCapExceededError):
+        set_preferences(
+            five_topic_db, user, ids, new_topic_names=["Quantum Computing", "Climate Tech"]
+        )
+
+
+def test_set_preferences_over_cap_new_names_create_no_orphan_topics(multi_topic_db: Session):
+    """A save rejected for exceeding the cap must not leave any invented Topic
+    row committed — the cap check runs before any Topic is created, not after."""
+    user = _user(multi_topic_db)
+
+    with pytest.raises(TopicCapExceededError):
+        set_preferences(
+            multi_topic_db,
+            user,
+            [],
+            new_topic_names=["Quantum Computing", "Climate Tech", "Robotics", "Biotech", "Fusion"],
+        )
+
+    assert multi_topic_db.scalar(select(Topic).where(Topic.name == "Quantum Computing")) is None
+
+
+def test_set_preferences_oversized_new_name_list_creates_no_topics(multi_topic_db: Session):
+    """An unbounded new_topic_names list must not be able to create an
+    unbounded number of pending Topic rows — the cap check runs first."""
+    user = _user(multi_topic_db)
+    names = [f"Topic {i}" for i in range(50)]
+
+    with pytest.raises(TopicCapExceededError):
+        set_preferences(multi_topic_db, user, [], new_topic_names=names)
+
+    count = multi_topic_db.scalar(select(Topic.id).where(Topic.name == "Topic 0"))
+    assert count is None
+
+
+def test_set_preferences_new_name_too_long_raises(multi_topic_db: Session):
+    user = _user(multi_topic_db)
+    long_name = "x" * 101
+
+    with pytest.raises(ValueError, match="too long"):
+        set_preferences(multi_topic_db, user, [], new_topic_names=[long_name])
+
+    assert multi_topic_db.scalar(select(Topic).where(Topic.name == long_name)) is None
+
+
+def test_set_preferences_duplicate_ids_in_topic_ids_not_double_counted(multi_topic_db: Session):
+    """Repeats of the same id in topic_ids must count once toward the cap, not
+    once per repetition — the pre-resolution cap check dedupes before counting."""
+    user = _user(multi_topic_db)
+    ai_id = _topic_id(multi_topic_db, "AI")
+
+    choices = set_preferences(multi_topic_db, user, [ai_id, ai_id, ai_id, ai_id, ai_id])
+
+    by_name = {c.name: c.subscribed for c in choices}
+    assert by_name["AI"] is True
+
+
+def test_set_preferences_new_ids_and_names_together_stay_at_cap(five_topic_db: Session):
+    user = _user(five_topic_db)
+    ids = [t for (t,) in five_topic_db.execute(select(Topic.id))][:3]
+
+    choices = set_preferences(five_topic_db, user, ids, new_topic_names=["Quantum Computing"])
+
+    assert sum(c.subscribed for c in choices) == MAX_TOPICS
 
 
 def test_set_preferences_updates_user_topic_preferences_for_digest(multi_topic_db: Session):

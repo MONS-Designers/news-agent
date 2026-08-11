@@ -3,6 +3,7 @@ provider. Run with: python -m newsagent.llm.demo (no API key required)."""
 
 from newsagent.llm.factory import get_llm_provider
 from newsagent.llm.types import ArticleInput, Refusal
+from newsagent.logging_setup import configure_logging
 
 SAMPLES = [
     ArticleInput(
@@ -43,4 +44,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    configure_logging()
     main()

@@ -2,7 +2,9 @@ import pytest
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
+from newsagent.llm.errors import LLMProviderError
 from newsagent.llm.mock import MockLLMProvider
+from newsagent.llm.types import ArticleInput, Refusal, RelevanceScore, Usage
 from newsagent.models import Article, Source, Topic
 from newsagent.models.base import Base
 from newsagent.pipeline.relevance import (
@@ -122,3 +124,22 @@ def test_usage_is_aggregated(db: Session):
     add_article(db, url_suffix="b")
     report = filter_pending_articles(db, MockLLMProvider())
     assert report.usage_input_units > 0
+
+
+class BillsThenFailsProvider(MockLLMProvider):
+    """GH #19: a call that billed tokens (valid HTTP 200 + usage block) but
+    still ends in LLMProviderError — e.g. GH #38's malformed-output cases —
+    used to report 0 usage, hiding exactly the failures likely to run up cost."""
+
+    def _score_relevance(
+        self, article: ArticleInput, topic: str, preference_history
+    ) -> RelevanceScore | Refusal:
+        self._record_usage(Usage(input_units=900, output_units=12, unit="tokens"))
+        raise LLMProviderError("external LLM returned malformed output")
+
+
+def test_a_billed_but_failed_call_still_counts_toward_usage(db: Session):
+    add_article(db)
+    report = filter_pending_articles(db, BillsThenFailsProvider())
+    assert report.errors == 1
+    assert (report.usage_input_units, report.usage_output_units) == (900, 12)

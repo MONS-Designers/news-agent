@@ -1,24 +1,30 @@
 """Digest builder stage: for each user, gather summarized articles
 in their subscribed topics that were never delivered to them before, and build
-(or extend) today's Digest.
+(or extend) the Digest for `for_date` — the weekly send date.
 
-Selection is "not yet sent", not "today's articles": a DigestArticle row is
-itself the record of delivery, so nothing repeats across days and nothing is
-lost if a day is skipped. One digest per user per date (unique constraint);
-re-running a day appends only newly arrived articles; no empty digests.
+Selection is "not yet sent", not "articles from this week": a DigestArticle row
+is itself the record of delivery, so nothing repeats across runs and nothing is
+lost if a week is skipped. One digest per user per date (unique constraint);
+re-running the same date appends only newly arrived articles; no empty digests.
+
+Cadence note: fetch/filter/summarize run daily so nothing scrolls off an RSS
+feed unseen, while this stage and `send` run weekly — so a week's worth of
+summarized candidates competes for `digest_max_articles` slots here.
 """
 
 import logging
 from dataclasses import dataclass
 from datetime import date
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from newsagent.config import settings
 from newsagent.llm.base import LLMProvider
 from newsagent.llm.errors import LLMError
 from newsagent.llm.types import Refusal
 from newsagent.models import Article, Digest, DigestArticle, Source, User, UserTopicPreference
+from newsagent.pipeline.ranking import select_top
 from newsagent.pipeline.summarize import SUMMARY_DONE
 
 logger = logging.getLogger(__name__)
@@ -91,13 +97,26 @@ def build_digests(
             db.flush()
             report.digests_created += 1
 
-        for article in articles:
+        # Only the ranked top-N get attached this run; the rest stay
+        # undelivered (no DigestArticle row) and are eligible next run (#25).
+        # `limit` accounts for articles a same-day rerun already attached, so
+        # the digest's total never exceeds digest_max_articles. Counted via a
+        # direct query, not `digest.articles`, so accessing the count here
+        # doesn't cache a stale (pre-insert) collection for `_compose_voice`.
+        already_attached = db.scalar(
+            select(func.count()).select_from(DigestArticle).where(DigestArticle.digest_id == digest.id)
+        )
+        selected = select_top(
+            db, user, articles, for_date, limit=settings.digest_max_articles - already_attached
+        )
+
+        for article in selected:
             db.add(DigestArticle(digest_id=digest.id, article_id=article.id))
-        report.articles_added += len(articles)
+        report.articles_added += len(selected)
         db.flush()
         # Refresh the voice against the digest's now-final article set.
         _compose_voice(provider, digest)
         db.commit()
-        logger.info("Digest for %s (%s): +%d articles", user.email, for_date, len(articles))
+        logger.info("Digest for %s (%s): +%d articles", user.email, for_date, len(selected))
 
     return report

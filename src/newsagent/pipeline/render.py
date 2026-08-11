@@ -1,6 +1,7 @@
 """Digest HTML rendering (issue #13): Hebrew, RTL, inline-styled premium-
-newspaper email. Groups the top articles by topic; every field rendered here
-was persisted by #11/#12, so nothing is recomputed.
+newspaper email. Renders the digest's already-selected articles in order;
+every field rendered here was persisted by #11/#12/#25, so nothing is
+recomputed or re-selected.
 
 Keyword emphasis is applied safely: bullet text is HTML-escaped first, then
 ``**markdown**`` markers become ``<strong>`` — provider output can never inject
@@ -23,9 +24,6 @@ _env = Environment(
     loader=FileSystemLoader(_TEMPLATES_DIR),
     autoescape=select_autoescape(["html", "j2"]),
 )
-
-# Placeholder cap until the weighted ranking engine (#25) selects the real top-5.
-_MAX_ARTICLES = 5
 
 _HEBREW_MONTHS = [
     "ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני",
@@ -116,30 +114,10 @@ def _to_view(article: Article) -> ArticleView:
     )
 
 
-def _select_diverse(articles: list[Article], limit: int) -> list[Article]:
-    """Round-robin across topics so the digest represents several of the user's
-    topics instead of being dominated by one. Placeholder ordering until the
-    weighted ranking engine (#25) selects the real top-N."""
-    by_topic: dict[str, list[Article]] = {}
-    for article in articles:
-        by_topic.setdefault(article.source.topic.name, []).append(article)
-
-    selected: list[Article] = []
-    queues = list(by_topic.values())
-    while len(selected) < limit and any(queues):
-        for queue in queues:
-            if queue:
-                selected.append(queue.pop(0))
-                if len(selected) >= limit:
-                    break
-    return selected
-
-
 def render_digest_html(digest: Digest) -> str:
     template = _env.get_template("digest.html.j2")
 
-    all_articles = [entry.article for entry in digest.articles]
-    articles = _select_diverse(all_articles, _MAX_ARTICLES)
+    articles = [entry.article for entry in digest.articles]
     views = [_to_view(a) for a in articles]
     total_reading_time = sum(v.reading_time_minutes for v in views)
 

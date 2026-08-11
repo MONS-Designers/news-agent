@@ -26,9 +26,12 @@ class PromptText:
 @dataclass(frozen=True)
 class TopicPopularity:
     """Cross-user selection count for one Topic — plain aggregate data the
-    calling service queries and passes in; providers never query the DB."""
+    calling service queries and passes in; providers never query the DB.
+    Carries `name` so a provider can reason about (and avoid duplicating) a
+    topic it can only otherwise see as an opaque id."""
 
     topic_id: int
+    name: str
     selection_count: int
 
 
@@ -37,3 +40,11 @@ class TopicSuggestion:
     """One candidate Topic returned by `suggest_topics`."""
 
     topic_id: int
+
+
+@dataclass(frozen=True)
+class TopicOption:
+    """One LLM-invented, not-yet-existing Topic name proposed by
+    `suggest_new_topics` (mirrors `RoleOption`)."""
+
+    name: str

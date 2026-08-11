@@ -32,7 +32,7 @@ class Digest(Base):
     )
     sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     opened_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    # Digest-level editorial voice (LLM-composed from the day's headlines):
+    # Digest-level editorial voice (LLM-composed from the week's headlines):
     # a warm personal opener and a light closing joke tied to the news.
     intro_he: Mapped[str | None] = mapped_column(Text, nullable=True)
     dad_joke_he: Mapped[str | None] = mapped_column(Text, nullable=True)
