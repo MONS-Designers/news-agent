@@ -66,6 +66,11 @@ class Settings(BaseSettings):
     google_client_secret: str = ""
     # Secret for signing the session cookie; override in .env for anything non-local.
     session_secret: str = ""
+    # Session cookie's Set-Cookie Domain attribute. Empty (default) = host-only,
+    # correct for local dev and single-domain deploys. Set to a parent domain
+    # (e.g. ".newsagent-ai.com") only when frontend and backend are split across
+    # subdomains, so the cookie set by the backend is sent on requests to both.
+    session_cookie_domain: str = ""
     # Where the API redirects back to after login (the Vue dev server).
     frontend_url: str = "http://127.0.0.1:5173"
     # Publicly reachable base URL of this API — used to build the open-tracking
