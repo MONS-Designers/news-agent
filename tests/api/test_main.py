@@ -46,7 +46,7 @@ def test_session_cookie_domain_applied_when_configured(monkeypatch: pytest.Monke
     with TestClient(test_app) as test_client:
         response = test_client.get("/__test_session__")
 
-    assert "Domain=.example.com" in response.headers.get("set-cookie", "")
+    assert "domain=.example.com" in response.headers.get("set-cookie", "")
 
 
 def test_session_cookie_has_no_domain_by_default(monkeypatch: pytest.MonkeyPatch):
@@ -62,4 +62,4 @@ def test_session_cookie_has_no_domain_by_default(monkeypatch: pytest.MonkeyPatch
     with TestClient(test_app) as test_client:
         response = test_client.get("/__test_session__")
 
-    assert "Domain=" not in response.headers.get("set-cookie", "")
+    assert "domain=" not in response.headers.get("set-cookie", "")
