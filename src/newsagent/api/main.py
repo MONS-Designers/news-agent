@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from starlette.middleware.sessions import SessionMiddleware
 
-from newsagent.api.routers import admin, admin_taxonomy, auth, me, tracking
+from newsagent.api.routers import admin, admin_engagement, admin_taxonomy, auth, me, tracking
 from newsagent.config import settings
 from newsagent.logging_setup import configure_logging
 
@@ -13,6 +13,7 @@ def create_app() -> FastAPI:
     app.include_router(auth.router)
     app.include_router(admin.router)
     app.include_router(admin_taxonomy.router)
+    app.include_router(admin_engagement.router)
     app.include_router(me.router)
     app.include_router(tracking.router)
 

@@ -9,7 +9,8 @@ from sqlalchemy.pool import StaticPool
 
 from newsagent.api.deps import get_db
 from newsagent.api.main import app
-from newsagent.models import Digest, User
+from newsagent.config import settings
+from newsagent.models import Digest, DigestLink, User
 from newsagent.models.base import Base
 
 
@@ -65,3 +66,40 @@ def test_unknown_token_still_returns_pixel_without_error(client: TestClient) -> 
     resp = client.get("/t/not-a-real-token.gif")
     assert resp.status_code == 200
     assert resp.headers["content-type"] == "image/gif"
+
+
+@pytest.fixture
+def article_link(db_session: Session, digest: Digest) -> DigestLink:
+    link = DigestLink(
+        digest_id=digest.id, kind="article", target_url="https://example.com/story"
+    )
+    db_session.add(link)
+    db_session.commit()
+    return link
+
+
+def test_click_redirects_to_real_destination_and_records_click(
+    client: TestClient, db_session: Session, article_link: DigestLink
+) -> None:
+    resp = client.get(f"/c/{article_link.token}", follow_redirects=False)
+    assert resp.status_code in (302, 307)
+    assert resp.headers["location"] == "https://example.com/story"
+    db_session.refresh(article_link)
+    assert article_link.clicked_at is not None
+
+
+def test_second_click_does_not_overwrite_first_click_time(
+    client: TestClient, db_session: Session, article_link: DigestLink
+) -> None:
+    client.get(f"/c/{article_link.token}", follow_redirects=False)
+    db_session.refresh(article_link)
+    first = article_link.clicked_at
+    client.get(f"/c/{article_link.token}", follow_redirects=False)
+    db_session.refresh(article_link)
+    assert article_link.clicked_at == first
+
+
+def test_unknown_click_token_redirects_to_frontend_without_error(client: TestClient) -> None:
+    resp = client.get("/c/not-a-real-token", follow_redirects=False)
+    assert resp.status_code in (302, 307)
+    assert resp.headers["location"] == settings.frontend_url

@@ -15,9 +15,12 @@ from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from markupsafe import Markup
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from newsagent.config import settings
 from newsagent.models import Article, Digest
+from newsagent.models.digest_link import KIND_ARTICLE, KIND_PREFERENCES, DigestLink
 
 _TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 _env = Environment(
@@ -97,15 +100,42 @@ class ArticleView:
     alt_text: str
 
 
-def _to_view(article: Article) -> ArticleView:
+def _get_or_create_link(
+    db: Session, digest: Digest, kind: str, target_url: str, article: Article | None = None
+) -> DigestLink:
+    """Get-or-create a click-trackable link for this digest (FR12). Same
+    get-or-create idempotency as services/sources.py: a retried send re-renders
+    the same digest and must reuse the same token, not mint a new one."""
+    article_id = article.id if article is not None else None
+    existing = db.scalar(
+        select(DigestLink).where(
+            DigestLink.digest_id == digest.id,
+            DigestLink.kind == kind,
+            DigestLink.article_id == article_id,
+        )
+    )
+    if existing is not None:
+        return existing
+    link = DigestLink(digest_id=digest.id, kind=kind, article_id=article_id, target_url=target_url)
+    db.add(link)
+    db.commit()
+    return link
+
+
+def _click_url(link: DigestLink) -> str:
+    return f"{settings.backend_base_url}/c/{link.token}"
+
+
+def _to_view(db: Session, digest: Digest, article: Article) -> ArticleView:
     topic_name = article.source.topic.name
     bullets = article.bullets_he or ([article.summary_he] if article.summary_he else [])
     title = article.title_he or article.title
+    link = _get_or_create_link(db, digest, KIND_ARTICLE, article.url, article=article)
     return ArticleView(
         title_he=_emphasize(title),
         bullets=[_emphasize(b) for b in bullets],
         reading_time_minutes=article.reading_time_minutes or 1,
-        url=article.url,
+        url=_click_url(link),
         source_name=article.source.name,
         topic_label=_TOPIC_LABELS.get(topic_name, topic_name),
         topic_color=_TOPIC_COLORS.get(topic_name, _DEFAULT_TOPIC_COLOR),
@@ -114,14 +144,18 @@ def _to_view(article: Article) -> ArticleView:
     )
 
 
-def render_digest_html(digest: Digest) -> str:
+def render_digest_html(digest: Digest, db: Session) -> str:
     template = _env.get_template("digest.html.j2")
 
     articles = [entry.article for entry in digest.articles]
-    views = [_to_view(a) for a in articles]
+    views = [_to_view(db, digest, a) for a in articles]
     total_reading_time = sum(v.reading_time_minutes for v in views)
 
     dad_joke_he = _truncate_punchline(digest.dad_joke_he) if digest.dad_joke_he else None
+
+    preferences_link = _get_or_create_link(
+        db, digest, KIND_PREFERENCES, f"{settings.frontend_url}/preferences"
+    )
 
     return template.render(
         digest_date=_hebrew_date(digest.date),
@@ -130,6 +164,6 @@ def render_digest_html(digest: Digest) -> str:
         joke_corner_title="קינוח",
         articles=views,
         total_reading_time=total_reading_time,
-        preferences_url=f"{settings.frontend_url}/preferences",
+        preferences_url=_click_url(preferences_link),
         tracking_pixel_url=f"{settings.backend_base_url}/t/{digest.tracking_token}.gif",
     )

@@ -8,6 +8,18 @@ export interface Source {
   status: string;
 }
 
+export interface DigestEngagement {
+  digest_id: number;
+  user_email: string;
+  date: string;
+  sent_at: string | null;
+  opened_at: string | null;
+  articles_total: number;
+  articles_clicked: number;
+  clicked_article_titles: string[];
+  preferences_clicked: boolean;
+}
+
 export interface PendingTaxonomySuggestion {
   id: number;
   kind: string;
@@ -101,6 +113,10 @@ export async function logout(): Promise<void> {
 
 export async function listPendingSources(): Promise<Source[]> {
   return request("/admin/sources");
+}
+
+export async function listDigestEngagement(): Promise<DigestEngagement[]> {
+  return request("/admin/engagement");
 }
 
 export async function listPendingTaxonomySuggestions(): Promise<PendingTaxonomySuggestion[]> {

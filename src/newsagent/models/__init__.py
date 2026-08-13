@@ -3,6 +3,7 @@ from newsagent.models.article import Article
 from newsagent.models.base import Base
 from newsagent.models.digest import Digest
 from newsagent.models.digest_article import DigestArticle
+from newsagent.models.digest_link import DigestLink
 from newsagent.models.field import Field
 from newsagent.models.pending_taxonomy_suggestion import PendingTaxonomySuggestion
 from newsagent.models.pipeline_run import PipelineRun
@@ -23,6 +24,7 @@ __all__ = [
     "UserTopicPreference",
     "Digest",
     "DigestArticle",
+    "DigestLink",
     "Field",
     "Role",
     "PendingTaxonomySuggestion",

@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory, RouteRecordRaw } from "vue-router";
 import AdminView from "@/views/AdminView.vue";
+import EngagementView from "@/views/EngagementView.vue";
 import HomeView from "@/views/HomeView.vue";
 import PreferencesView from "@/views/PreferencesView.vue";
 import TaxonomyQueueView from "@/views/TaxonomyQueueView.vue";
@@ -16,6 +17,12 @@ const routes: RouteRecordRaw[] = [
     path: "/admin/taxonomy",
     name: "TaxonomyQueue",
     component: TaxonomyQueueView,
+    meta: { requiresAdmin: true },
+  },
+  {
+    path: "/admin/engagement",
+    name: "Engagement",
+    component: EngagementView,
     meta: { requiresAdmin: true },
   },
   {

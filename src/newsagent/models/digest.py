@@ -10,6 +10,7 @@ from newsagent.models.base import Base
 
 if TYPE_CHECKING:
     from newsagent.models.digest_article import DigestArticle
+    from newsagent.models.digest_link import DigestLink
     from newsagent.models.user import User
 
 
@@ -39,3 +40,4 @@ class Digest(Base):
 
     user: Mapped["User"] = relationship(back_populates="digests")
     articles: Mapped[list["DigestArticle"]] = relationship(back_populates="digest")
+    links: Mapped[list["DigestLink"]] = relationship(back_populates="digest")

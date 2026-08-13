@@ -1,0 +1,42 @@
+import secrets
+from datetime import datetime
+from typing import TYPE_CHECKING
+
+from sqlalchemy import DateTime, ForeignKey, String, Text, UniqueConstraint, func
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from newsagent.models.base import Base
+
+if TYPE_CHECKING:
+    from newsagent.models.article import Article
+    from newsagent.models.digest import Digest
+
+KIND_ARTICLE = "article"
+KIND_PREFERENCES = "preferences"
+
+
+def _generate_link_token() -> str:
+    return secrets.token_urlsafe(24)
+
+
+class DigestLink(Base):
+    """A click-trackable link embedded in a sent digest (FR12). Same shape as
+    Digest.opened_at: an unguessable per-link token, and clicked_at set once on
+    first click. One row per (digest, kind, article) — get-or-created at render
+    time so a retried send reuses the same token instead of minting a new one."""
+
+    __tablename__ = "digest_links"
+    __table_args__ = (UniqueConstraint("digest_id", "kind", "article_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    digest_id: Mapped[int] = mapped_column(ForeignKey("digests.id"))
+    token: Mapped[str] = mapped_column(String, unique=True, default=_generate_link_token)
+    kind: Mapped[str] = mapped_column(String)
+    # Set only for kind=article; null for the digest's single preferences link.
+    article_id: Mapped[int | None] = mapped_column(ForeignKey("articles.id"), nullable=True)
+    target_url: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    clicked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    digest: Mapped["Digest"] = relationship(back_populates="links")
+    article: Mapped["Article | None"] = relationship()
