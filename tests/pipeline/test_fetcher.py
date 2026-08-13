@@ -5,7 +5,7 @@ import pytest
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
-from newsagent.models import Article, Source, Topic
+from newsagent.models import Article, Source, Topic, User, UserTopicPreference
 from newsagent.models.base import Base
 from newsagent.pipeline.fetcher import extract_image_url, fetch_approved_sources, fetch_source
 
@@ -20,6 +20,10 @@ def db() -> Session:
         session.flush()
         session.add(Source(topic_id=topic.id, name="Approved feed", url="feed://ok", status="approved"))
         session.add(Source(topic_id=topic.id, name="Pending feed", url="feed://pending", status="pending"))
+        user = User(email="user@example.com")
+        session.add(user)
+        session.flush()
+        session.add(UserTopicPreference(user_id=user.id, topic_id=topic.id))
         session.commit()
         yield session
 
@@ -97,6 +101,33 @@ def test_only_approved_sources_are_fetched(db: Session):
 
     fetch_approved_sources(db, parse)
     assert calls == ["feed://ok"]
+
+
+def test_sources_with_no_subscribed_topic_are_skipped(db: Session):
+    """GH #45: fetching a source nobody subscribes to is pure waste — the
+    approved-but-unsubscribed source must never even be polled."""
+    unsubscribed_topic = Topic(name="Space")
+    db.add(unsubscribed_topic)
+    db.flush()
+    db.add(
+        Source(
+            topic_id=unsubscribed_topic.id,
+            name="No subscribers",
+            url="feed://nobody",
+            status="approved",
+        )
+    )
+    db.commit()
+
+    calls: list[str] = []
+
+    def parse(url: str) -> Any:
+        calls.append(url)
+        return FakeFeed(entries=[])
+
+    fetch_approved_sources(db, parse)
+    assert calls == ["feed://ok"]
+    assert "feed://nobody" not in calls
 
 
 def test_entry_without_link_or_title_is_ignored(db: Session):

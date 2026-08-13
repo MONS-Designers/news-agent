@@ -19,7 +19,7 @@ from newsagent.llm.base import LLMProvider
 from newsagent.llm.errors import LLMError
 from newsagent.llm.types import ArticleInput, Refusal
 from newsagent.pipeline.relevance import STATUS_RELEVANT
-from newsagent.models import Article
+from newsagent.models import Article, Source, UserTopicPreference
 
 logger = logging.getLogger(__name__)
 
@@ -69,10 +69,17 @@ def _record_failure(article: Article, report: SummarizeReport) -> None:
 def summarize_relevant_articles(db: Session, provider: LLMProvider) -> SummarizeReport:
     report = SummarizeReport()
 
+    # Skip articles whose source's topic nobody is subscribed to (GH #45) —
+    # this is the paid LLM stage, so it's the most expensive place this
+    # waste could otherwise happen.
+    subscribed_topic_ids = select(UserTopicPreference.topic_id)
     articles = db.scalars(
-        select(Article).where(
+        select(Article)
+        .join(Source)
+        .where(
             Article.relevance_status == STATUS_RELEVANT,
             Article.summary_status.in_(_SUMMARIZABLE),
+            Source.topic_id.in_(subscribed_topic_ids),
         )
     ).all()
 

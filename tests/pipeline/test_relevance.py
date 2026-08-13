@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from newsagent.llm.errors import LLMProviderError
 from newsagent.llm.mock import MockLLMProvider
 from newsagent.llm.types import ArticleInput, Refusal, RelevanceScore, Usage
-from newsagent.models import Article, Source, Topic
+from newsagent.models import Article, Source, Topic, User, UserTopicPreference
 from newsagent.models.base import Base
 from newsagent.pipeline.relevance import (
     STATUS_ERROR,
@@ -40,6 +40,10 @@ def db() -> Session:
         session.add(
             Source(id=2, topic_id=topic.id, name="Rejected", url="feed://bad", status="rejected")
         )
+        user = User(email="user@example.com")
+        session.add(user)
+        session.flush()
+        session.add(UserTopicPreference(user_id=user.id, topic_id=topic.id))
         session.commit()
         yield session
 
@@ -109,6 +113,24 @@ def test_provider_error_marks_error_and_run_continues(db: Session):
 def test_articles_from_unapproved_sources_are_skipped(db: Session):
     article = add_article(db, source_id=2)
     report = filter_pending_articles(db, MockLLMProvider())
+    assert report.scored == 0
+    assert article.relevance_status == STATUS_PENDING
+
+
+def test_articles_with_no_subscribed_topic_are_skipped(db: Session):
+    """GH #45: scoring an article nobody subscribes to is a paid LLM call
+    for no one."""
+    unsubscribed_topic = Topic(name="Space")
+    db.add(unsubscribed_topic)
+    db.flush()
+    db.add(
+        Source(id=3, topic_id=unsubscribed_topic.id, name="No subscribers", url="feed://sp", status="approved")
+    )
+    db.commit()
+    article = add_article(db, source_id=3)
+
+    report = filter_pending_articles(db, MockLLMProvider())
+
     assert report.scored == 0
     assert article.relevance_status == STATUS_PENDING
 

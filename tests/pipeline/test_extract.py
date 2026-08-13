@@ -4,7 +4,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from newsagent.config import settings
-from newsagent.models import Article, Source, Topic
+from newsagent.models import Article, Source, Topic, User, UserTopicPreference
 from newsagent.models.base import Base
 from newsagent.pipeline.extract import (
     EXTRACTION_DONE,
@@ -23,6 +23,10 @@ def db() -> Session:
         session.add(topic)
         session.flush()
         session.add(Source(id=1, topic_id=topic.id, name="Feed", url="feed://ok", status="approved"))
+        user = User(email="user@example.com")
+        session.add(user)
+        session.flush()
+        session.add(UserTopicPreference(user_id=user.id, topic_id=topic.id))
         session.commit()
         yield session
 
@@ -30,13 +34,14 @@ def db() -> Session:
 def add_article(
     db: Session,
     *,
+    source_id: int = 1,
     relevance_status: str = "relevant",
     extraction_status: str = EXTRACTION_PENDING,
     extraction_attempts: int = 0,
     url_suffix: str = "1",
 ) -> Article:
     article = Article(
-        source_id=1,
+        source_id=source_id,
         title="Headline",
         url=f"https://example.com/{url_suffix}",
         rss_summary="A short snippet.",
@@ -121,6 +126,26 @@ def test_irrelevant_articles_are_not_selected(db: Session, monkeypatch: pytest.M
     _mock_fetch_success(monkeypatch)
     _mock_extract_text(monkeypatch, "content")
     add_article(db, relevance_status="irrelevant")
+
+    report = extract_relevant_articles(db)
+
+    assert report.extracted == 0
+    assert report.failed == 0
+
+
+def test_articles_with_no_subscribed_topic_are_skipped(db: Session, monkeypatch: pytest.MonkeyPatch):
+    """GH #45: fetching + parsing full text for a topic nobody subscribes to
+    is wasted network and CPU cost."""
+    _mock_fetch_success(monkeypatch)
+    _mock_extract_text(monkeypatch, "content")
+    unsubscribed_topic = Topic(name="Space")
+    db.add(unsubscribed_topic)
+    db.flush()
+    db.add(
+        Source(id=2, topic_id=unsubscribed_topic.id, name="No subscribers", url="feed://sp", status="approved")
+    )
+    db.commit()
+    add_article(db, source_id=2, url_suffix="unsub")
 
     report = extract_relevant_articles(db)
 

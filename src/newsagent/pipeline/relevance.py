@@ -17,7 +17,7 @@ from newsagent.config import settings
 from newsagent.llm.base import LLMProvider
 from newsagent.llm.errors import LLMError
 from newsagent.llm.types import ArticleInput, Refusal
-from newsagent.models import Article, Source
+from newsagent.models import Article, Source, UserTopicPreference
 from newsagent.models.source import STATUS_APPROVED
 
 logger = logging.getLogger(__name__)
@@ -69,10 +69,19 @@ def filter_pending_articles(
         threshold = settings.relevance_threshold
     report = FilterReport()
 
+    # Skip articles whose source's topic nobody is subscribed to (GH #45) — a
+    # topic that lost its last subscriber simply stops advancing here rather
+    # than needing separate cleanup; nothing scores it, so nothing downstream
+    # ever sees it.
+    subscribed_topic_ids = select(UserTopicPreference.topic_id)
     articles = db.scalars(
         select(Article)
         .join(Source)
-        .where(Article.relevance_status.in_(_FILTERABLE), Source.status == STATUS_APPROVED)
+        .where(
+            Article.relevance_status.in_(_FILTERABLE),
+            Source.status == STATUS_APPROVED,
+            Source.topic_id.in_(subscribed_topic_ids),
+        )
     ).all()
 
     for article in articles:

@@ -6,7 +6,7 @@ from newsagent.config import settings
 from newsagent.llm.errors import LLMProviderError
 from newsagent.llm.mock import MockLLMProvider
 from newsagent.llm.types import ArticleInput, Refusal, SummaryResult, Usage
-from newsagent.models import Article, Source, Topic
+from newsagent.models import Article, Source, Topic, User, UserTopicPreference
 from newsagent.models.base import Base
 from newsagent.pipeline.summarize import (
     SUMMARY_DONE,
@@ -32,6 +32,10 @@ def db() -> Session:
         session.add(topic)
         session.flush()
         session.add(Source(id=1, topic_id=topic.id, name="Feed", url="feed://ok", status="approved"))
+        user = User(email="user@example.com")
+        session.add(user)
+        session.flush()
+        session.add(UserTopicPreference(user_id=user.id, topic_id=topic.id))
         session.commit()
         yield session
 
@@ -39,6 +43,7 @@ def db() -> Session:
 def add_article(
     db: Session,
     *,
+    source_id: int = 1,
     relevance_status: str = "relevant",
     summary_status: str = SUMMARY_PENDING,
     text: str = LONG_TEXT,
@@ -46,7 +51,7 @@ def add_article(
     summarize_attempts: int = 0,
 ) -> Article:
     article = Article(
-        source_id=1,
+        source_id=source_id,
         title="Some article title",
         url=f"https://example.com/{url_suffix}",
         rss_summary=text,
@@ -204,3 +209,21 @@ def test_empty_summary_also_counts_toward_terminal_state(
     assert report.errors == 1
     assert article.summarize_attempts == 1
     assert article.summary_status == SUMMARY_FAILED
+
+
+def test_articles_with_no_subscribed_topic_are_skipped(db: Session):
+    """GH #45: summarizing is the paid LLM stage — skipping it for a topic
+    nobody subscribes to is where the waste this issue names matters most."""
+    unsubscribed_topic = Topic(name="Space")
+    db.add(unsubscribed_topic)
+    db.flush()
+    db.add(
+        Source(id=2, topic_id=unsubscribed_topic.id, name="No subscribers", url="feed://sp", status="approved")
+    )
+    db.commit()
+    article = add_article(db, source_id=2, url_suffix="unsub")
+
+    report = summarize_relevant_articles(db, MockLLMProvider())
+
+    assert report.summarized == 0
+    assert article.summary_status == SUMMARY_PENDING

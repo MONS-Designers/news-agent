@@ -26,7 +26,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from newsagent.config import settings
-from newsagent.models import Article
+from newsagent.models import Article, Source, UserTopicPreference
 from newsagent.pipeline.relevance import STATUS_RELEVANT
 
 logger = logging.getLogger(__name__)
@@ -72,10 +72,17 @@ def _extract_text(html: str) -> str | None:
 def extract_relevant_articles(db: Session) -> ExtractReport:
     report = ExtractReport()
 
+    # Skip articles whose source's topic nobody is subscribed to (GH #45) —
+    # same waste this story exists to avoid paying for, applied to the
+    # network fetch + parse cost this stage owns.
+    subscribed_topic_ids = select(UserTopicPreference.topic_id)
     articles = db.scalars(
-        select(Article).where(
+        select(Article)
+        .join(Source)
+        .where(
             Article.relevance_status == STATUS_RELEVANT,
             Article.extraction_status.in_(_EXTRACTABLE),
+            Source.topic_id.in_(subscribed_topic_ids),
         )
     ).all()
 

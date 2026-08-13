@@ -12,7 +12,7 @@ import feedparser
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from newsagent.models import Article, Source
+from newsagent.models import Article, Source, UserTopicPreference
 from newsagent.models.source import STATUS_APPROVED
 
 logger = logging.getLogger(__name__)
@@ -126,8 +126,16 @@ def fetch_source(db: Session, source: Source, parse: ParseFunc = feedparser.pars
 
 
 def fetch_approved_sources(db: Session, parse: ParseFunc = feedparser.parse) -> FetchReport:
+    """Approved sources whose topic nobody is subscribed to are skipped
+    entirely (GH #45) — fetching them for no one is pure waste that then
+    compounds through relevance-scoring and summarize's paid LLM calls."""
     report = FetchReport()
-    sources = db.scalars(select(Source).where(Source.status == STATUS_APPROVED)).all()
+    subscribed_topic_ids = select(UserTopicPreference.topic_id)
+    sources = db.scalars(
+        select(Source).where(
+            Source.status == STATUS_APPROVED, Source.topic_id.in_(subscribed_topic_ids)
+        )
+    ).all()
     for source in sources:
         report.results.append(fetch_source(db, source, parse))
     return report
