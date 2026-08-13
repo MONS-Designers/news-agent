@@ -5,14 +5,14 @@
         class="flex h-[22px] w-[22px] items-center justify-center rounded-md bg-hd-accent-2/16 text-[11px] font-bold text-hd-accent"
         >2</span
       >
-      <span class="text-[11px] font-bold uppercase tracking-[2px] text-hd-label">Interests (optional)</span>
+      <span class="text-[11px] font-bold uppercase tracking-[2px] text-hd-label">תחומי עניין </span>
     </div>
 
     <div
       v-if="promptSuggestions.length"
       class="mb-3 flex flex-wrap gap-2"
       role="group"
-      aria-label="Example prompts"
+      aria-label="דוגמאות להשראה"
     >
       <button
         v-for="(prompt, index) in promptSuggestions"
@@ -28,18 +28,18 @@
     <textarea
       v-model="interestFreeText"
       class="min-h-[110px] w-full resize-y rounded-xl border border-white/[0.09] bg-white/[0.02] p-3.5 text-[13.5px] leading-[1.55] text-hd-fg [font-family:inherit] placeholder:text-hd-muted focus-visible:border-hd-accent-2/35 focus-visible:outline-none"
-      placeholder="Type freely — we'll use this to sharpen your suggestions..."
+      placeholder="כתוב בחופשיות - נשתמש בזה כדי לחדד את ההצעות שלך..."
       rows="4"
-      aria-label="Your interests, in your own words"
+      aria-label="תחומי העניין שלך, במילים שלך"
     ></textarea>
 
     <div class="mt-7 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3.5">
-      <button type="button" :class="BTN_GHOST" :disabled="saving" @click="emit('back')">← Back</button>
+      <button type="button" :class="BTN_GHOST" :disabled="saving" @click="emit('back')">חזרה →</button>
       <div class="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:gap-3.5">
         <p v-if="saveError" class="text-xs text-hd-subtitle">{{ saveError }}</p>
-        <button type="button" :class="BTN_GHOST" :disabled="saving" @click="advance">Skip for now →</button>
+        <button type="button" :class="BTN_GHOST" :disabled="saving" @click="advance">אגדיר מאוחר יותר ←</button>
         <button type="button" :class="BTN_PRIMARY" :disabled="saving" @click="advance">
-          {{ saving ? "Saving…" : "Continue" }}
+          {{ saving ? "שומר…" : "המשך" }}
         </button>
       </div>
     </div>
@@ -71,12 +71,12 @@ onMounted(async () => {
     interestFreeText.value = profile.interest_free_text ?? "";
     initialText = interestFreeText.value;
   } catch {
-    // Best-effort pre-fill only — a failure here just means the textarea
+    // Best-effort pre-fill only - a failure here just means the textarea
     // starts blank, same as today's behavior, not a blocking error.
   }
 });
 
-// Illustrative only (FR-5) — clicking one just fills the textarea, still
+// Illustrative only (FR-5) - clicking one just fills the textarea, still
 // freely editable; a fetch failure just means no hints show, same as the
 // pre-LLM behavior, so there's no error branch here. Prompts are fetched
 // based on the user's saved profile from Step 1, so wait until this step
@@ -93,9 +93,9 @@ watch(
   }
 );
 
-/** Continue and Skip do the same thing here — Step 2 is never gated (PRD
+/** Continue and Skip do the same thing here - Step 2 is never gated (PRD
  * FR-4). Both save whatever text exists (nothing to save if blank or
- * unchanged since load, so no API call — and no suggestion recompute — is
+ * unchanged since load, so no API call - and no suggestion recompute - is
  * made in those cases) and advance; they only differ in label. */
 async function advance() {
   if (saving.value) return;
@@ -112,7 +112,7 @@ async function advance() {
     initialText = text;
     emit("continue");
   } catch {
-    saveError.value = "Couldn't save. Check your connection and try again.";
+    saveError.value = "השמירה נכשלה. בדוק את החיבור ונסה שוב.";
   } finally {
     saving.value = false;
   }

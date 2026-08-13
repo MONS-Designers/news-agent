@@ -1,13 +1,13 @@
 <template>
   <div class="space-y-6">
     <div>
-      <h1 class="text-2xl font-semibold tracking-tight">My topic preferences</h1>
+      <h1 class="text-2xl font-semibold tracking-tight">העדפות הנושאים שלי</h1>
       <p class="mt-1 text-sm text-neutral-500">
-        Choose which topics appear in your weekly digest.
+        בחירת הנושאים שיופיעו בדייג'סט השבועי שלך.
       </p>
     </div>
 
-    <div v-if="loading" class="text-sm text-neutral-500">Loading…</div>
+    <div v-if="loading" class="text-sm text-neutral-500">טוען…</div>
 
     <div
       v-else-if="errorMessage"
@@ -19,25 +19,25 @@
     <div v-else-if="showSummary" class="space-y-5 rounded-xl border border-neutral-200 p-5">
       <dl class="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
         <div>
-          <dt class="text-neutral-500">Field</dt>
+          <dt class="text-neutral-500">תחום</dt>
           <dd class="font-medium">{{ profile?.field_name }}</dd>
         </div>
         <div>
-          <dt class="text-neutral-500">Role</dt>
+          <dt class="text-neutral-500">תפקיד</dt>
           <dd class="font-medium">{{ profile?.role_name }}</dd>
         </div>
         <div>
-          <dt class="text-neutral-500">Experience</dt>
+          <dt class="text-neutral-500">ניסיון</dt>
           <dd class="font-medium">{{ experienceLabel }}</dd>
         </div>
         <div v-if="profile?.interest_free_text" class="col-span-2">
-          <dt class="text-neutral-500">Interests</dt>
+          <dt class="text-neutral-500">תחומי עניין</dt>
           <dd class="font-medium">{{ profile.interest_free_text }}</dd>
         </div>
       </dl>
 
       <div>
-        <p class="mb-1.5 text-sm text-neutral-500">Subscribed topics</p>
+        <p class="mb-1.5 text-sm text-neutral-500">נושאים רשומים</p>
         <div class="flex flex-wrap gap-2">
           <span
             v-for="topic in subscribedTopics"
@@ -46,7 +46,7 @@
           >
             {{ topic.name }}
           </span>
-          <span v-if="subscribedTopics.length === 0" class="text-xs text-neutral-400">None yet</span>
+          <span v-if="subscribedTopics.length === 0" class="text-xs text-neutral-400">עדיין אין</span>
         </div>
       </div>
 
@@ -55,7 +55,7 @@
         class="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800"
         @click="editing = true"
       >
-        Edit profile
+        עריכת פרופיל
       </button>
     </div>
 
@@ -64,9 +64,9 @@
       class="flex items-center justify-between rounded-xl border border-neutral-200 p-5"
     >
       <div>
-        <p class="text-sm font-medium">Weekly digest emails</p>
+        <p class="text-sm font-medium">מיילים שבועיים</p>
         <p class="text-xs text-neutral-500">
-          {{ subscription?.unsubscribed ? "Paused — you won't receive the digest." : "Active" }}
+          {{ subscription?.unsubscribed ? "מושהה - לא תקבל את הדייג'סט." : "פעיל" }}
         </p>
       </div>
       <button
@@ -75,7 +75,7 @@
         class="rounded-lg border border-neutral-300 px-3 py-1.5 text-sm font-medium hover:bg-neutral-50 disabled:opacity-50"
         @click="toggleSubscription"
       >
-        {{ subscription?.unsubscribed ? "Resume" : "Pause" }}
+        {{ subscription?.unsubscribed ? "המשך" : "השהיה" }}
       </button>
     </div>
 
@@ -105,21 +105,21 @@ const loading = ref(false);
 const errorMessage = ref("");
 
 // A returning user with a completed profile sees a read-only summary first,
-// not the wizard — editing (and the suggestion-recompute logic it can
+// not the wizard - editing (and the suggestion-recompute logic it can
 // trigger) only happens when they explicitly choose to.
 const editing = ref(false);
 const showSummary = computed(() => !editing.value && !!profile.value?.field_name);
 
 // Mirrors AboutYouStep.vue's EXPERIENCE_BUCKETS display labels.
 const EXPERIENCE_LABELS: Record<string, string> = {
-  "0-2": "0–2 yrs",
-  "3-5": "3–5 yrs",
-  "6-10": "6–10 yrs",
-  "10+": "10+ yrs",
+  "0-2": "0–2 שנים",
+  "3-5": "3–5 שנים",
+  "6-10": "6–10 שנים",
+  "10+": "10+ שנים",
 };
 const experienceLabel = computed(() => {
   const bucket = profile.value?.experience_bucket;
-  return bucket ? (EXPERIENCE_LABELS[bucket] ?? bucket) : "—";
+  return bucket ? (EXPERIENCE_LABELS[bucket] ?? bucket) : "-";
 });
 
 const subscribedTopics = computed(() => preferences.value.filter((topic) => topic.subscribed));
@@ -138,11 +138,11 @@ async function loadPreferences() {
     subscription.value = sub;
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) {
-      errorMessage.value = "Sign in with Google to view your preferences.";
+      errorMessage.value = "התחבר עם Google כדי לצפות בהעדפות שלך.";
     } else if (error instanceof ApiError && error.status === 403) {
-      errorMessage.value = "This account has no user profile. Contact an admin.";
+      errorMessage.value = "לחשבון הזה אין פרופיל משתמש. פנה למנהל המערכת.";
     } else {
-      errorMessage.value = "Failed to load preferences.";
+      errorMessage.value = "טעינת ההעדפות נכשלה.";
     }
   } finally {
     loading.value = false;
@@ -150,14 +150,14 @@ async function loadPreferences() {
 }
 
 async function refreshPreferencesQuietly() {
-  // Unlike loadPreferences, does not touch `loading` — that flag gates
+  // Unlike loadPreferences, does not touch `loading` - that flag gates
   // ProfilePickerShell behind v-if, so toggling it here would destroy and
   // recreate the whole guided flow (resetting it to Step 1) right after the
   // user just finished it. This just re-syncs the preferences ref.
   try {
     preferences.value = await listMyPreferences();
   } catch {
-    // Best-effort background refresh — the guided flow's own save already
+    // Best-effort background refresh - the guided flow's own save already
     // succeeded and showed its own feedback; a failed refresh here shouldn't
     // interrupt anything.
   }
@@ -169,7 +169,7 @@ async function toggleSubscription() {
   try {
     subscription.value = await updateMySubscription(!subscription.value.unsubscribed);
   } catch {
-    // Best-effort — leave the displayed state as-is on failure, no separate
+    // Best-effort - leave the displayed state as-is on failure, no separate
     // error banner for a single toggle.
   } finally {
     subscriptionSaving.value = false;

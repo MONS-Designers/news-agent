@@ -27,7 +27,7 @@
         :aria-pressed="otherButtonActive"
         @click="selectOther"
       >
-        Other
+        אחר
       </button>
     </div>
 
@@ -38,7 +38,7 @@
       class="mt-3 w-full rounded-[10px] border border-hd-accent-2/40 bg-hd-accent-2/[0.06] px-3.5 py-[11px] text-[13.5px] text-hd-fg [font-family:inherit] placeholder:text-hd-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-hd-accent-2 focus-visible:outline-offset-2"
       :maxlength="MAX_NAME_LENGTH"
       :placeholder="otherPlaceholder"
-      :aria-label="`Your ${label.toLowerCase()}, if not listed above`"
+      :aria-label="`ה${label} שלך, אם לא ברשימה למעלה`"
     />
   </div>
 </template>
@@ -67,7 +67,7 @@ const otherText = defineModel<string>("otherText", { required: true });
 
 // True only when `isOther` is set by the real "Other" free-text button, not
 // by a not-yet-curated chip (selectNew also sets isOther=true, but keeps
-// selectedName pointed at the chip's name — selectOther clears it to null).
+// selectedName pointed at the chip's name - selectOther clears it to null).
 // Derived, not local state: a parent resetting isOther/selectedName directly
 // (e.g. AboutYouStep.vue clearing the Role row on Field change) must not
 // leave this stale, since nothing else here would resync it.
@@ -103,7 +103,7 @@ function selectNew(name: string) {
 }
 
 function selectOther() {
-  // Clear any stale text from a previous visit to "Other" — otherwise
+  // Clear any stale text from a previous visit to "Other" - otherwise
   // switching curated -> Other silently resubmits the old value.
   otherText.value = "";
   selectedName.value = null;
@@ -114,7 +114,7 @@ const CHIP_BASE =
   "inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-[10px] border px-4 py-[11px] text-[13.5px] [font-family:inherit] motion-reduce:transition-none [transition:border-color_0.18s_ease,background_0.18s_ease,transform_0.18s_ease] focus-visible:outline focus-visible:outline-2 focus-visible:outline-hd-accent-2 focus-visible:outline-offset-2 active:scale-[0.97]";
 // Hover styles are gated behind `hover:hover` so tapping on a touchscreen never
 // leaves a chip stuck in its hover-lit state (the classic mobile Safari/Chrome
-// sticky-:hover bug) — only pointers that can sustain hover (a mouse) get it.
+// sticky-:hover bug) - only pointers that can sustain hover (a mouse) get it.
 const CHIP_UNSELECTED =
   "border-white/[0.09] bg-white/[0.02] [@media(hover:hover)]:hover:border-white/[0.22] [@media(hover:hover)]:hover:bg-white/[0.05] motion-safe:[@media(hover:hover)]:hover:-translate-y-px";
 const CHIP_SELECTED =

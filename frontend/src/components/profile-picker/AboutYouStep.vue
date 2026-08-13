@@ -2,9 +2,9 @@
   <div>
     <ChipRow
       step-num="1"
-      label="Field"
+      label="תחום"
       :options="fields"
-      other-placeholder="e.g. Marine Biology"
+      other-placeholder="לדוגמה: ביולוגיה ימית"
       :placeholder-text="null"
       v-model:selected-name="fieldName"
       v-model:is-other="fieldIsOther"
@@ -14,9 +14,9 @@
     <div class="mt-7">
       <ChipRow
         step-num="2"
-        label="Role"
+        label="תפקיד"
         :options="roles"
-        other-placeholder="e.g. Developer Relations"
+        other-placeholder="לדוגמה: יחסי מפתחים"
         :placeholder-text="rolePlaceholder"
         v-model:selected-name="roleName"
         v-model:is-other="roleIsOther"
@@ -30,7 +30,7 @@
           class="flex h-[22px] w-[22px] items-center justify-center rounded-md bg-hd-accent-2/16 text-[11px] font-bold text-hd-accent"
           >3</span
         >
-        <span class="text-[11px] font-bold uppercase tracking-[2px] text-hd-label">Experience</span>
+        <span class="text-[11px] font-bold uppercase tracking-[2px] text-hd-label">ניסיון</span>
       </legend>
       <div class="flex gap-0.5 rounded-[10px] border border-white/[0.08] bg-white/[0.03] p-[3px]">
         <label
@@ -53,7 +53,7 @@
       </div>
     </fieldset>
 
-    <p v-if="loadError" class="mt-3 text-xs text-hd-subtitle">Couldn't load options. Try reloading the page.</p>
+    <p v-if="loadError" class="mt-3 text-xs text-hd-subtitle">טעינת האפשרויות נכשלה. נסה לרענן את הדף.</p>
 
     <div class="mt-7 flex items-center justify-end gap-3.5">
       <p v-if="saveError" class="text-xs text-hd-subtitle">{{ saveError }}</p>
@@ -64,7 +64,7 @@
         :disabled="!canContinue || saving"
         @click="onContinue"
       >
-        {{ saving ? "Saving…" : "Continue" }}
+        {{ saving ? "שומר…" : "המשך" }}
       </button>
     </div>
   </div>
@@ -87,10 +87,10 @@ const emit = defineEmits<{ continue: [] }>();
 // Storage values must match services/profile.py:EXPERIENCE_BUCKETS exactly;
 // display labels (en dash) are presentation-only and never sent to the API.
 const EXPERIENCE_BUCKETS = [
-  { value: "0-2", label: "0–2 yrs" },
-  { value: "3-5", label: "3–5 yrs" },
-  { value: "6-10", label: "6–10 yrs" },
-  { value: "10+", label: "10+ yrs" },
+  { value: "0-2", label: "0–2 שנים" },
+  { value: "3-5", label: "3–5 שנים" },
+  { value: "6-10", label: "6–10 שנים" },
+  { value: "10+", label: "10+ שנים" },
 ];
 
 const fields = ref<FieldOption[]>([]);
@@ -155,8 +155,8 @@ const selectedField = computed(() =>
 const rolesLoading = ref(false);
 
 const rolePlaceholder = computed(() => {
-  if (!fieldSatisfied.value) return "Pick a field first";
-  if (rolesLoading.value) return "Loading roles…";
+  if (!fieldSatisfied.value) return "בחר תחום קודם";
+  if (rolesLoading.value) return "טוען תפקידים…";
   return null;
 });
 
@@ -183,7 +183,7 @@ watch([fieldName, fieldIsOther], async () => {
   }
 
   // The Role fetch now merges in an LLM call (Role and Prompt Suggestions
-  // story), so it can take noticeably longer than the old DB-only read —
+  // story), so it can take noticeably longer than the old DB-only read -
   // without this, the row just looks empty/broken for that stretch.
   rolesLoading.value = true;
   try {
@@ -236,7 +236,7 @@ async function onContinue() {
     captureSnapshot();
     emit("continue");
   } catch {
-    saveError.value = "Couldn't save. Check your connection and try again.";
+    saveError.value = "השמירה נכשלה. בדוק את החיבור ונסה שוב.";
   } finally {
     saving.value = false;
   }
@@ -249,7 +249,7 @@ onMounted(async () => {
     experienceBucket.value = profile.experience_bucket;
 
     if (profile.field_name === null) {
-      captureSnapshot(); // brand-new user — nothing to pre-fill, snapshot is all-blank
+      captureSnapshot(); // brand-new user - nothing to pre-fill, snapshot is all-blank
       return;
     }
 

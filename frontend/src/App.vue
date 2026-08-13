@@ -10,7 +10,7 @@
             class="rounded-lg px-3 py-1.5 text-sm font-medium text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
             exact-active-class="bg-neutral-100 text-neutral-900"
           >
-            Admin
+            ניהול
           </router-link>
           <router-link
             v-if="me?.is_admin"
@@ -18,7 +18,7 @@
             class="rounded-lg px-3 py-1.5 text-sm font-medium text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
             active-class="bg-neutral-100 text-neutral-900"
           >
-            Taxonomy
+            טקסונומיה
           </router-link>
           <router-link
             v-if="me?.is_admin"
@@ -26,14 +26,14 @@
             class="rounded-lg px-3 py-1.5 text-sm font-medium text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
             active-class="bg-neutral-100 text-neutral-900"
           >
-            Engagement
+            מעורבות
           </router-link>
           <router-link
             to="/preferences"
             class="rounded-lg px-3 py-1.5 text-sm font-medium text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
             active-class="bg-neutral-100 text-neutral-900"
           >
-            Preferences
+            העדפות
           </router-link>
         </nav>
         <div class="ms-auto flex items-center gap-3">
@@ -43,7 +43,7 @@
               @click="signOut"
               class="rounded-lg border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-100"
             >
-              Sign out
+              התנתקות
             </button>
           </template>
           <a
@@ -51,7 +51,7 @@
             :href="loginUrl()"
             class="rounded-lg bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-neutral-700"
           >
-            Sign in with Google
+            התחברות עם Google
           </a>
         </div>
       </div>
@@ -80,17 +80,17 @@ const router = useRouter();
 const errorBanner = ref("");
 
 const ERROR_MESSAGES: Record<string, string> = {
-  unauthorized: "This Google account is not registered for NewsAgent. Contact an admin.",
-  oauth_failed: "Google sign-in failed. Please try again.",
+  unauthorized: "חשבון ה-Google הזה אינו רשום ל-NewsAgent. פנה למנהל המערכת.",
+  oauth_failed: "ההתחברות עם Google נכשלה. נסה שוב.",
 };
 
 onMounted(async () => {
   const error = new URLSearchParams(window.location.search).get("error");
   // capacity_full gets its own dedicated screen in HomeView.vue (UX-DR5),
-  // not the generic banner — showing both would be a redundant, weaker
+  // not the generic banner - showing both would be a redundant, weaker
   // version of the same message.
   if (error && error !== "capacity_full") {
-    errorBanner.value = ERROR_MESSAGES[error] ?? "Sign-in error.";
+    errorBanner.value = ERROR_MESSAGES[error] ?? "שגיאת התחברות.";
   }
   await ensureMe();
 });

@@ -8,34 +8,34 @@
     <div class="grain" aria-hidden="true"></div>
 
     <section v-if="capacityFull" class="hero">
-      <p class="kicker">NewsAgent · AI Digest</p>
-      <h1 class="title">We're at capacity right now.</h1>
+      <p class="kicker">NewsAgent · דייג'סט AI</p>
+      <h1 class="title">אנחנו במלוא התפוסה כרגע.</h1>
       <p class="subtitle">
-        NewsAgent is limited to a small group of early users while we dial things in. We saved
-        your email — you'll be invited as soon as a spot opens up.
+        NewsAgent פתוח כרגע לקבוצה קטנה של משתמשים מוקדמים בזמן שאנחנו מכווננים את המערכת. שמרנו
+        את כתובת המייל שלך - תקבל הזמנה ברגע שיתפנה מקום.
       </p>
     </section>
 
     <template v-else>
       <section class="hero">
-        <p class="kicker">NewsAgent · AI Digest</p>
+        <p class="kicker">NewsAgent · דייג'סט AI</p>
         <template v-if="firstRun">
-          <h1 class="title">You're in.<br />Let's set up your digest.</h1>
+          <h1 class="title">אתה בפנים.<br />בוא נגדיר את הדייג'סט שלך.</h1>
           <p class="subtitle">
-            One more step — tell us your field and interests, and we'll start building your first
-            weekly digest around what actually matters to you.
+            עוד צעד אחד - ספר לנו על התחום ותחומי העניין שלך, ונתחיל לבנות את הדייג'סט השבועי
+            הראשון שלך סביב מה שבאמת חשוב לך.
           </p>
         </template>
         <template v-else>
-          <h1 class="title">One digest.<br />Everything that matters to you.</h1>
+          <h1 class="title">דייג'סט אחד.<br />כל מה שחשוב לך.</h1>
           <p class="subtitle">
-            An AI that reads the news so you don't have to — distilled into one focused digest,
-            delivered weekly, built around what you actually care about.
+            בינה מלאכותית שקוראת את החדשות בשבילך - מזוקקת לדייג'סט אחד וממוקד, שמגיע כל שבוע,
+            בנוי סביב מה שבאמת מעניין אותך.
           </p>
         </template>
         <button type="button" class="cta" @click="goToPreferences">
-          Set up your digest
-          <span class="cta-arrow" aria-hidden="true">→</span>
+          אני רוצה להגדיר את את הדייג'סט שלי
+          <span class="cta-arrow" aria-hidden="true">←</span>
         </button>
       </section>
 
@@ -58,7 +58,7 @@
     </template>
 
     <footer class="foot">
-      <p class="foot-text">Delivered by email. Nothing else to check.</p>
+      <p class="foot-text">מגיע במייל. אין שום דבר אחר לבדוק.</p>
     </footer>
   </div>
 </template>
@@ -76,7 +76,7 @@ const capacityFull = computed(() => route.query.error === "capacity_full");
 
 // A freshly self-registered user (no profile yet, no digest history) sees a
 // welcome/first-run beat here instead of the generic anonymous pitch
-// (UX-DR6) — distinct from PreferencesView.vue's returning-user summary,
+// (UX-DR6) - distinct from PreferencesView.vue's returning-user summary,
 // which is a different screen entirely.
 const firstRun = ref(false);
 
@@ -87,7 +87,7 @@ async function checkFirstRun() {
     const profile = await getMyProfile();
     firstRun.value = profile.field_name === null;
   } catch {
-    // Best-effort — on failure, just show the default (non-first-run) content.
+    // Best-effort - on failure, just show the default (non-first-run) content.
   }
 }
 
@@ -97,21 +97,21 @@ function goToPreferences() {
 
 const steps = [
   {
-    title: "Tell it about you",
-    body: "Your field, your role, what you're actually interested in — a couple of minutes, once.",
+    title: "הסיפור שלך",
+    body: "התחום שלך, התפקיד שלך, מה שבאמת מעניין אותך - כמה דקות, פעם אחת.",
   },
   {
-    title: "It reads everything",
-    body: "Sources across the web, filtered and summarized down to what's actually relevant.",
+    title: "הוא קורא הכל",
+    body: "מקורות מכל הרשת, מסוננים ומסוכמים לכדי מה שבאמת רלוונטי.",
   },
   {
-    title: "You get one digest",
-    body: "A single, focused email each week. No feed to scroll, no app to open.",
+    title: "דייג'סט מסודר נוחת אצלך במייל",
+    body: "מייל אחד וממוקד כל שבוע. בלי פיד לגלול, בלי אפליקציה לפתוח.",
   },
 ];
 
 // -- Depth: orb parallax (mirrors ProfilePickerShell.vue's Hybrid Depth
-// technique) — recomputed from current state each event, never appended. --
+// technique) - recomputed from current state each event, never appended. --
 const orbA = ref<HTMLElement | null>(null);
 const orbB = ref<HTMLElement | null>(null);
 const orbC = ref<HTMLElement | null>(null);
@@ -164,7 +164,7 @@ let revealObserver: IntersectionObserver | null = null;
 
 // -- Light 3D tilt: a restrained perspective tilt following the cursor
 // within each card, released back to flat on mouse-leave. Small max angle
-// deliberately — the brand brief calls for "serious and mysterious," not a
+// deliberately - the brand brief calls for "serious and mysterious," not a
 // showy tilt-card gimmick. --
 const cardEls: (HTMLElement | null)[] = [];
 function setCardRef(el: HTMLElement | null, index: number) {
@@ -348,7 +348,7 @@ onBeforeUnmount(() => {
   transition: transform 0.2s ease;
 }
 .cta:hover .cta-arrow {
-  transform: translateX(3px);
+  transform: translateX(-3px);
 }
 
 .steps {

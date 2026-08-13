@@ -2,16 +2,16 @@
   <div class="space-y-6">
     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <h1 class="text-2xl font-semibold tracking-tight">Taxonomy queue</h1>
+        <h1 class="text-2xl font-semibold tracking-tight">תור טקסונומיה</h1>
         <p class="mt-1 text-sm text-neutral-500">
-          Review "Other" field and role submissions from users.
+          סקירת הצעות תחום ותפקיד מסוג "אחר" שהוגשו על ידי משתמשים.
         </p>
       </div>
       <button
         @click="loadSuggestions"
         class="inline-flex items-center justify-center rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900"
       >
-        Load pending suggestions
+        טעינת הצעות ממתינות
       </button>
     </div>
 
@@ -22,7 +22,7 @@
       {{ actionError }}
     </div>
 
-    <div v-if="loading" class="text-sm text-neutral-500">Loading…</div>
+    <div v-if="loading" class="text-sm text-neutral-500">טוען…</div>
 
     <div
       v-else-if="errorMessage"
@@ -46,17 +46,16 @@
             <span
               class="rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700"
             >
-              {{ suggestion.kind }}
+              {{ kindLabel(suggestion.kind) }}
             </span>
             <span class="text-sm text-neutral-500">
-              {{ suggestion.submission_count }}
-              {{ suggestion.submission_count === 1 ? "submission" : "submissions" }}
+              {{ suggestion.submission_count === 1 ? "הגשה אחת" : `${suggestion.submission_count} הגשות` }}
             </span>
           </div>
         </div>
 
         <div class="mt-4 flex flex-col gap-2 border-t border-neutral-100 pt-4 sm:flex-row sm:items-center">
-          <label class="sr-only" :for="`name-${suggestion.id}`">Curated name</label>
+          <label class="sr-only" :for="`name-${suggestion.id}`">שם מתויג</label>
           <input
             :id="`name-${suggestion.id}`"
             v-model="curatedNames[suggestion.id]"
@@ -69,21 +68,20 @@
               :disabled="pendingId === suggestion.id || !canPromote(suggestion)"
               class="inline-flex items-center justify-center rounded-lg bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-700 disabled:opacity-50"
             >
-              Promote
+              קדם
             </button>
             <button
               @click="decide(suggestion, 'rejected')"
               :disabled="pendingId === suggestion.id"
               class="inline-flex items-center justify-center rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-red-500 disabled:opacity-50"
             >
-              Dismiss
+              דחה
             </button>
           </div>
         </div>
 
         <p v-if="!canPromote(suggestion)" class="mt-2 text-sm text-neutral-500">
-          This role was submitted under a field that is not curated yet. Promote that field first,
-          or dismiss this suggestion.
+          התפקיד הזה הוגש תחת תחום שעדיין לא מתויג. קדם קודם את התחום הזה, או דחה את ההצעה הזו.
         </p>
       </li>
     </ul>
@@ -92,7 +90,7 @@
       v-else
       class="rounded-xl border border-dashed border-neutral-300 bg-white p-8 text-center text-sm text-neutral-500"
     >
-      No pending taxonomy suggestions.
+      אין הצעות טקסונומיה ממתינות.
     </div>
   </div>
 </template>
@@ -114,20 +112,28 @@ const actionError = ref("");
 const pendingId = ref<number | null>(null);
 
 // A role submitted under a field that is itself uncurated "Other" text carries
-// no field_id, so field_name is null for role rows too — not only field rows.
+// no field_id, so field_name is null for role rows too - not only field rows.
 function isOrphanRole(suggestion: PendingTaxonomySuggestion): boolean {
   return suggestion.kind === "role" && suggestion.field_name === null;
 }
 
+const KIND_LABELS: Record<string, string> = {
+  field: "תחום",
+  role: "תפקיד",
+};
+function kindLabel(kind: string): string {
+  return KIND_LABELS[kind] ?? kind;
+}
+
 function context(suggestion: PendingTaxonomySuggestion): string {
   if (suggestion.kind === "field") {
-    return "New field";
+    return "תחום חדש";
   }
-  return suggestion.field_name ? `Under ${suggestion.field_name}` : "Field not curated";
+  return suggestion.field_name ? `תחת ${suggestion.field_name}` : "תחום לא מתויג";
 }
 
 // Role.field_id is a non-nullable foreign key, so there is no row the backend
-// could write for an orphan role — it answers 400. Mirror that in the UI rather
+// could write for an orphan role - it answers 400. Mirror that in the UI rather
 // than offering an action that always fails.
 function canPromote(suggestion: PendingTaxonomySuggestion): boolean {
   return !isOrphanRole(suggestion);
@@ -141,11 +147,11 @@ async function loadSuggestions() {
     curatedNames.value = Object.fromEntries(suggestions.value.map((s) => [s.id, s.text]));
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) {
-      errorMessage.value = "Sign in with Google to view pending suggestions.";
+      errorMessage.value = "התחבר עם Google כדי לצפות בהצעות הממתינות.";
     } else if (error instanceof ApiError && error.status === 403) {
-      errorMessage.value = "Your account does not have admin access.";
+      errorMessage.value = "לחשבון שלך אין הרשאת מנהל.";
     } else {
-      errorMessage.value = "Failed to load taxonomy suggestions.";
+      errorMessage.value = "טעינת הצעות הטקסונומיה נכשלה.";
     }
   } finally {
     loading.value = false;
@@ -163,7 +169,7 @@ async function decide(
     await decideTaxonomySuggestion(suggestion.id, status, name);
     suggestions.value = suggestions.value.filter((s) => s.id !== suggestion.id);
   } catch {
-    actionError.value = `Failed to ${status === "approved" ? "promote" : "dismiss"} suggestion.`;
+    actionError.value = `הפעולה נכשלה: לא ניתן ${status === "approved" ? "לקדם" : "לדחות"} את ההצעה.`;
   } finally {
     pendingId.value = null;
   }

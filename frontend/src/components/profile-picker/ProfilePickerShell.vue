@@ -20,13 +20,13 @@
     ></div>
 
     <div class="relative z-[2]">
-      <p class="mb-2.5 text-[11px] font-bold uppercase tracking-[3px] text-hd-kicker">Preferences</p>
-      <h2 class="mb-2.5 text-[30px] font-[650] tracking-[-0.5px] text-hd-title">Set up your profile</h2>
+      <p class="mb-2.5 text-[11px] font-bold uppercase tracking-[3px] text-hd-kicker">העדפות</p>
+      <h2 class="mb-2.5 text-[30px] font-[650] tracking-[-0.5px] text-hd-title">הגדרת הפרופיל שלך</h2>
       <p class="mb-7 max-w-[52ch] text-sm leading-[1.55] text-hd-subtitle">
-        Three quick steps. Change any of it later — this never locks in.
+        שלושה שלבים מהירים. אפשר לשנות כל דבר אחר כך - שום דבר לא ננעל.
       </p>
 
-      <ol class="mb-7 flex list-none items-center gap-2 p-0" aria-label="Setup progress">
+      <ol class="mb-7 flex list-none items-center gap-2 p-0" aria-label="התקדמות ההגדרה">
         <li v-for="step in steps" :key="step.n" class="flex min-w-0 flex-1 items-center gap-2">
           <span :class="stepDotClasses(step.n)">{{ step.n }}</span>
           <span :class="stepLabelClasses(step.n)">{{ step.label }}</span>
@@ -38,7 +38,7 @@
           v-show, not v-if/v-else: these panels must never be unmounted, or
           AboutYouStep's Field/Role/Experience selections would be destroyed
           the moment the user leaves Step 1 (this was the actual cause of the
-          old "state dies on unmount" gap — an accidental side effect of
+          old "state dies on unmount" gap - an accidental side effect of
           destroy/recreate, not an intentional design). Entrance-animation
           replay is handled separately, below, so it no longer depends on
           destroying the DOM to work.
@@ -70,9 +70,9 @@ import TopicsStep from "./TopicsStep.vue";
 const emit = defineEmits<{ "topics-saved": [] }>();
 
 const steps = [
-  { n: 1, label: "About you" },
-  { n: 2, label: "Interests" },
-  { n: 3, label: "Topics" },
+  { n: 1, label: "עליך" },
+  { n: 2, label: "תחומי עניין" },
+  { n: 3, label: "נושאים" },
 ];
 
 const currentStep = ref(1);
@@ -110,9 +110,9 @@ const orbB = ref<HTMLElement | null>(null);
 const orbC = ref<HTMLElement | null>(null);
 
 // Mouse + scroll driven parallax. Both handlers recompute each orb's full
-// transform from current state — never append to the existing transform
+// transform from current state - never append to the existing transform
 // string (that grows unbounded and freezes the tab under fast/repeated
-// scroll events — learned the hard way in the UX prototype).
+// scroll events - learned the hard way in the UX prototype).
 const orbConfigs = [
   { depthX: 26, scrollFactor: 0.04 },
   { depthX: 40, scrollFactor: -0.06 },
@@ -166,7 +166,7 @@ function handleMotionChange(event: MediaQueryListEvent | MediaQueryList) {
 }
 
 // The mouse half of the parallax is meaningless without a persistent pointer
-// (a tap has no "position to hover from") — only attach/detach it for
+// (a tap has no "position to hover from") - only attach/detach it for
 // devices that actually have one, reactively, so a 2-in-1 switching between
 // touch and a plugged-in mouse still gets the right behavior. Scroll-position
 // parallax is unaffected and keeps working on touch devices.
@@ -186,7 +186,7 @@ function handleHoverChange(event: MediaQueryListEvent | MediaQueryList) {
   }
 }
 
-// Panels are kept mounted via v-show (never destroyed — see the template
+// Panels are kept mounted via v-show (never destroyed - see the template
 // comment), so the entrance animation no longer replays "for free" as a side
 // effect of recreation. Restart it explicitly, the same way the approved
 // mockup's own goStep() does: force a reflow between clearing and restoring
@@ -194,7 +194,7 @@ function handleHoverChange(event: MediaQueryListEvent | MediaQueryList) {
 function replayEntrance(el: HTMLElement | null) {
   if (!el || reducedMotion) return;
   el.style.animation = "none";
-  void el.offsetWidth; // reflow — must be read, not optimized away
+  void el.offsetWidth; // reflow - must be read, not optimized away
   el.style.animation = "";
 }
 
