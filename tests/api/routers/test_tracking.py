@@ -103,3 +103,62 @@ def test_unknown_click_token_redirects_to_frontend_without_error(client: TestCli
     resp = client.get("/c/not-a-real-token", follow_redirects=False)
     assert resp.status_code in (302, 307)
     assert resp.headers["location"] == settings.frontend_url
+
+
+@pytest.fixture
+def unsubscribe_link(db_session: Session, digest: Digest) -> DigestLink:
+    link = DigestLink(
+        digest_id=digest.id, kind="unsubscribe", target_url=f"{settings.frontend_url}/preferences"
+    )
+    db_session.add(link)
+    db_session.commit()
+    return link
+
+
+def test_unsubscribe_click_sets_user_unsubscribed_at(
+    client: TestClient, db_session: Session, unsubscribe_link: DigestLink
+) -> None:
+    client.get(f"/c/{unsubscribe_link.token}", follow_redirects=False)
+    user = db_session.get(User, 1)
+    assert user is not None
+    assert user.unsubscribed_at is not None
+
+
+def test_unsubscribe_click_twice_does_not_error(
+    client: TestClient, db_session: Session, unsubscribe_link: DigestLink
+) -> None:
+    client.get(f"/c/{unsubscribe_link.token}", follow_redirects=False)
+    user = db_session.get(User, 1)
+    first = user.unsubscribed_at
+    client.get(f"/c/{unsubscribe_link.token}", follow_redirects=False)
+    db_session.refresh(user)
+    assert user.unsubscribed_at == first
+
+
+def test_click_marks_digest_as_opened_when_pixel_never_loaded(
+    client: TestClient, db_session: Session, digest: Digest, article_link: DigestLink
+) -> None:
+    assert digest.opened_at is None
+    client.get(f"/c/{article_link.token}", follow_redirects=False)
+    db_session.refresh(digest)
+    assert digest.opened_at is not None
+
+
+def test_click_does_not_overwrite_earlier_open_time(
+    client: TestClient, db_session: Session, digest: Digest, article_link: DigestLink
+) -> None:
+    client.get(f"/t/{digest.tracking_token}.gif")
+    db_session.refresh(digest)
+    first = digest.opened_at
+    client.get(f"/c/{article_link.token}", follow_redirects=False)
+    db_session.refresh(digest)
+    assert digest.opened_at == first
+
+
+def test_article_click_does_not_unsubscribe(
+    client: TestClient, db_session: Session, article_link: DigestLink
+) -> None:
+    client.get(f"/c/{article_link.token}", follow_redirects=False)
+    user = db_session.get(User, 1)
+    assert user is not None
+    assert user.unsubscribed_at is None

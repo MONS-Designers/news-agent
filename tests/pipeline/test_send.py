@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 
 import pytest
 from sqlalchemy import create_engine, select
@@ -74,5 +74,21 @@ def test_already_sent_digest_is_not_resent(db: Session):
 def test_failed_send_leaves_sent_at_null_for_retry(db: Session):
     report = send_pending_digests(db, FailingSender())
     assert report.failed == 1
+    digest = db.scalar(select(Digest))
+    assert digest is not None and digest.sent_at is None
+
+
+def test_unsubscribed_users_digest_is_not_sent(db: Session):
+    """GH #46: catches the same-run race where a user unsubscribes after
+    their digest was already built but before send runs."""
+    user = db.get(User, 1)
+    user.unsubscribed_at = datetime.now()
+    db.commit()
+
+    sender = RecordingSender()
+    report = send_pending_digests(db, sender)
+
+    assert report.sent == 0
+    assert len(sender.sent) == 0
     digest = db.scalar(select(Digest))
     assert digest is not None and digest.sent_at is None

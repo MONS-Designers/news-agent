@@ -59,17 +59,48 @@
       </button>
     </div>
 
+    <div
+      v-if="showSummary"
+      class="flex items-center justify-between rounded-xl border border-neutral-200 p-5"
+    >
+      <div>
+        <p class="text-sm font-medium">Weekly digest emails</p>
+        <p class="text-xs text-neutral-500">
+          {{ subscription?.unsubscribed ? "Paused — you won't receive the digest." : "Active" }}
+        </p>
+      </div>
+      <button
+        type="button"
+        :disabled="subscriptionSaving"
+        class="rounded-lg border border-neutral-300 px-3 py-1.5 text-sm font-medium hover:bg-neutral-50 disabled:opacity-50"
+        @click="toggleSubscription"
+      >
+        {{ subscription?.unsubscribed ? "Resume" : "Pause" }}
+      </button>
+    </div>
+
     <ProfilePickerShell v-else @topics-saved="refreshPreferencesQuietly" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { ApiError, getMyProfile, listMyPreferences, type Profile, type TopicPreference } from "@/api/client";
+import {
+  ApiError,
+  getMyProfile,
+  getMySubscription,
+  listMyPreferences,
+  updateMySubscription,
+  type Profile,
+  type Subscription,
+  type TopicPreference,
+} from "@/api/client";
 import ProfilePickerShell from "@/components/profile-picker/ProfilePickerShell.vue";
 
 const preferences = ref<TopicPreference[]>([]);
 const profile = ref<Profile | null>(null);
+const subscription = ref<Subscription | null>(null);
+const subscriptionSaving = ref(false);
 const loading = ref(false);
 const errorMessage = ref("");
 
@@ -97,9 +128,14 @@ async function loadPreferences() {
   loading.value = true;
   errorMessage.value = "";
   try {
-    const [prefs, prof] = await Promise.all([listMyPreferences(), getMyProfile()]);
+    const [prefs, prof, sub] = await Promise.all([
+      listMyPreferences(),
+      getMyProfile(),
+      getMySubscription(),
+    ]);
     preferences.value = prefs;
     profile.value = prof;
+    subscription.value = sub;
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) {
       errorMessage.value = "Sign in with Google to view your preferences.";
@@ -124,6 +160,19 @@ async function refreshPreferencesQuietly() {
     // Best-effort background refresh — the guided flow's own save already
     // succeeded and showed its own feedback; a failed refresh here shouldn't
     // interrupt anything.
+  }
+}
+
+async function toggleSubscription() {
+  if (!subscription.value) return;
+  subscriptionSaving.value = true;
+  try {
+    subscription.value = await updateMySubscription(!subscription.value.unsubscribed);
+  } catch {
+    // Best-effort — leave the displayed state as-is on failure, no separate
+    // error banner for a single toggle.
+  } finally {
+    subscriptionSaving.value = false;
   }
 }
 

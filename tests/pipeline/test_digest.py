@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 
 import pytest
 from sqlalchemy import create_engine, select
@@ -104,6 +104,21 @@ def test_same_day_rerun_appends_to_existing_digest(db: Session):
     digests = list(db.scalars(select(Digest)))
     assert len(digests) == 1
     assert len(digests[0].articles) == 2
+
+
+def test_unsubscribed_user_gets_no_digest(db: Session):
+    """GH #46: an unsubscribed user's digest isn't even built, not just held
+    back at send time."""
+    user = db.get(User, 1)
+    user.unsubscribed_at = datetime.now()
+    db.commit()
+    add_article(db, source_id=1, url_suffix="a")
+
+    report = build_digests(db, MockLLMProvider(), for_date=TODAY)
+
+    assert report.users_processed == 0
+    assert report.digests_created == 0
+    assert db.scalar(select(Digest)) is None
 
 
 def test_two_users_get_independent_digests(db: Session):

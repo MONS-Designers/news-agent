@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from newsagent.mail.base import EmailSendError, EmailSender
-from newsagent.models import Digest
+from newsagent.models import Digest, User
 from newsagent.pipeline.render import render_digest_html
 
 logger = logging.getLogger(__name__)
@@ -26,7 +26,14 @@ class SendReport:
 def send_pending_digests(db: Session, sender: EmailSender) -> SendReport:
     report = SendReport()
 
-    digests = db.scalars(select(Digest).where(Digest.sent_at.is_(None))).all()
+    # A user who unsubscribed (GH #46) after their digest was already built
+    # but before it was sent must not receive it — build_digests skips them
+    # going forward, but this catches the same-run race.
+    digests = db.scalars(
+        select(Digest)
+        .join(User)
+        .where(Digest.sent_at.is_(None), User.unsubscribed_at.is_(None))
+    ).all()
     for digest in digests:
         html = render_digest_html(digest, db)
         subject = f"הדייג'סט השבועי שלך — {digest.date.isoformat()}"

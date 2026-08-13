@@ -13,6 +13,7 @@ if TYPE_CHECKING:
 
 KIND_ARTICLE = "article"
 KIND_PREFERENCES = "preferences"
+KIND_UNSUBSCRIBE = "unsubscribe"
 
 
 def _generate_link_token() -> str:

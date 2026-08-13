@@ -34,6 +34,10 @@ export interface TopicPreference {
   subscribed: boolean;
 }
 
+export interface Subscription {
+  unsubscribed: boolean;
+}
+
 export interface Me {
   email: string;
   is_admin: boolean;
@@ -147,6 +151,18 @@ export async function updateMyPreferences(
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ topic_ids: topicIds, new_topic_names: newTopicNames }),
+  });
+}
+
+export async function getMySubscription(): Promise<Subscription> {
+  return request("/me/subscription");
+}
+
+export async function updateMySubscription(unsubscribed: boolean): Promise<Subscription> {
+  return request("/me/subscription", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ unsubscribed }),
   });
 }
 

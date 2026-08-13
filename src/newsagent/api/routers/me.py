@@ -9,11 +9,13 @@ from newsagent.api.schemas import (
     ProfileOut,
     ProfileUpdateIn,
     RoleOut,
+    SubscriptionOut,
+    SubscriptionUpdateIn,
     TopicPreferenceOut,
     TopicSuggestionsOut,
 )
 from newsagent.models import Field, User
-from newsagent.services import preferences, profile, taxonomy
+from newsagent.services import preferences, profile, subscription, taxonomy
 
 router = APIRouter(prefix="/me", tags=["me"])
 
@@ -37,6 +39,21 @@ def update_my_preferences(
         raise HTTPException(status_code=400, detail=error.detail) from error
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@router.get("/subscription", response_model=SubscriptionOut)
+def get_my_subscription(user: User = Depends(require_user)) -> SubscriptionOut:
+    return SubscriptionOut(unsubscribed=user.unsubscribed_at is not None)
+
+
+@router.put("/subscription", response_model=SubscriptionOut)
+def update_my_subscription(
+    body: SubscriptionUpdateIn,
+    user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+) -> SubscriptionOut:
+    updated = subscription.set_unsubscribed(db, user, body.unsubscribed)
+    return SubscriptionOut(unsubscribed=updated.unsubscribed_at is not None)
 
 
 @router.get("/fields", response_model=list[FieldOut])

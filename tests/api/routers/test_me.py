@@ -36,6 +36,28 @@ def test_put_then_get_reflects_new_subscriptions(as_user_with_db: TestClient):
     assert get_body == put_body
 
 
+def test_get_subscription_defaults_to_active(as_user_with_db: TestClient):
+    response = as_user_with_db.get("/me/subscription")
+    assert response.status_code == 200
+    assert response.json() == {"unsubscribed": False}
+
+
+def test_put_subscription_unsubscribes_then_resubscribes(as_user_with_db: TestClient):
+    response = as_user_with_db.put("/me/subscription", json={"unsubscribed": True})
+    assert response.status_code == 200
+    assert response.json() == {"unsubscribed": True}
+    assert as_user_with_db.get("/me/subscription").json() == {"unsubscribed": True}
+
+    response = as_user_with_db.put("/me/subscription", json={"unsubscribed": False})
+    assert response.status_code == 200
+    assert response.json() == {"unsubscribed": False}
+
+
+def test_subscription_unauthenticated_gets_401(client: TestClient):
+    assert client.get("/me/subscription").status_code == 401
+    assert client.put("/me/subscription", json={"unsubscribed": True}).status_code == 401
+
+
 def test_put_unknown_topic_id_returns_400(as_user_with_db: TestClient):
     response = as_user_with_db.put("/me/preferences", json={"topic_ids": [999]})
     assert response.status_code == 400

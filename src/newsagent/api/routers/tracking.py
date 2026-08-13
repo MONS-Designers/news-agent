@@ -19,6 +19,8 @@ from sqlalchemy.orm import Session
 from newsagent.api.deps import get_db
 from newsagent.config import settings
 from newsagent.models import Digest, DigestLink
+from newsagent.models.digest_link import KIND_UNSUBSCRIBE
+from newsagent.services import subscription
 
 router = APIRouter(tags=["tracking"])
 
@@ -46,5 +48,11 @@ def track_click(token: str, db: Session = Depends(get_db)) -> RedirectResponse:
         return RedirectResponse(url=settings.frontend_url)
     if link.clicked_at is None:
         link.clicked_at = datetime.now()
-        db.commit()
+    # A click proves the digest was opened even if the tracking pixel's image
+    # never loaded (image-blocking is the common case, not the exception).
+    if link.digest.opened_at is None:
+        link.digest.opened_at = datetime.now()
+    db.commit()
+    if link.kind == KIND_UNSUBSCRIBE:
+        subscription.set_unsubscribed(db, link.digest.user, True)
     return RedirectResponse(url=link.target_url)

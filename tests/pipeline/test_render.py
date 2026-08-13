@@ -99,7 +99,7 @@ def test_total_reading_time_sums_displayed_articles(db: Session):
     articles = [add_article(db, url_suffix=str(i), minutes=2) for i in range(3)]
     digest = build_digest(db, articles)
     html = render_digest_html(digest, db)
-    assert "6 דקות קריאה" in html  # 3 articles x 2 min
+    assert "<bdi>6 דקות קריאה</bdi>" in html  # 3 articles x 2 min
 
 
 def test_render_does_not_recap_or_drop_articles(db: Session):
@@ -108,7 +108,21 @@ def test_render_does_not_recap_or_drop_articles(db: Session):
     articles = [add_article(db, url_suffix=str(i), minutes=1) for i in range(8)]
     digest = build_digest(db, articles)
     html = render_digest_html(digest, db)
-    assert "8 דקות קריאה" in html
+    assert "<bdi>8 דקות קריאה</bdi>" in html
+
+
+def test_reading_time_grouped_with_its_hebrew_unit_in_one_bidi_isolate(db: Session):
+    """A bare digit isolated on its own (<bdi>1</bdi> דק' קריאה) could drift
+    away from its Hebrew unit during bidi resolution and end up positioned
+    next to the wrong neighbor — reported live as "1 · TechCrunch דק' קריאה"
+    instead of "TechCrunch · 1 דק' קריאה". Grouping the digit and its unit
+    into a single isolate keeps them atomic."""
+    digest = build_digest(db, [add_article(db, url_suffix="a", minutes=1)])
+    html = render_digest_html(digest, db)
+    assert "<bdi>1 דק׳ קריאה</bdi>" in html
+    source_pos = html.index("<bdi>TechCrunch</bdi>")
+    reading_time_pos = html.index("<bdi>1 דק׳ קריאה</bdi>")
+    assert source_pos < reading_time_pos
 
 
 def test_tracking_pixel_present(db: Session):
@@ -136,6 +150,16 @@ def test_preferences_link_is_click_tracked(db: Session):
     )
     assert link is not None
     assert link.target_url.endswith("/preferences")
+    assert f"/c/{link.token}" in html
+
+
+def test_unsubscribe_link_is_click_tracked(db: Session):
+    digest = build_digest(db, [add_article(db, url_suffix="a")])
+    html = render_digest_html(digest, db)
+    link = db.scalar(
+        select(DigestLink).where(DigestLink.digest_id == digest.id, DigestLink.kind == "unsubscribe")
+    )
+    assert link is not None
     assert f"/c/{link.token}" in html
 
 

@@ -32,6 +32,11 @@ class User(Base):
     name: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
+    # Digest delivery opt-out (GH #46) — same nullable-timestamp shape as
+    # Digest.opened_at/DigestLink.clicked_at: None = receiving digests,
+    # a timestamp = when they stopped. Reversible by clearing it back to None.
+    unsubscribed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
     # Profile: plain strings, not foreign keys — "Other" is a UI concept only,
     # a curated pick and a typed "Other" value are stored identically (AD-6).
     field_name: Mapped[str | None] = mapped_column(String, nullable=True)

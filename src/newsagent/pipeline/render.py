@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 
 from newsagent.config import settings
 from newsagent.models import Article, Digest
-from newsagent.models.digest_link import KIND_ARTICLE, KIND_PREFERENCES, DigestLink
+from newsagent.models.digest_link import KIND_ARTICLE, KIND_PREFERENCES, KIND_UNSUBSCRIBE, DigestLink
 
 _TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 _env = Environment(
@@ -156,6 +156,9 @@ def render_digest_html(digest: Digest, db: Session) -> str:
     preferences_link = _get_or_create_link(
         db, digest, KIND_PREFERENCES, f"{settings.frontend_url}/preferences"
     )
+    unsubscribe_link = _get_or_create_link(
+        db, digest, KIND_UNSUBSCRIBE, f"{settings.frontend_url}/preferences"
+    )
 
     return template.render(
         digest_date=_hebrew_date(digest.date),
@@ -165,5 +168,6 @@ def render_digest_html(digest: Digest, db: Session) -> str:
         articles=views,
         total_reading_time=total_reading_time,
         preferences_url=_click_url(preferences_link),
+        unsubscribe_url=_click_url(unsubscribe_link),
         tracking_pixel_url=f"{settings.backend_base_url}/t/{digest.tracking_token}.gif",
     )

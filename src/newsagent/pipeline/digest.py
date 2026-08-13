@@ -82,7 +82,9 @@ def build_digests(
         for_date = date.today()
     report = DigestReport()
 
-    for user in db.scalars(select(User)):
+    # Unsubscribed users (GH #46) are skipped entirely — no digest is even
+    # built for them, not just held back at send time.
+    for user in db.scalars(select(User).where(User.unsubscribed_at.is_(None))):
         report.users_processed += 1
         articles = _undelivered_articles(db, user)
         if not articles:

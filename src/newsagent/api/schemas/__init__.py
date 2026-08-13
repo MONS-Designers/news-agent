@@ -3,6 +3,7 @@ from newsagent.api.schemas.identity import IdentityOut
 from newsagent.api.schemas.preference import PreferenceUpdateIn, TopicPreferenceOut
 from newsagent.api.schemas.profile import ProfileOut, ProfileUpdateIn, TopicSuggestionsOut
 from newsagent.api.schemas.source import SourceOut, SourceStatusUpdate
+from newsagent.api.schemas.subscription import SubscriptionOut, SubscriptionUpdateIn
 from newsagent.api.schemas.taxonomy import (
     FieldOut,
     PendingTaxonomySuggestionOut,
@@ -21,6 +22,8 @@ __all__ = [
     "RoleOut",
     "SourceOut",
     "SourceStatusUpdate",
+    "SubscriptionOut",
+    "SubscriptionUpdateIn",
     "TaxonomySuggestionDecision",
     "TopicPreferenceOut",
     "TopicSuggestionsOut",
