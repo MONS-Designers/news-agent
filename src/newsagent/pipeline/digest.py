@@ -16,7 +16,7 @@ import logging
 from dataclasses import dataclass
 from datetime import date
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from newsagent.config import settings
@@ -103,11 +103,23 @@ def build_digests(
         # the digest's total never exceeds digest_max_articles. Counted via a
         # direct query, not `digest.articles`, so accessing the count here
         # doesn't cache a stale (pre-insert) collection for `_compose_voice`.
-        already_attached = db.scalar(
-            select(func.count()).select_from(DigestArticle).where(DigestArticle.digest_id == digest.id)
+        # Same query also gives the already-attached topics, so a rerun's
+        # diversity floor (GH #37) isn't recomputed from zero.
+        already_attached_topic_ids = list(
+            db.scalars(
+                select(Source.topic_id)
+                .join(Article, Article.source_id == Source.id)
+                .join(DigestArticle, DigestArticle.article_id == Article.id)
+                .where(DigestArticle.digest_id == digest.id)
+            )
         )
         selected = select_top(
-            db, user, articles, for_date, limit=settings.digest_max_articles - already_attached
+            db,
+            user,
+            articles,
+            for_date,
+            limit=settings.digest_max_articles - len(already_attached_topic_ids),
+            already_represented_topic_ids=set(already_attached_topic_ids),
         )
 
         for article in selected:

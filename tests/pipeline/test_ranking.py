@@ -160,3 +160,75 @@ def test_repeat_opener_bias_ranks_preferred_topic_higher(db: Session):
     candidate_b = add_article(db, source_id=2, url_suffix="candB")
     selected = select_top(db, user, [candidate_b, candidate_a], TODAY)
     assert selected[0].id == candidate_a.id
+
+
+def test_diversity_floor_guarantees_low_volume_topic_a_slot(db: Session):
+    """Without the floor, Topic A's 10 higher-scoring candidates alone would
+    fill every slot in the default digest_max_articles=7 cap, leaving Topic
+    B's subscriber with nothing from that topic — GH #37."""
+    user = db.get(User, 1)
+    topic_a_articles = [
+        add_article(db, source_id=1, url_suffix=f"a{i}", relevance_score=0.9) for i in range(10)
+    ]
+    topic_b_article = add_article(db, source_id=2, url_suffix="b0", relevance_score=0.1)
+
+    selected = select_top(db, user, [*topic_a_articles, topic_b_article], TODAY)
+
+    assert len(selected) == settings.digest_max_articles
+    assert topic_b_article.id in {a.id for a in selected}
+
+
+def test_diversity_floor_ranks_guaranteed_slots_by_each_topics_best_score(db: Session):
+    """N (3 topics) > L (2 slots): the guaranteed slots go to the two topics
+    whose single best candidate scores highest — not to the two
+    highest-scoring candidates overall, which could both come from one topic."""
+    user = db.get(User, 1)
+    topic_c = Topic(id=3, name="Climate")
+    db.add(topic_c)
+    db.add(Source(id=3, topic_id=3, name="Climate feed", url="feed://cl", status="approved"))
+    db.commit()
+
+    best_a = add_article(db, source_id=1, url_suffix="a-best", relevance_score=0.9)
+    best_b = add_article(db, source_id=2, url_suffix="b-best", relevance_score=0.7)
+    best_c = add_article(db, source_id=3, url_suffix="c-best", relevance_score=0.3)
+
+    selected = select_top(db, user, [best_a, best_b, best_c], TODAY, limit=2)
+
+    assert {a.id for a in selected} == {best_a.id, best_b.id}
+
+
+def test_zero_candidate_topic_wastes_no_slot(db: Session):
+    """A user subscribed to Topic B who simply has no eligible Topic B
+    candidate this run gets Topic A's candidates filling every slot, not an
+    empty/wasted slot reserved for a topic with nothing to show."""
+    user = db.get(User, 1)
+    topic_a_articles = [
+        add_article(db, source_id=1, url_suffix=f"a{i}", relevance_score=0.9) for i in range(3)
+    ]
+
+    selected = select_top(db, user, topic_a_articles, TODAY, limit=5)
+
+    assert len(selected) == 3
+
+
+def test_diversity_floor_skips_already_represented_topics_on_rerun(db: Session):
+    """A same-day rerun where Topic A already has an attached article: Topic
+    A's higher-scoring candidate must NOT take the single remaining guaranteed
+    slot over Topic B, which has none yet — the floor isn't recomputed from
+    zero (GH #37 AC4)."""
+    user = db.get(User, 1)
+    candidate_a = add_article(db, source_id=1, url_suffix="a0", relevance_score=0.9)
+    candidate_b = add_article(db, source_id=2, url_suffix="b0", relevance_score=0.3)
+
+    fresh_run = select_top(db, user, [candidate_a, candidate_b], TODAY, limit=1)
+    assert fresh_run[0].id == candidate_a.id  # no prior attachment: Topic A wins on score
+
+    rerun = select_top(
+        db,
+        user,
+        [candidate_a, candidate_b],
+        TODAY,
+        limit=1,
+        already_represented_topic_ids={1},  # Topic A already attached earlier today
+    )
+    assert rerun[0].id == candidate_b.id  # Topic A's floor is already satisfied

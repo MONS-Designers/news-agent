@@ -76,7 +76,12 @@ def score_article(
 
 
 def select_top(
-    db: Session, user: User, candidates: list[Article], for_date: date, limit: int | None = None
+    db: Session,
+    user: User,
+    candidates: list[Article],
+    for_date: date,
+    limit: int | None = None,
+    already_represented_topic_ids: set[int] | None = None,
 ) -> list[Article]:
     """Rank `candidates` by `final_score` descending and keep the top `limit`
     (default `digest_max_articles`). Callers pass a smaller `limit` when a
@@ -85,21 +90,58 @@ def select_top(
     for leaving the rest unattached (no DigestArticle row) so they remain
     undelivered.
 
-    Known gap (GH #37, MVP blocker since the weekly cadence): ranking is purely
-    by score with no per-topic floor, so one high-volume topic can take every
-    slot and a subscribed topic can be absent from the digest entirely — for a
-    whole week, now that a week of candidates competes for these slots."""
+    Topic-diversity floor (GH #37): among candidates whose topic isn't already
+    represented in this digest (`already_represented_topic_ids` — a same-day
+    rerun's already-attached topics, not recomputed from zero), one guaranteed
+    slot goes to each such topic's single best-scoring candidate, topics
+    ranked by that best score (not raw global score) until slots run out.
+    Remaining slots are filled by global score among whatever's left,
+    including candidates from already-represented topics — the floor just
+    means those topics don't get a *second* guaranteed pick. A topic with
+    zero eligible candidates never entered `candidates` in the first place, so
+    it costs no slot. A single topic gives the floor nothing to do: its one
+    guaranteed pick is already the global top scorer, so the result is
+    identical to plain top-N-by-score.
+    """
     if limit is None:
         limit = settings.digest_max_articles
     if not candidates or limit <= 0:
         return []
+    if already_represented_topic_ids is None:
+        already_represented_topic_ids = set()
+
     affinities = topic_affinity(db, user, for_date)
     # published_at/scraped_at are naive UTC (feedparser's parsed struct_time,
     # SQLite's server-side now()) — compare against UTC "now", not local time.
     now = datetime.now(timezone.utc).replace(tzinfo=None)
-    ranked = sorted(
-        candidates,
-        key=lambda article: score_article(article, now=now, topic_affinities=affinities),
-        reverse=True,
-    )
-    return ranked[:limit]
+    scored = [
+        (article, score_article(article, now=now, topic_affinities=affinities))
+        for article in candidates
+    ]
+    scored.sort(key=lambda pair: pair[1], reverse=True)
+
+    by_topic: dict[int, list[tuple[Article, float]]] = {}
+    for article, score in scored:
+        topic_id = article.source.topic_id
+        if topic_id in already_represented_topic_ids:
+            continue
+        by_topic.setdefault(topic_id, []).append((article, score))
+
+    # scored is already score-descending, so each topic's first entry here is
+    # that topic's single best-scoring candidate.
+    topic_order = sorted(by_topic, key=lambda topic_id: by_topic[topic_id][0][1], reverse=True)
+
+    guaranteed: list[tuple[Article, float]] = []
+    guaranteed_ids: set[int] = set()
+    for topic_id in topic_order:
+        if len(guaranteed) >= limit:
+            break
+        article, score = by_topic[topic_id][0]
+        guaranteed.append((article, score))
+        guaranteed_ids.add(article.id)
+
+    remaining = limit - len(guaranteed)
+    fill = [pair for pair in scored if pair[0].id not in guaranteed_ids][:remaining]
+
+    selected = sorted(guaranteed + fill, key=lambda pair: pair[1], reverse=True)
+    return [article for article, _ in selected]
