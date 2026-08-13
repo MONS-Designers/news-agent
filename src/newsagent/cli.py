@@ -13,7 +13,7 @@ from newsagent.llm import get_llm_provider
 from newsagent.logging_setup import configure_logging
 from newsagent.mail import get_email_sender
 from newsagent.models.pipeline_run import RUN_TYPE_FILTER, RUN_TYPE_SUMMARIZE
-from newsagent.pipeline import digest, fetcher, relevance, send, summarize
+from newsagent.pipeline import digest, extract, fetcher, relevance, send, summarize
 from newsagent.services import identity, pipeline_runs, preferences, sources, taxonomy
 
 
@@ -35,6 +35,9 @@ def main(argv: list[str] | None = None) -> int:
     subparsers.add_parser("fetch", help="Fetch new articles from all approved sources")
     subparsers.add_parser("filter", help="Score pending articles for relevance to their topic")
     subparsers.add_parser("summarize", help="Summarize + translate relevant articles to Hebrew")
+    subparsers.add_parser(
+        "extract", help="Fetch + extract full article text for relevant articles"
+    )
 
     subscribe_cmd = subparsers.add_parser("subscribe", help="Subscribe a user to a topic")
     subscribe_cmd.add_argument("email")
@@ -116,6 +119,9 @@ def main(argv: list[str] | None = None) -> int:
                 usage_input_units=summary_report.usage_input_units,
                 usage_output_units=summary_report.usage_output_units,
             )
+        elif args.command == "extract":
+            extract_report = extract.extract_relevant_articles(db)
+            print(f"Extracted {extract_report.extracted}, failed {extract_report.failed}")
         elif args.command == "usage-report":
             usage = pipeline_runs.build_usage_report(db)
             if not usage.by_stage:

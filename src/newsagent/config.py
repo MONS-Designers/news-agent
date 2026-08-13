@@ -22,6 +22,13 @@ class Settings(BaseSettings):
     # retry default (newsagent.llm.base) — consistency, not a separate tuning.
     max_summarize_attempts: int = 3
 
+    # Bounded retries before a failing article's extraction_status becomes the
+    # terminal "failed" (Epic D, Story D.1) — same pattern as C.1 above.
+    max_extraction_attempts: int = 2
+    # Extracted full_text is truncated to this length before it's ever stored,
+    # so it's already bounded before it could reach an LLM prompt (NFR3).
+    extraction_max_chars: int = 10_000
+
     # Weighted digest ranking (issue #25): final_score = relevance_weight*relevance
     # + recency_weight*recency + interest_weight*interest. Weight trio sums to 1.0.
     relevance_weight: float = 0.40

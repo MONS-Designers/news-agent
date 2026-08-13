@@ -38,6 +38,11 @@ class Article(Base):
     # reaches settings.max_summarize_attempts, so a deterministically-failing
     # article stops being billed for forever.
     summarize_attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    # Full-text extraction (Epic D, Story D.1): pending -> done | failed (bounded
+    # retries via extraction_attempts, same pattern as summarize_attempts above).
+    # summarize.py already prefers full_text when this reaches "done".
+    extraction_status: Mapped[str] = mapped_column(String, default="pending", server_default="pending")
+    extraction_attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     # Key points for the email body; each may carry **markdown** keyword emphasis.
     bullets_he: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
     # General "worth-reading" signal (0-1), distinct from relevance; feeds ranking.
