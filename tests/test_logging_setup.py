@@ -5,7 +5,7 @@ Two global-state hazards shape this file:
 1. configure_logging() mutates the process-wide root logger, so every test runs
    under restore_root_logger. Without it a handler leaks into every sibling suite.
 2. These tests read the `settings` singleton, which loads the developer's local
-   .env ahead of code defaults — and README now tells developers to set exactly
+   .env ahead of code defaults - and README now tells developers to set exactly
    these variables. Every test therefore pins the values it depends on, including
    the ones asserting "the default", so a local .env can never break them.
 """
@@ -110,7 +110,7 @@ def test_file_destination_writes_records_to_the_file(log_to):
 
 def test_record_format_carries_a_timestamp(log_to):
     """The spec's stated justification for owning the format is that a file log
-    without timestamps is not diagnosable — so pin it, or a format regression
+    without timestamps is not diagnosable - so pin it, or a format regression
     would pass every other test in this file."""
     log_file = log_to()
 
@@ -251,7 +251,7 @@ def test_explicit_access_log_opt_out_is_honored(log_to):
 
 
 def test_server_handlers_are_closed_when_cleared(log_to, tmp_path: Path):
-    """Clearing without closing leaks the fd — and on Windows keeps the old
+    """Clearing without closing leaks the fd - and on Windows keeps the old
     file locked for the life of the process."""
     log_to(name="closed.log", level="INFO")
     stale_path = tmp_path / "stale-uvicorn.log"
@@ -293,7 +293,7 @@ def test_out_of_range_numeric_levels_are_rejected(
 def test_empty_level_falls_back_to_the_default(
     default_settings, monkeypatch: pytest.MonkeyPatch
 ):
-    """Mirrors the empty-destination rule — a blank env var means "unset"."""
+    """Mirrors the empty-destination rule - a blank env var means "unset"."""
     monkeypatch.setattr(settings, "log_level", "  ")
 
     configure_logging()
@@ -322,7 +322,7 @@ def test_server_logs_reach_the_configured_destination(log_to):
 
 def test_log_level_governs_server_and_third_party_loggers(log_to):
     """uvicorn pins itself to INFO and the noisy pair get a WARNING floor, so a
-    stricter LOG_LEVEL must still win — otherwise ERROR silences the application
+    stricter LOG_LEVEL must still win - otherwise ERROR silences the application
     while server and transport chatter keeps flowing, the exact inverse of intent."""
     from logging.config import dictConfig
 

@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /*
-  Hybrid Depth tokens, per DESIGN.md — the profile picker's dark visual
+  Hybrid Depth tokens, per DESIGN.md - the profile picker's dark visual
   identity, deliberately scoped in usage to that component only (see
   ProfilePickerShell.vue and friends), but expressed here as Tailwind theme
   tokens per UX-DR4 so the picker uses the same utility-class convention as

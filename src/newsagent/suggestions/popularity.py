@@ -3,7 +3,7 @@
 MVP default and the only always-available path: no API key, no network, no DB
 access of its own. `suggest_roles`/`suggest_prompts` have nothing to generate
 without a connected LLM-backed source, so they return empty (FR-2/FR-5
-assumptions) — only `suggest_topics` is real.
+assumptions) - only `suggest_topics` is real.
 """
 
 from collections.abc import Sequence
@@ -41,7 +41,7 @@ class PopularitySuggestionSource(SuggestionSource):
         interest_free_text: str | None,
         popularity: Sequence[TopicPopularity],
     ) -> list[TopicSuggestion]:
-        # Deliberately ignores field_name/role_name/interest_free_text — a
+        # Deliberately ignores field_name/role_name/interest_free_text - a
         # popularity ranking that doesn't key off the user's profile is what
         # makes this the fallback, not a targeted suggestion. Stable sort so a
         # deterministic input ordering (as the calling service would produce

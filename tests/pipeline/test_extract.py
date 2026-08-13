@@ -155,7 +155,7 @@ def test_articles_with_no_subscribed_topic_are_skipped(db: Session, monkeypatch:
 
 def test_empty_extraction_result_counts_as_failure(db: Session, monkeypatch: pytest.MonkeyPatch):
     """trafilatura.extract() returning None is a parse failure, not "no
-    article" — must count toward the same bounded-retry terminal state as a
+    article" - must count toward the same bounded-retry terminal state as a
     fetch failure."""
     monkeypatch.setattr(settings, "max_extraction_attempts", 1)
     _mock_fetch_success(monkeypatch)

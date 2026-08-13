@@ -61,7 +61,7 @@ async def callback(request: Request, db: Session = Depends(get_db)) -> RedirectR
 
     identity = auth.resolve_identity(db, email, name=name, cap=settings.max_users)
     if identity is None:
-        # Brand-new email, but the registration cap is already full — leave a
+        # Brand-new email, but the registration cap is already full - leave a
         # real trace (FR11) instead of a dead-end sign-in attempt.
         capture_to_waitlist(db, email, name)
         return RedirectResponse(f"{settings.frontend_url}/?error=capacity_full")

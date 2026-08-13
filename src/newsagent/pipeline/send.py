@@ -1,5 +1,5 @@
 """Digest delivery stage (issue #13): render + send every digest not yet
-sent, mark sent_at on success. A failed send leaves sent_at NULL — the next
+sent, mark sent_at on success. A failed send leaves sent_at NULL - the next
 run retries it, mirroring the retry pattern used across the pipeline.
 """
 
@@ -27,7 +27,7 @@ def send_pending_digests(db: Session, sender: EmailSender) -> SendReport:
     report = SendReport()
 
     # A user who unsubscribed (GH #46) after their digest was already built
-    # but before it was sent must not receive it — build_digests skips them
+    # but before it was sent must not receive it - build_digests skips them
     # going forward, but this catches the same-run race.
     digests = db.scalars(
         select(Digest)
@@ -36,7 +36,7 @@ def send_pending_digests(db: Session, sender: EmailSender) -> SendReport:
     ).all()
     for digest in digests:
         html = render_digest_html(digest, db)
-        subject = f"הדייג'סט השבועי שלך — {digest.date.isoformat()}"
+        subject = f"הדייג'סט השבועי שלך - {digest.date.isoformat()}"
         try:
             sender.send(digest.user.email, subject, html)
         except EmailSendError as error:

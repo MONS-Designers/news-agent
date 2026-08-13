@@ -1,4 +1,4 @@
-"""Sender selection — swapping providers is a one-line config change
+"""Sender selection - swapping providers is a one-line config change
 (NEWSAGENT_EMAIL_SENDER)."""
 
 from pathlib import Path

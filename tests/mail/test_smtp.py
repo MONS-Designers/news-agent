@@ -67,7 +67,7 @@ def test_send_logs_in_and_delivers(monkeypatch: pytest.MonkeyPatch):
     assert to_addrs == ["reader@example.com"]
     assert "Daily digest" in message
     # Hebrew body is base64-encoded (non-ASCII, MIMEText's default transfer
-    # encoding) — decode before checking content, not a raw substring match.
+    # encoding) - decode before checking content, not a raw substring match.
     parsed = message_from_string(message)
     body = parsed.get_payload(decode=True).decode("utf-8")
     assert "שלום עולם" in body

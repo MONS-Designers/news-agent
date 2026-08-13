@@ -2,7 +2,7 @@
 source's topic through the LLM provider, persist score + verdict.
 
 Score is the provider's fact; the verdict is pipeline policy (threshold from
-config) — both are stored, so a threshold change can re-verdict without paying
+config) - both are stored, so a threshold change can re-verdict without paying
 for re-scoring. Scored exactly once: only pending/error articles enter, and the
 DB row is the cache. Per-article commit so progress survives crashes.
 """
@@ -48,13 +48,13 @@ class FilterReport:
 
     @property
     def borderline(self) -> int:
-        """Scores between the contract anchors (0.3–0.7) — worth watching."""
+        """Scores between the contract anchors (0.3–0.7) - worth watching."""
         return sum(1 for s in self.scores if 0.3 < s < 0.7)
 
 
 def _accumulate_usage(report: FilterReport, provider: LLMProvider) -> None:
-    """Drain whatever the provider billed for the article just processed —
-    success or failure — so a malformed-output error doesn't read as free."""
+    """Drain whatever the provider billed for the article just processed -
+    success or failure - so a malformed-output error doesn't read as free."""
     for usage in provider.drain_usage():
         report.usage_input_units += usage.input_units
         report.usage_output_units += usage.output_units
@@ -69,7 +69,7 @@ def filter_pending_articles(
         threshold = settings.relevance_threshold
     report = FilterReport()
 
-    # Skip articles whose source's topic nobody is subscribed to (GH #45) — a
+    # Skip articles whose source's topic nobody is subscribed to (GH #45) - a
     # topic that lost its last subscriber simply stops advancing here rather
     # than needing separate cleanup; nothing scores it, so nothing downstream
     # ever sees it.

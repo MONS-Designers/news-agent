@@ -8,25 +8,25 @@ context: []
 baseline_commit: '0f9154cd40a2e787de197ad6b9ca755229f1898e'
 ---
 
-<frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">
+<frozen-after-approval reason="human-owned intent - do not modify unless human renegotiates">
 
 ## Intent
 
 **Problem:** `SuggestionSource.suggest_roles`/`suggest_prompts` exist on the interface and work (verified in a prior session) but nothing in the app calls them. Role selection (Step 1) only ever queries the DB-curated `Role` list per Field (Story 1.2); the Interests step (Step 2) shows no example prompts at all (FR-5 unimplemented).
 
-**Approach:** On Field selection, merge DB-curated Roles with LLM-invented new ones (context-aware, capped at exactly 10, DB-first) into the existing Role picker, synchronously. On reaching the Interests step, fetch up to 3 LLM-generated example prompts using the user's already-saved Field/Role/Experience (no new state-lifting needed — Step 1 already persisted them). A role the user newly picks that isn't yet curated queues into the existing `PendingTaxonomySuggestion` admin-review flow, exactly like today's "Other" text.
+**Approach:** On Field selection, merge DB-curated Roles with LLM-invented new ones (context-aware, capped at exactly 10, DB-first) into the existing Role picker, synchronously. On reaching the Interests step, fetch up to 3 LLM-generated example prompts using the user's already-saved Field/Role/Experience (no new state-lifting needed - Step 1 already persisted them). A role the user newly picks that isn't yet curated queues into the existing `PendingTaxonomySuggestion` admin-review flow, exactly like today's "Other" text.
 
 ## Boundaries & Constraints
 
 **Always:**
-- `suggestions/` stays DB-free (AD-3) — `services/taxonomy.py` queries curated Roles and passes names into `suggest_roles` as plain data (mirrors how `popularity` is passed into `suggest_topics`); the LLM never sees raw DB access.
-- Role suggestion cap is exactly up to 10, DB-curated first (deduped by `normalize_taxonomy_text`, per AD-6), then LLM-invented new names filling the remainder — never fewer than 10 when the LLM can supply more, never more than 10 total.
-- A user-selected new (not-yet-curated) Role queues via the **existing** `record_pending_suggestion(kind=KIND_ROLE, field_id=..., text=...)` (Epic 2) — no second review mechanism.
+- `suggestions/` stays DB-free (AD-3) - `services/taxonomy.py` queries curated Roles and passes names into `suggest_roles` as plain data (mirrors how `popularity` is passed into `suggest_topics`); the LLM never sees raw DB access.
+- Role suggestion cap is exactly up to 10, DB-curated first (deduped by `normalize_taxonomy_text`, per AD-6), then LLM-invented new names filling the remainder - never fewer than 10 when the LLM can supply more, never more than 10 total.
+- A user-selected new (not-yet-curated) Role queues via the **existing** `record_pending_suggestion(kind=KIND_ROLE, field_id=..., text=...)` (Epic 2) - no second review mechanism.
 - Suggested Prompts are illustrative only (FR-5): fetching/showing them never writes anything; clicking one only fills the textarea (still freely editable).
-- `llm/`, `MockLLMProvider`, `PopularitySuggestionSource`, and all Topic/`TopicSuggestion` code are untouched — this story is Roles + Prompts only (Topic new-candidate handling is separately deferred).
+- `llm/`, `MockLLMProvider`, `PopularitySuggestionSource`, and all Topic/`TopicSuggestion` code are untouched - this story is Roles + Prompts only (Topic new-candidate handling is separately deferred).
 - `ChipRow.vue`'s existing Field-row behavior is unchanged; only the Role row gains "new" chips.
 
-**Ask First:** none identified for implementation choices below — the design (merge order, cap, queue reuse, prompt context) was already confirmed with the user this session.
+**Ask First:** none identified for implementation choices below - the design (merge order, cap, queue reuse, prompt context) was already confirmed with the user this session.
 
 **Never:** change `TopicSuggestion`/Topic pending-status handling (deferred separately), add a second taxonomy review path, make any `suggestions/` adapter touch the DB directly, add streaming/async.
 
@@ -71,15 +71,15 @@ baseline_commit: '0f9154cd40a2e787de197ad6b9ca755229f1898e'
 - [x] Given a Field with 2 curated Roles, when selected, then up to 10 Role chips show (2 curated + up to 8 new, never a curated name duplicated by an LLM one).
 - [x] Given the user picks a new (non-curated) Role chip and continues, then `User.role_name` is saved and exactly one new `PendingTaxonomySuggestion(kind='role')` row exists for it.
 - [x] Given the user reaches the Interests step, then up to 3 example prompts appear, generated using their already-saved Field/Role/Experience.
-- [x] Given the local LLM is unreachable, then Role selection still works (curated-only) and the Interests step shows no prompts — no error surfaced to the user in either case.
+- [x] Given the local LLM is unreachable, then Role selection still works (curated-only) and the Interests step shows no prompts - no error surfaced to the user in either case.
 
 ## Spec Change Log
 
 ## Design Notes
 
-**Why `_apply`'s existing "claim must resolve" validation is untouched:** rather than loosening that server-side check (which would also weaken Field's unrelated guard), the frontend keeps sending `role_is_other=true` for a newly-picked LLM chip — same as manually-typed "Other" — so the existing, already-tested validation/queueing path handles it unchanged. `ChipRow.vue` decouples this from the UI: a "new" chip sets `isOther=true`/`otherText=<name>` under the hood but stays rendered as a selected chip (no free-text box), via a small per-option `isCurated` flag rather than a global toggle.
+**Why `_apply`'s existing "claim must resolve" validation is untouched:** rather than loosening that server-side check (which would also weaken Field's unrelated guard), the frontend keeps sending `role_is_other=true` for a newly-picked LLM chip - same as manually-typed "Other" - so the existing, already-tested validation/queueing path handles it unchanged. `ChipRow.vue` decouples this from the UI: a "new" chip sets `isOther=true`/`otherText=<name>` under the hood but stays rendered as a selected chip (no free-text box), via a small per-option `isCurated` flag rather than a global toggle.
 
-**Merge order:** curated Roles first (already vetted), LLM fills remaining slots to 10 with names not matching any curated Role (`normalize_taxonomy_text` comparison, AD-6) — mirrors how `suggest_topics`'s candidate-restriction already works.
+**Merge order:** curated Roles first (already vetted), LLM fills remaining slots to 10 with names not matching any curated Role (`normalize_taxonomy_text` comparison, AD-6) - mirrors how `suggest_topics`'s candidate-restriction already works.
 
 ## Verification
 
@@ -90,7 +90,7 @@ baseline_commit: '0f9154cd40a2e787de197ad6b9ca755229f1898e'
 
 ## Suggested Review Order
 
-**Role merge logic (backend) — entry point**
+**Role merge logic (backend) - entry point**
 
 - Core merge/cap/dedupe, plus review-added blank/overlong-name filtering.
   [`taxonomy.py:133`](../../src/newsagent/services/taxonomy.py#L133)
@@ -114,7 +114,7 @@ baseline_commit: '0f9154cd40a2e787de197ad6b9ca755229f1898e'
 - New thin prompt-suggestions endpoint.
   [`me.py:92`](../../src/newsagent/api/routers/me.py#L92)
 
-- `RoleOut` gains `is_curated` — the schema boundary the frontend keys off.
+- `RoleOut` gains `is_curated` - the schema boundary the frontend keys off.
   [`taxonomy.py:12`](../../src/newsagent/api/schemas/taxonomy.py#L12)
 
 **LLM adapter contract**
@@ -127,7 +127,7 @@ baseline_commit: '0f9154cd40a2e787de197ad6b9ca755229f1898e'
 
 **Frontend: Role chip selection state**
 
-- Review fix: `otherButtonActive` is now derived, not local state — was desyncing when a parent reset `isOther` directly (e.g. on Field change).
+- Review fix: `otherButtonActive` is now derived, not local state - was desyncing when a parent reset `isOther` directly (e.g. on Field change).
   [`ChipRow.vue:73`](../../frontend/src/components/profile-picker/ChipRow.vue#L73)
 
 - The three selection paths this derivation depends on staying consistent.
@@ -141,7 +141,7 @@ baseline_commit: '0f9154cd40a2e787de197ad6b9ca755229f1898e'
 - Fetch-on-mount, illustrative only; review fix: chip `:key` now includes index to avoid collisions on duplicate LLM text.
   [`InterestsStep.vue:59`](../../frontend/src/components/profile-picker/InterestsStep.vue#L59)
 
-- `RoleOption`/`listRoles`/`getPromptSuggestions` — the typed client surface both steps consume.
+- `RoleOption`/`listRoles`/`getPromptSuggestions` - the typed client surface both steps consume.
   [`client.ts:36`](../../frontend/src/api/client.ts#L36)
 
 **Peripherals**

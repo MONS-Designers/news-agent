@@ -1,7 +1,7 @@
 """Domain service for writing a user's profile (issue: Profile-Based Topic
 Suggestions). Owns the profile-save transaction; delegates every taxonomy
 lookup and review-queue write to services/taxonomy.py. Also owns the async
-suggestion-computation BackgroundTask this triggers (AD-5) — the only file
+suggestion-computation BackgroundTask this triggers (AD-5) - the only file
 that imports from newsagent.suggestions (AD-3's profile -> suggestions
 dependency direction)."""
 
@@ -27,11 +27,11 @@ from newsagent.suggestions import SuggestionError, TopicPopularity, get_suggesti
 
 MAX_NAME_LENGTH = 100
 
-# Generous cap on free text — this eventually feeds an LLM prompt (FR-8), so
+# Generous cap on free text - this eventually feeds an LLM prompt (FR-8), so
 # unbounded text is a real cost/abuse surface even before that path exists.
 MAX_INTEREST_LENGTH = 2000
 
-# Fixed illustrative set (PRD FR-3) — no "Other" path, unlike Field/Role, so
+# Fixed illustrative set (PRD FR-3) - no "Other" path, unlike Field/Role, so
 # these are validated as a closed set rather than resolved against a curated
 # DB table. Values are storage keys; display labels ("0–2 yrs" etc.) are a
 # frontend-only concern.
@@ -45,7 +45,7 @@ PROMPT_SUGGESTION_CAP = 3
 TOPIC_SUGGESTION_CAP = 10
 
 # One fixed message for every rejection cause. Which check failed (blank, too
-# long, not actually curated) is deliberately not disclosed — the frontend
+# long, not actually curated) is deliberately not disclosed - the frontend
 # validates before submitting, so a user only reaches this via a hand-built
 # request, and a probe should not be able to enumerate the curated list.
 INVALID_PROFILE = "Invalid profile selection."
@@ -59,7 +59,7 @@ def _clean(name: str) -> str:
 
 
 def _clean_interest(text: str) -> str:
-    """Unlike `_clean`, blank is not an error — only validates the length cap
+    """Unlike `_clean`, blank is not an error - only validates the length cap
     and strips. Deliberately does NOT collapse blank to None here: that
     conversion happens in `_apply`, at the point of assignment, so a
     submitted-but-blank string (clear the field) stays distinguishable from a
@@ -87,9 +87,9 @@ def save_profile(
     Field and Role are stored as plain strings on User whether they came from
     the curated list or were typed via "Other" (AD-6). Each "Other" value also
     stages a Pending Taxonomy Suggestion for admin review. Experience Bucket and
-    Interest Free-Text have no "Other" path — Experience Bucket is validated
+    Interest Free-Text have no "Other" path - Experience Bucket is validated
     against a fixed set, Interest Free-Text is free text with only a length
-    cap — and neither ever queues a suggestion.
+    cap - and neither ever queues a suggestion.
 
     The `*_is_other` flags are claims, not instructions: a request asserting a
     curated pick is rejected unless the name actually resolves against the
@@ -98,12 +98,12 @@ def save_profile(
 
     `field_name`/`role_name`/`experience_bucket`/`interest_free_text` of `None`
     mean "not submitted in this request" and leave the existing value
-    untouched — this is what lets a later step (e.g. Interest Free-Text alone)
+    untouched - this is what lets a later step (e.g. Interest Free-Text alone)
     save without resubmitting Field/Role and double-counting an "Other"
     suggestion. Blank or over-long name input, any experience_bucket outside
     the fixed set, and over-long interest text are rejected; a blank interest
     text is not an error, it just stores as None. Submitting `role_name`
-    without `field_name` is rejected — a Role can never be resolved without a
+    without `field_name` is rejected - a Role can never be resolved without a
     Field, curated or "Other," in the same request.
 
     All writes share one commit, so a rejected input persists nothing.
@@ -153,7 +153,7 @@ def _apply(
     interest_free_text: str | None,
 ) -> User:
     # A Role can only ever be resolved against a Field supplied in the same
-    # request — reject up front rather than reaching for an undefined `field`
+    # request - reject up front rather than reaching for an undefined `field`
     # below. No caller needs this combination today (Step 1 always sends both
     # together; Step 2 sends neither), so this is a defensive 400, not a gap.
     if role_name is not None and field_name is None:
@@ -164,7 +164,7 @@ def _apply(
         if not field_is_other and field is None:
             raise ValueError(INVALID_PROFILE)
 
-        # Store the curated spelling, not the client's casing — AD-6's name-lookup
+        # Store the curated spelling, not the client's casing - AD-6's name-lookup
         # is what every later consumer depends on, and "  tech " must not become a
         # value that never matches "Tech" again.
         user.field_name = field.name if field is not None and not field_is_other else field_name
@@ -184,7 +184,7 @@ def _apply(
             if role_is_other:
                 # A Role suggestion records which Field it was submitted under so the
                 # admin queue can scope it. The Field itself may be uncurated "Other"
-                # text with no row to point at — then field_id stays None rather than
+                # text with no row to point at - then field_id stays None rather than
                 # dropping the submission.
                 taxonomy.record_pending_suggestion(
                     db,
@@ -196,14 +196,14 @@ def _apply(
     if interest_free_text is not None:
         # A submitted-but-blank string clears the field to NULL; a field that
         # was never submitted at all (None, filtered out above this line) is
-        # left untouched — see _clean_interest's docstring.
+        # left untouched - see _clean_interest's docstring.
         user.interest_free_text = interest_free_text or None
 
     if experience_bucket is not None:
         user.experience_bucket = experience_bucket
 
     # Unconditional on every successful save, regardless of which fields this
-    # particular request touched (AD-5) — the seq race-guard in
+    # particular request touched (AD-5) - the seq race-guard in
     # _compute_and_store_suggestions makes a premature/redundant trigger from
     # an earlier step harmless, so there is no need to distinguish "which
     # step" called this.
@@ -218,7 +218,7 @@ def _apply(
 def suggest_prompts_for_user(user: User) -> list[str]:
     """Up to `PROMPT_SUGGESTION_CAP` illustrative example prompts for the
     Interests step (FR-5), generated from the user's already-saved
-    Field/Role/Experience Bucket. Fetching never writes anything (FR-5) — a
+    Field/Role/Experience Bucket. Fetching never writes anything (FR-5) - a
     failure just means no prompts show, matching the pre-LLM behavior, not an
     error surfaced to the user."""
     try:
@@ -237,14 +237,14 @@ def suggest_prompts_for_user(user: User) -> list[str]:
 
 
 def _topic_popularity(db: Session) -> list[TopicPopularity]:
-    """Every *approved* Topic's cross-user selection count, including zero — a
+    """Every *approved* Topic's cross-user selection count, including zero - a
     topic nobody has picked yet is still a valid fallback candidate, and
     dropping it would risk an empty popularity list (breaking FR-9's
     non-empty guarantee) the moment no topic has ever been selected
     system-wide. Starting the query from Topic with an outer join (not from
     UserTopicPreference) is what keeps zero-selection topics in the result.
 
-    Filtered to `status='approved'` (CAP-3) — a still-`pending` Topic (e.g.
+    Filtered to `status='approved'` (CAP-3) - a still-`pending` Topic (e.g.
     another user's not-yet-reviewed invented name) must never be offered as a
     candidate to anyone else. Carries `name` alongside `topic_id` +
     `selection_count` so a provider can reason about (and avoid duplicating)
@@ -268,11 +268,11 @@ def _write_status_best_effort(db: Session, user: User, expected_seq: int, status
     """Out-of-band status write from inside the LLM window (GH #36), as opposed
     to the run's own final write. Seq-guarded on freshly-read state for the same
     reason the final write is: a superseded computation must not stamp a status
-    onto a newer request. Runs on the calling thread only — never a worker.
+    onto a newer request. Runs on the calling thread only - never a worker.
 
     Best-effort by design: these writes exist to improve what the poller sees,
     so a DB failure here must not abort a run that would otherwise finish. That
-    matters more than it looks — this is the first write the computation makes
+    matters more than it looks - this is the first write the computation makes
     before its LLM calls have returned, and the MVP's SQLite file is also
     written by the separate pipeline process, so "database is locked" is a real
     outcome rather than a theoretical one.
@@ -294,10 +294,10 @@ def _mark_pending_slow(db: Session, user: User, expected_seq: int) -> None:
 
 
 def _compute_and_store_suggestions(db: Session, user_id: int, expected_seq: int) -> None:
-    """BackgroundTask body (session-agnostic — the caller owns the session's
+    """BackgroundTask body (session-agnostic - the caller owns the session's
     lifecycle). Computes suggestions for `user_id` and writes the result only
     if `expected_seq` still matches the current `User.suggestion_request_seq`
-    at write time — a superseded (re-saved-over) computation discards its
+    at write time - a superseded (re-saved-over) computation discards its
     result instead of overwriting a newer one.
     """
     user = db.get(User, user_id)
@@ -313,7 +313,7 @@ def _compute_and_store_suggestions(db: Session, user_id: int, expected_seq: int)
         # Run both calls concurrently (GH #36): neither reads the other's
         # result, so back-to-back cost their sum (~25s live) for no reason.
         #
-        # The workers receive plain data only — dataclasses and strings, all of
+        # The workers receive plain data only - dataclasses and strings, all of
         # it already read on this thread. Nothing inside a worker may touch
         # `db`: two threads sharing one Session corrupts it silently. Threads
         # rather than processes because both calls block on network I/O and
@@ -352,7 +352,7 @@ def _compute_and_store_suggestions(db: Session, user_id: int, expected_seq: int)
         computed_topic_ids = [s.topic_id for s in suggestions][:TOPIC_SUGGESTION_CAP]
 
         # Dedupe invented names against the approved catalog (case/whitespace
-        # -insensitive, AD-6's normalize_taxonomy_text) — "ai" must not show
+        # -insensitive, AD-6's normalize_taxonomy_text) - "ai" must not show
         # as a separate pill next to an existing "AI" Topic. Fill only the
         # slots the existing-topic picks above didn't already use, so the
         # merged existing+new total never exceeds TOPIC_SUGGESTION_CAP.
@@ -410,7 +410,7 @@ def _compute_and_store_suggestions(db: Session, user_id: int, expected_seq: int)
 
 def run_suggestion_computation(engine: Engine | Connection, user_id: int, expected_seq: int) -> None:
     """The actual FastAPI BackgroundTask target. Opens its own session bound
-    to `engine` — the request-scoped session from Depends(get_db) is already
+    to `engine` - the request-scoped session from Depends(get_db) is already
     closed by the time a BackgroundTask runs, so it cannot be reused here."""
     with Session(engine) as db:
         _compute_and_store_suggestions(db, user_id, expected_seq)

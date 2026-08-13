@@ -1,4 +1,4 @@
-"""Drop digest_articles.summary_he — the summary lives on Article (issue #11
+"""Drop digest_articles.summary_he - the summary lives on Article (issue #11
 decision: DigestArticle references the article, it doesn't own the summary).
 
 Revision ID: f9c2d7e0b118

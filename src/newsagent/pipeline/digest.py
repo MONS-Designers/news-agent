@@ -1,6 +1,6 @@
 """Digest builder stage: for each user, gather summarized articles
 in their subscribed topics that were never delivered to them before, and build
-(or extend) the Digest for `for_date` — the weekly send date.
+(or extend) the Digest for `for_date` - the weekly send date.
 
 Selection is "not yet sent", not "articles from this week": a DigestArticle row
 is itself the record of delivery, so nothing repeats across runs and nothing is
@@ -8,7 +8,7 @@ lost if a week is skipped. One digest per user per date (unique constraint);
 re-running the same date appends only newly arrived articles; no empty digests.
 
 Cadence note: fetch/filter/summarize run daily so nothing scrolls off an RSS
-feed unseen, while this stage and `send` run weekly — so a week's worth of
+feed unseen, while this stage and `send` run weekly - so a week's worth of
 summarized candidates competes for `digest_max_articles` slots here.
 """
 
@@ -82,7 +82,7 @@ def build_digests(
         for_date = date.today()
     report = DigestReport()
 
-    # Unsubscribed users (GH #46) are skipped entirely — no digest is even
+    # Unsubscribed users (GH #46) are skipped entirely - no digest is even
     # built for them, not just held back at send time.
     for user in db.scalars(select(User).where(User.unsubscribed_at.is_(None))):
         report.users_processed += 1

@@ -41,11 +41,11 @@ MoSCoW (approved):
 - Purity is a contract property: same input yields same output class of behavior, making caching adapters legal.
 - Explicit refusal (provider declines to summarize/score bad content) is a distinct outcome, not a failure.
 - Errors are classified by origin (context/input, LLM/provider, transport/infra), each with its own handling policy; callers always see a uniform outcome: success / failure / retry. End users are never exposed to raw provider errors.
-- Usage is reported in neutral, optional units — never mandated token counts.
+- Usage is reported in neutral, optional units - never mandated token counts.
 - Provider output parsing is adapter-internal; the contract only exposes typed results.
 
 ## Open questions deferred
-- Faithfulness verification of summaries: a future optional pipeline stage (cheap heuristic / LLM judge on sample / human review) — the contract must not block it, but it is not a provider obligation.
+- Faithfulness verification of summaries: a future optional pipeline stage (cheap heuristic / LLM judge on sample / human review) - the contract must not block it, but it is not a provider obligation.
 - Cost cap enforcement and spend reporting policy: issue #19 (usage field here is the enabler only).
 - Personalization/learning beyond the optional preference-history hook on score_relevance.
 - Async variant of the interface.

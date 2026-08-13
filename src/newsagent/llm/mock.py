@@ -1,8 +1,8 @@
-"""Deterministic mock provider — deliberately boring.
+"""Deterministic mock provider - deliberately boring.
 
 Same input always yields the same output; no API key, no network. Scoring is
 topic-token overlap; "translation" is a marker prefix. The `fail_*` knobs exist
-only so the contract tests can exercise the shared retry mechanics — by default
+only so the contract tests can exercise the shared retry mechanics - by default
 the mock never fails.
 """
 
@@ -44,12 +44,12 @@ def _emphasize_longest(sentence: str) -> str:
     return sentence.replace(target, f"**{target}**", 1)
 
 
-# A small deterministic groaner pool — a real provider writes jokes tied to the
+# A small deterministic groaner pool - a real provider writes jokes tied to the
 # actual headlines; the mock just picks one stably so tests never flake.
 _DAD_JOKES = [
-    "קראתי ספר על אנטי-גרביטציה — אי אפשר להניח אותו מהיד.",
+    "קראתי ספר על אנטי-גרביטציה - אי אפשר להניח אותו מהיד.",
     "למה האלגוריתם הלך לטיפול? היו לו יותר מדי בעיות לא פתורות.",
-    "אמרתי למחשב שאני צריך הפסקה — הוא ענה: 'אין בעיה, אני כבר קורס'.",
+    "אמרתי למחשב שאני צריך הפסקה - הוא ענה: 'אין בעיה, אני כבר קורס'.",
     "איך קוראים לענן שמאחסן בדיחות? ענן גיבוי־חיוך.",
 ]
 

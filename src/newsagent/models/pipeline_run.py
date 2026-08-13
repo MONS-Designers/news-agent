@@ -11,7 +11,7 @@ RUN_TYPE_SUMMARIZE = "summarize"
 
 
 class PipelineRun(Base):
-    """One row per completed `filter`/`summarize` CLI run — coarse spend/volume
+    """One row per completed `filter`/`summarize` CLI run - coarse spend/volume
     trend history. Schema + write path only; no reporting UI reads this yet."""
 
     __tablename__ = "pipeline_runs"

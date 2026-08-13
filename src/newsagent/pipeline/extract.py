@@ -1,18 +1,18 @@
 """Full-text extraction stage (Epic D, Story D.1): fetch the source page for
 articles that already passed relevance filtering, pull out just the article
 body (not nav/ads/boilerplate) via trafilatura, and store it so summarize.py
-writes from the real article instead of the RSS snippet — it already prefers
+writes from the real article instead of the RSS snippet - it already prefers
 full_text when present.
 
 A source that can't be fetched or parsed doesn't abort the run (FR6); it's
 retried up to a configured cap, then reaches a terminal "failed" state so a
-deterministically-broken source stops being fetched forever — same pattern
+deterministically-broken source stops being fetched forever - same pattern
 as Story C.1's summarize retries.
 
 Fetching (Story D.2) uses `httpx` directly instead of trafilatura's own
 downloader, so timeout/User-Agent are ours to configure, and runs through a
 bounded ThreadPoolExecutor so one slow source can't stall the whole run.
-Workers receive plain URLs only — the SQLAlchemy Session is never touched
+Workers receive plain URLs only - the SQLAlchemy Session is never touched
 off the calling thread, same discipline as GH #36's concurrent LLM calls.
 """
 
@@ -45,7 +45,7 @@ class ExtractReport:
 
 
 def _fetch_html(url: str) -> str | None:
-    """No DB access — safe to run off the main thread in the bounded
+    """No DB access - safe to run off the main thread in the bounded
     ThreadPoolExecutor below."""
     try:
         response = httpx.get(
@@ -72,7 +72,7 @@ def _extract_text(html: str) -> str | None:
 def extract_relevant_articles(db: Session) -> ExtractReport:
     report = ExtractReport()
 
-    # Skip articles whose source's topic nobody is subscribed to (GH #45) —
+    # Skip articles whose source's topic nobody is subscribed to (GH #45) -
     # same waste this story exists to avoid paying for, applied to the
     # network fetch + parse cost this stage owns.
     subscribed_topic_ids = select(UserTopicPreference.topic_id)

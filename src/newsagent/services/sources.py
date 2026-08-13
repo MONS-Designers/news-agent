@@ -11,7 +11,7 @@ from newsagent.models import Source, Topic
 from newsagent.models.source import STATUS_APPROVED, STATUS_PENDING
 from newsagent.models.topic import STATUS_APPROVED as TOPIC_STATUS_APPROVED
 
-# Curated starter feeds per topic — all seeded as approved (admin-curated).
+# Curated starter feeds per topic - all seeded as approved (admin-curated).
 DEFAULT_SOURCES: dict[str, list[tuple[str, str]]] = {
     "AI": [
         ("TechCrunch AI", "https://techcrunch.com/category/artificial-intelligence/feed/"),

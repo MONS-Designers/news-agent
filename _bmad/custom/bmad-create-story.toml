@@ -1,5 +1,5 @@
 # Team overrides for bmad-create-story.
-# Committed to the repo — applies to every developer on the project.
+# Committed to the repo - applies to every developer on the project.
 # Source: Epic 2 retrospective, 2026-07-27
 # (_bmad-output/implementation-artifacts/epic-2-retro-2026-07-27.md)
 
@@ -8,11 +8,11 @@
 # Retro action item 3. Three consecutive stories (1.7, 2.1, 2.2) shipped an
 # assumption that every automated gate passed and only a live browser session
 # caught, because story files are written from epics.md and the architecture
-# spine — which describe the *model*, not the states the data is actually in.
+# spine - which describe the *model*, not the states the data is actually in.
 # In every case the contradicting row was already sitting in the dev DB before
 # the story was written.
 activation_steps_append = [
-  "REAL-DATA REVIEW (mandatory, before writing any task). Identify every table this story reads or writes. Query the dev SQLite DB at {project-root}/newsagent.db for the actual rows in those tables — not the schema, the rows. Record in the story's Dev Notes, under a `### Real data as it stands` heading: each distinct state observed (including nullable columns that are actually null, rows predating a later-added column, and values that violate what the model text implies), and for each one, which acceptance criterion covers it. If a real state is not covered by any AC, that is a gap: raise it with the user before finalizing the story rather than discovering it during live verification.",
+  "REAL-DATA REVIEW (mandatory, before writing any task). Identify every table this story reads or writes. Query the dev SQLite DB at {project-root}/newsagent.db for the actual rows in those tables - not the schema, the rows. Record in the story's Dev Notes, under a `### Real data as it stands` heading: each distinct state observed (including nullable columns that are actually null, rows predating a later-added column, and values that violate what the model text implies), and for each one, which acceptance criterion covers it. If a real state is not covered by any AC, that is a gap: raise it with the user before finalizing the story rather than discovering it during live verification.",
 ]
 
 persistent_facts = [

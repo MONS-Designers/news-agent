@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 class Role(Base):
     """An admin-curated job function, scoped under exactly one Field.
 
-    Names are unique per Field, not globally — "Researcher" legitimately exists
+    Names are unique per Field, not globally - "Researcher" legitimately exists
     under both Healthcare and Education.
     """
 

@@ -97,7 +97,7 @@ def update_my_profile(
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
 
-    # db.get_bind(), not db itself — the request-scoped session is already
+    # db.get_bind(), not db itself - the request-scoped session is already
     # closed by the time this BackgroundTask runs (AD-5).
     background_tasks.add_task(
         profile.run_suggestion_computation, db.get_bind(), updated.id, updated.suggestion_request_seq

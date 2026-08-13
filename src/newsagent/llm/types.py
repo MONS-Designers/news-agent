@@ -1,6 +1,6 @@
 """Typed contract objects for the LLM provider interface.
 
-The contract speaks domain language (article, topic, score, summary) — never
+The contract speaks domain language (article, topic, score, summary) - never
 LLM language. Inputs are clean plain text only; media/HTML handling is the
 pipeline's job, upstream of any provider.
 """
@@ -18,7 +18,7 @@ class ArticleInput:
 
 @dataclass(frozen=True)
 class Usage:
-    """Optional work report in neutral units — token counts are an LLM
+    """Optional work report in neutral units - token counts are an LLM
     assumption and are deliberately not part of the contract."""
 
     input_units: int
@@ -39,13 +39,13 @@ class RelevanceScore:
 class SummaryResult:
     """A Hebrew summary of an article.
 
-    `bullets_he` are the key points for the email body — 3 short Hebrew lines.
+    `bullets_he` are the key points for the email body - 3 short Hebrew lines.
     Keyword emphasis is marked with ``**markdown**`` (never raw HTML): the
     renderer HTML-escapes the text and only then converts the markers to
     ``<strong>``, so provider output can never inject markup.
 
     `interestingness` is a general 0.0–1.0 "worth-reading" signal, distinct
-    from topic relevance — a routine update scores low, a genuine development
+    from topic relevance - a routine update scores low, a genuine development
     scores high. It feeds the per-user digest ranking, not filtering."""
 
     summary_he: str
@@ -61,7 +61,7 @@ class SummaryResult:
 class DigestVoice:
     """Digest-level editorial voice generated from the day's headlines: a warm
     personal opening line and a light closing joke tied to the news. Distinct
-    from per-article summaries — this is the human touch wrapping the digest."""
+    from per-article summaries - this is the human touch wrapping the digest."""
 
     intro_he: str
     dad_joke_he: str
@@ -71,7 +71,7 @@ class DigestVoice:
 @dataclass(frozen=True)
 class Refusal:
     """Provider explicitly declines to process the input (junk, empty, broken
-    content). A legitimate answer distinct from failure — callers branch on it
+    content). A legitimate answer distinct from failure - callers branch on it
     separately from error handling."""
 
     reason: str

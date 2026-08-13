@@ -1,6 +1,6 @@
 """Unit tests for markdown-fence extraction (GH #40).
 
-The risk here is not "does it strip a fence" — it is "does it ever damage a
+The risk here is not "does it strip a fence" - it is "does it ever damage a
 response that was already fine". Most of these tests guard that direction.
 """
 
@@ -48,14 +48,14 @@ def test_a_fence_inside_a_string_value_is_not_treated_as_a_wrapper():
 
 
 def test_content_that_is_not_json_is_left_alone_for_the_caller_to_reject():
-    """Stripping must not invent success — non-JSON stays non-JSON so the
+    """Stripping must not invent success - non-JSON stays non-JSON so the
     caller still raises, and the diagnostics still fire."""
     assert strip_code_fence("Sure! Here is your answer.") == "Sure! Here is your answer."
 
 
 def test_unterminated_fence_is_left_alone():
     """A truncated response that opened a fence but never closed it is a
-    genuine failure — not something to silently 'repair'."""
+    genuine failure - not something to silently 'repair'."""
     content = f"```json\n{PAYLOAD[:20]}"
 
     assert strip_code_fence(content) == content

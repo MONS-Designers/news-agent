@@ -32,7 +32,7 @@ def upgrade() -> None:
 
     op.add_column("users", sa.Column("role_name", sa.String(), nullable=True))
 
-    # Preserves the submission's display casing, which normalized_text discards —
+    # Preserves the submission's display casing, which normalized_text discards -
     # Story 2.2 promotes from these rows and must not mint lowercase names.
     op.add_column(
         "pending_taxonomy_suggestions", sa.Column("raw_text", sa.String(), nullable=True)

@@ -1,8 +1,8 @@
 """Interface-owned error hierarchy, classified by origin.
 
-Mirrors `newsagent.llm.errors` exactly (AD-3 — the two pluggable-provider
+Mirrors `newsagent.llm.errors` exactly (AD-3 - the two pluggable-provider
 sub-patterns share a shape but not a module). Adapters translate
-vendor-specific exceptions into these — no vendor exception type may cross the
+vendor-specific exceptions into these - no vendor exception type may cross the
 interface boundary. `transient` marks errors the base class retries
 internally before surfacing.
 """

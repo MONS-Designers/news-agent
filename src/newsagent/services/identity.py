@@ -36,7 +36,7 @@ def add_user(db: Session, email: str, name: str | None = None) -> tuple[User, bo
 
 def register_user_if_capacity(db: Session, email: str, name: str | None, cap: int) -> User | None:
     """Create a User row for a brand-new email, but only if the total User
-    count is still under `cap` — and do it atomically (FR3): the count check
+    count is still under `cap` - and do it atomically (FR3): the count check
     and the insert are one SQL statement (INSERT...SELECT...WHERE), not a
     separate count-then-insert from the application. Two concurrent callers
     racing for the last slot can never both succeed; SQLite's single-writer

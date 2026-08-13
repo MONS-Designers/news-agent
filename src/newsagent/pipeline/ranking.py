@@ -7,7 +7,7 @@ eligible again on a future run.
 `final_score = relevance_weight*relevance + recency_weight*recency +
 interest_weight*interest`, where `interest` blends the LLM's interestingness
 score with a per-topic personalization affinity derived from which of the
-user's past digests they actually opened — issue #25 is the first real
+user's past digests they actually opened - issue #25 is the first real
 consumer of #13's open-tracking data.
 """
 
@@ -27,8 +27,8 @@ def topic_affinity(db: Session, user: User, before_date: date) -> dict[int, floa
     """Per-topic personalization signal: among the user's past **sent** digests
     (excluding the one being built for `before_date`) that contained at least
     one article of a given topic, the fraction that were opened. A topic with
-    no such history — including when the user has no past sent digests at
-    all — defaults to neutral (0.5)."""
+    no such history - including when the user has no past sent digests at
+    all - defaults to neutral (0.5)."""
     past_digests = db.scalars(
         select(Digest).where(
             Digest.user_id == user.id,
@@ -91,12 +91,12 @@ def select_top(
     undelivered.
 
     Topic-diversity floor (GH #37): among candidates whose topic isn't already
-    represented in this digest (`already_represented_topic_ids` — a same-day
+    represented in this digest (`already_represented_topic_ids` - a same-day
     rerun's already-attached topics, not recomputed from zero), one guaranteed
     slot goes to each such topic's single best-scoring candidate, topics
     ranked by that best score (not raw global score) until slots run out.
     Remaining slots are filled by global score among whatever's left,
-    including candidates from already-represented topics — the floor just
+    including candidates from already-represented topics - the floor just
     means those topics don't get a *second* guaranteed pick. A topic with
     zero eligible candidates never entered `candidates` in the first place, so
     it costs no slot. A single topic gives the floor nothing to do: its one
@@ -112,7 +112,7 @@ def select_top(
 
     affinities = topic_affinity(db, user, for_date)
     # published_at/scraped_at are naive UTC (feedparser's parsed struct_time,
-    # SQLite's server-side now()) — compare against UTC "now", not local time.
+    # SQLite's server-side now()) - compare against UTC "now", not local time.
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     scored = [
         (article, score_article(article, now=now, topic_affinities=affinities))

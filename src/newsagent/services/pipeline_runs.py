@@ -1,5 +1,5 @@
 """Persistence for per-run LLM usage history (GH #19 follow-up). One row per
-completed `filter`/`summarize` CLI invocation — written from cli.py only."""
+completed `filter`/`summarize` CLI invocation - written from cli.py only."""
 
 from dataclasses import dataclass
 
@@ -53,7 +53,7 @@ def record_run(
 
 
 def build_usage_report(db: Session) -> UsageReport:
-    """Total LLM usage per stage and per day, straight from pipeline_runs —
+    """Total LLM usage per stage and per day, straight from pipeline_runs -
     the CLI's answer to "what has this cost so far" without grepping logs."""
     by_stage_rows = db.execute(
         select(

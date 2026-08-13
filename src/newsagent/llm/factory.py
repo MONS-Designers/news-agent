@@ -1,4 +1,4 @@
-"""Provider selection — swapping providers is a one-line config change
+"""Provider selection - swapping providers is a one-line config change
 (NEWSAGENT_LLM_PROVIDER)."""
 
 from newsagent.config import settings

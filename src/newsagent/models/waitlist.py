@@ -8,7 +8,7 @@ from newsagent.models.base import Base
 
 class Waitlist(Base):
     """A brand-new email captured because it arrived after the self-
-    registration cap was full (FR11) — not a User, never signed in."""
+    registration cap was full (FR11) - not a User, never signed in."""
 
     __tablename__ = "waitlist"
 

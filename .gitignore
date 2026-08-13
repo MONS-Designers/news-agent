@@ -5,7 +5,7 @@ __pycache__/
 venv/
 .env
 *.db
-# NEWSAGENT_LOG_FILE output — at DEBUG these contain raw LLM responses and article text
+# NEWSAGENT_LOG_FILE output - at DEBUG these contain raw LLM responses and article text
 *.log
 logs/
 .pytest_cache/

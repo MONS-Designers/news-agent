@@ -150,7 +150,7 @@ def test_usage_is_aggregated(db: Session):
 
 class BillsThenFailsProvider(MockLLMProvider):
     """GH #19: a call that billed tokens (valid HTTP 200 + usage block) but
-    still ends in LLMProviderError — e.g. GH #38's malformed-output cases —
+    still ends in LLMProviderError - e.g. GH #38's malformed-output cases -
     used to report 0 usage, hiding exactly the failures likely to run up cost."""
 
     def _score_relevance(

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Relevance Filtering — Brainstorm Keepsake</title>
+<title>Relevance Filtering - Brainstorm Keepsake</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%94%8D%3C/text%3E%3C/svg%3E">
 <style>
   :root{
@@ -258,7 +258,7 @@
     font-family:var(--mono);font-size:11px;color:var(--safari);
   }
   .specimen .spotted{font-family:var(--mono);font-size:10.5px;color:var(--safari);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px;}
-  .specimen .spotted::before{content:"⌕ SPOTTED — ";}
+  .specimen .spotted::before{content:"⌕ SPOTTED - ";}
   .specimen p{margin:0;font-size:14px;color:var(--ink);}
 
   /* ---------- 6. SCAMPER ---------- */
@@ -339,11 +339,11 @@
     <p class="hero-sub">Every article that survives the fetch has to earn its way into the digest. This session designed the gate: a persistent verdict machine sitting between <span class="code">fetch</span> and <span class="code">extract</span>.</p>
 
     <div class="meta-row">
-      <span><b>topic</b> — relevance filtering stage, scope · data model · thresholds · failure handling · cost</span>
-      <span><b>goal</b> — understand what to implement before coding</span>
-      <span><b>mode</b> — autonomous</span>
-      <span><b>status</b> — complete</span>
-      <span><b>updated</b> — 2026-07-20T00:25</span>
+      <span><b>topic</b> - relevance filtering stage, scope · data model · thresholds · failure handling · cost</span>
+      <span><b>goal</b> - understand what to implement before coding</span>
+      <span><b>mode</b> - autonomous</span>
+      <span><b>status</b> - complete</span>
+      <span><b>updated</b> - 2026-07-20T00:25</span>
     </div>
 
     <div class="funnel-stage reveal">
@@ -381,13 +381,13 @@
       <div class="stratum reveal" data-layer="1">
         <div class="idea-card">
           <span class="tag">the core claim</span>
-          <p>Filtering is fundamentally a <b>persistent verdict</b> on an article–topic pair, not a transient computation — the verdict must outlive the run.</p>
+          <p>Filtering is fundamentally a <b>persistent verdict</b> on an article–topic pair, not a transient computation - the verdict must outlive the run.</p>
         </div>
       </div>
       <div class="stratum reveal" data-layer="2">
         <div class="idea-card">
           <span class="tag">the pair is fixed</span>
-          <p>An article inherits its candidate topic from its source (<span class="code">source.topic_id</span>) — no cross-topic scoring needed in MVP; the pair is fixed at fetch time.</p>
+          <p>An article inherits its candidate topic from its source (<span class="code">source.topic_id</span>) - no cross-topic scoring needed in MVP; the pair is fixed at fetch time.</p>
         </div>
       </div>
       <div class="stratum reveal" data-layer="3">
@@ -399,25 +399,25 @@
       <div class="stratum reveal" data-layer="4">
         <div class="idea-card">
           <span class="tag">score ≠ verdict</span>
-          <p>Score and verdict are separate: score is provider <i>fact</i> (0–1), verdict is pipeline <i>policy</i> (threshold from config) — store both so threshold changes can re-verdict without re-scoring.</p>
+          <p>Score and verdict are separate: score is provider <i>fact</i> (0–1), verdict is pipeline <i>policy</i> (threshold from config) - store both so threshold changes can re-verdict without re-scoring.</p>
         </div>
       </div>
       <div class="stratum reveal" data-layer="5">
         <div class="idea-card">
           <span class="tag">the cost model</span>
-          <p>Scoring exactly once per article is the cost model: <b>the DB row IS the cache</b> — the purity property carried over from the #5 spec.</p>
+          <p>Scoring exactly once per article is the cost model: <b>the DB row IS the cache</b> - the purity property carried over from the #5 spec.</p>
         </div>
       </div>
       <div class="stratum reveal" data-layer="6">
         <div class="idea-card">
           <span class="tag">the input problem</span>
-          <p>Fetcher currently stores only title + url; full text is #9 and not built yet. MVP filter must work on title alone — or the fetcher should also capture the RSS summary/description field.</p>
+          <p>Fetcher currently stores only title + url; full text is #9 and not built yet. MVP filter must work on title alone - or the fetcher should also capture the RSS summary/description field.</p>
         </div>
       </div>
       <div class="stratum reveal" data-layer="7">
         <div class="idea-card">
           <span class="tag">the resolution</span>
-          <p>RSS entries almost always carry a summary/description — storing it at fetch time costs nothing and dramatically improves filter signal versus title alone.</p>
+          <p>RSS entries almost always carry a summary/description - storing it at fetch time costs nothing and dramatically improves filter signal versus title alone.</p>
         </div>
       </div>
     </div>
@@ -434,29 +434,29 @@
 
     <div class="case-grid">
       <div class="case-file reveal">
-        <p class="sym">digest arrived empty — for a week</p>
+        <p class="sym">digest arrived empty - for a week</p>
         <p class="symptom">Threshold too high for a stingy provider; nobody noticed the score distribution had drifted.</p>
         <div class="fix">Log the score distribution every run so drift is visible.</div>
       </div>
       <div class="case-file reveal">
         <p class="sym">LLM bill exploded</p>
         <p class="symptom">A schema migration reset article statuses; the filter re-scored all 5,000 historical articles in one run.</p>
-        <div class="fix">Only score articles in <span class="code">pending</span> state — never re-enter terminal states.</div>
+        <div class="fix">Only score articles in <span class="code">pending</span> state - never re-enter terminal states.</div>
       </div>
       <div class="case-file reveal">
         <p class="sym">200 articles stuck forever</p>
         <p class="symptom">One provider outage marked 200 articles <span class="code">error</span> and they never recovered.</p>
-        <div class="fix"><span class="code">error</span> is retryable — next run picks error articles up again (error ≠ terminal).</div>
+        <div class="fix"><span class="code">error</span> is retryable - next run picks error articles up again (error ≠ terminal).</div>
       </div>
       <div class="case-file reveal">
         <p class="sym">a great article vanished, silently</p>
-        <p class="symptom">Dropped by the filter and nobody could say why — no trace of the decision.</p>
-        <div class="fix">Verdicts carry the score that produced them — auditable in the DB, no black box.</div>
+        <p class="symptom">Dropped by the filter and nobody could say why - no trace of the decision.</p>
+        <div class="fix">Verdicts carry the score that produced them - auditable in the DB, no black box.</div>
       </div>
       <div class="case-file reveal">
         <p class="sym">run crashed mid-batch</p>
         <p class="symptom">Half the batch scored, half not, and the crash lost track of which was which.</p>
-        <div class="fix">Per-article commit, same pattern as the fetcher — progress survives crashes.</div>
+        <div class="fix">Per-article commit, same pattern as the fetcher - progress survives crashes.</div>
       </div>
       <div class="case-file reveal">
         <p class="sym">filtered a rejected source</p>
@@ -473,7 +473,7 @@
     <p class="kicker reveal"><span class="n">03</span> · Technique</p>
     <h2 class="title reveal">Cost Lens</h2>
     <div class="accent-rule reveal"></div>
-    <p class="sub reveal">Every idea judged in dollars — and tokens.</p>
+    <p class="sub reveal">Every idea judged in dollars - and tokens.</p>
 
     <div class="cost-compare reveal">
       <div class="cost-bar-group">
@@ -495,9 +495,9 @@
     </div>
 
     <div class="cost-notes">
-      <div class="idea-card reveal"><p><span class="dollar">$</span><span class="code">score_relevance_many</span> (batch, built in #5) is the natural call shape — one run scores all pending in a loop; a real adapter may batch further later.</p></div>
-      <div class="idea-card reveal"><p><span class="dollar">$</span>Aggregate usage from <span class="code">RelevanceScore.usage</span> into the run report — the first real consumer of the usage field, feeding #19 for free.</p></div>
-      <div class="idea-card reveal"><p><span class="dollar">$</span>Refused articles (junk/too short) cost <b>zero LLM calls</b> when the refusal check is input-side — mock refuses before scoring; the real adapter should too.</p></div>
+      <div class="idea-card reveal"><p><span class="dollar">$</span><span class="code">score_relevance_many</span> (batch, built in #5) is the natural call shape - one run scores all pending in a loop; a real adapter may batch further later.</p></div>
+      <div class="idea-card reveal"><p><span class="dollar">$</span>Aggregate usage from <span class="code">RelevanceScore.usage</span> into the run report - the first real consumer of the usage field, feeding #19 for free.</p></div>
+      <div class="idea-card reveal"><p><span class="dollar">$</span>Refused articles (junk/too short) cost <b>zero LLM calls</b> when the refusal check is input-side - mock refuses before scoring; the real adapter should too.</p></div>
       <div class="idea-card reveal"><p><span class="dollar">$</span>Pipeline order is itself a cost decision: filter-before-extract is the single biggest lever in this stage.</p></div>
     </div>
   </div>
@@ -509,21 +509,21 @@
     <p class="kicker reveal"><span class="n">04</span> · Technique</p>
     <h2 class="title reveal">Role Playing</h2>
     <div class="accent-rule reveal"></div>
-    <p class="sub reveal">Five stakeholder voices, solo — each pulling the design in a different direction.</p>
+    <p class="sub reveal">Five stakeholder voices, solo - each pulling the design in a different direction.</p>
 
     <div class="panel">
       <div class="voice reveal">
         <div class="avatar">DBA</div>
         <div class="bubble">
           <div class="role">the DBA</div>
-          <p>Do <b>not</b> bloat <span class="code">Article</span> with filter columns forever — but for MVP, two columns (<span class="code">relevance_score</span>, <span class="code">relevance_status</span>) beat a join table. Revisit only if multi-topic scoring arrives.</p>
+          <p>Do <b>not</b> bloat <span class="code">Article</span> with filter columns forever - but for MVP, two columns (<span class="code">relevance_score</span>, <span class="code">relevance_status</span>) beat a join table. Revisit only if multi-topic scoring arrives.</p>
         </div>
       </div>
       <div class="voice reveal">
         <div class="avatar">UI</div>
         <div class="bubble">
           <div class="role">the future admin UI</div>
-          <p>Irrelevant articles should remain queryable — "why was X dropped?" Soft verdicts in the DB enable a review screen later; deletion would destroy that.</p>
+          <p>Irrelevant articles should remain queryable - "why was X dropped?" Soft verdicts in the DB enable a review screen later; deletion would destroy that.</p>
         </div>
       </div>
       <div class="voice reveal">
@@ -537,14 +537,14 @@
         <div class="avatar">#12</div>
         <div class="bubble">
           <div class="role">the digest builder (next consumer)</div>
-          <p>Give me one boolean question answerable by index — <span class="code">status == relevant</span> — not a score I have to interpret.</p>
+          <p>Give me one boolean question answerable by index - <span class="code">status == relevant</span> - not a score I have to interpret.</p>
         </div>
       </div>
       <div class="voice reveal">
         <div class="avatar">🧑</div>
         <div class="bubble">
           <div class="role">the reader</div>
-          <p>Borderline scores (0.3–0.7, between anchors) worry me. MVP policy: a single threshold decides — but log the borderline count so we can tune with real data.</p>
+          <p>Borderline scores (0.3–0.7, between anchors) worry me. MVP policy: a single threshold decides - but log the borderline count so we can tune with real data.</p>
         </div>
       </div>
     </div>
@@ -560,11 +560,11 @@
     <p class="sub reveal">Invented for this session: hunt the inputs that break the happy path.</p>
 
     <div class="safari-grid">
-      <div class="specimen reveal"><span class="num">#1</span><div class="spotted">non-english title</div><p>A Hebrew title from a Hebrew feed — the provider contract handles any language; no special-casing in the filter.</p></div>
-      <div class="specimen reveal"><span class="num">#2</span><div class="spotted">duplicate coverage</div><p>Same story from two sources (TechCrunch + Verge cover the same launch) — both scored independently. Cross-source dedup is a different problem, explicitly out of scope for #10.</p></div>
-      <div class="specimen reveal"><span class="num">#3</span><div class="spotted">topic renamed mid-flight</div><p>Topic renamed by an admin — scores already stored survive; verdict recomputation is possible because score is kept separate from verdict.</p></div>
-      <div class="specimen reveal"><span class="num">#4</span><div class="spotted">empty summary ambiguity</div><p>Empty RSS summary stored as empty string vs <span class="code">None</span> — normalize at fetch: absent summary = <span class="code">None</span>; filter builds <span class="code">ArticleInput</span> from title + (summary or '').</p></div>
-      <div class="specimen reveal"><span class="num">#5</span><div class="spotted">provider refusal</div><p>Refused by the provider (too short) — status <span class="code">refused</span>, terminal, zero retries; distinct from <span class="code">error</span>, which retries.</p></div>
+      <div class="specimen reveal"><span class="num">#1</span><div class="spotted">non-english title</div><p>A Hebrew title from a Hebrew feed - the provider contract handles any language; no special-casing in the filter.</p></div>
+      <div class="specimen reveal"><span class="num">#2</span><div class="spotted">duplicate coverage</div><p>Same story from two sources (TechCrunch + Verge cover the same launch) - both scored independently. Cross-source dedup is a different problem, explicitly out of scope for #10.</p></div>
+      <div class="specimen reveal"><span class="num">#3</span><div class="spotted">topic renamed mid-flight</div><p>Topic renamed by an admin - scores already stored survive; verdict recomputation is possible because score is kept separate from verdict.</p></div>
+      <div class="specimen reveal"><span class="num">#4</span><div class="spotted">empty summary ambiguity</div><p>Empty RSS summary stored as empty string vs <span class="code">None</span> - normalize at fetch: absent summary = <span class="code">None</span>; filter builds <span class="code">ArticleInput</span> from title + (summary or '').</p></div>
+      <div class="specimen reveal"><span class="num">#5</span><div class="spotted">provider refusal</div><p>Refused by the provider (too short) - status <span class="code">refused</span>, terminal, zero retries; distinct from <span class="code">error</span>, which retries.</p></div>
     </div>
   </div>
 </section>
@@ -575,26 +575,26 @@
     <p class="kicker reveal"><span class="n">06</span> · Technique</p>
     <h2 class="title reveal">SCAMPER</h2>
     <div class="accent-rule reveal"></div>
-    <p class="sub reveal">Mutate the stage design, one operator at a time. Two operators weren't explored — left dim on purpose.</p>
+    <p class="sub reveal">Mutate the stage design, one operator at a time. Two operators weren't explored - left dim on purpose.</p>
 
     <div class="scamper-grid reveal">
       <div class="letter used" title="Substitute">S</div>
       <div class="letter used" title="Combine">C</div>
       <div class="letter used" title="Adapt">A</div>
-      <div class="letter" title="Modify — not explored">M</div>
-      <div class="letter" title="Put to other use — not explored">P</div>
+      <div class="letter" title="Modify - not explored">M</div>
+      <div class="letter" title="Put to other use - not explored">P</div>
       <div class="letter used" title="Eliminate">E</div>
       <div class="letter used" title="Reverse">R</div>
     </div>
 
     <div class="scamper-list">
       <div class="scamper-item reveal">
-        <span class="word">Substitute</span>LLM scoring for a keyword pre-filter?<span class="verdict-chip no">no — not mvp</span>
+        <span class="word">Substitute</span>LLM scoring for a keyword pre-filter?<span class="verdict-chip no">no - not mvp</span>
         <p>But a zero-cost heuristic pre-gate (dead link, duplicate title) could shrink LLM calls later.</p>
       </div>
       <div class="scamper-item reveal">
         <span class="word">Combine</span>filter + extract in one pass?<span class="verdict-chip no">no</span>
-        <p>Order matters for cost — filter first is 10x cheaper. Keep stages separate per architecture.</p>
+        <p>Order matters for cost - filter first is 10x cheaper. Keep stages separate per architecture.</p>
       </div>
       <div class="scamper-item reveal">
         <span class="word">Adapt</span>reuse the fetcher's reporting shape<span class="verdict-chip yes">yes</span>
@@ -663,7 +663,7 @@
     </div>
 
     <div class="synthesis-text reveal">
-      <p>The stage is a <b>persistent verdict machine</b>: score once — the DB row <i>is</i> the cache — and verdict = <span class="code">policy(score, config threshold)</span>. States are <span class="code">pending</span> / <span class="code">relevant</span> / <span class="code">irrelevant</span> / <span class="code">refused</span> (terminal) / <span class="code">error</span> (retryable). It needs the fetcher to also store the RSS summary. The report mirrors the fetcher's pattern and aggregates usage. Threshold is global, default <b>0.7</b>.</p>
+      <p>The stage is a <b>persistent verdict machine</b>: score once - the DB row <i>is</i> the cache - and verdict = <span class="code">policy(score, config threshold)</span>. States are <span class="code">pending</span> / <span class="code">relevant</span> / <span class="code">irrelevant</span> / <span class="code">refused</span> (terminal) / <span class="code">error</span> (retryable). It needs the fetcher to also store the RSS summary. The report mirrors the fetcher's pattern and aggregates usage. Threshold is global, default <b>0.7</b>.</p>
       <div class="chip-row">
         <span class="chip">score once, verdict is policy</span>
         <span class="chip">NEWSAGENT_RELEVANCE_THRESHOLD = 0.7</span>

@@ -4,8 +4,8 @@ emails (FR12, FR13).
 No auth on either endpoint: the token itself is the credential (unguessable,
 unique per digest / per link). The open pixel always returns the same image
 regardless of whether the token is valid, so it can't be used to enumerate
-which tokens exist. The click redirect can't offer that same guarantee — it
-has to know the real destination to redirect to — but the token is still
+which tokens exist. The click redirect can't offer that same guarantee - it
+has to know the real destination to redirect to - but the token is still
 unguessable, matching FR12's "same shape as the existing pixel" design.
 """
 

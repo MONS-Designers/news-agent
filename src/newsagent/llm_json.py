@@ -21,7 +21,7 @@ def strip_code_fence(content: str) -> str:
     Measured on `z-ai/glm-5.2` (GH #40): the model wraps its JSON in a
     ```json fence in roughly half of all calls despite the system prompt
     saying not to, which made ~41% of summarize calls unparseable. The JSON
-    itself is complete and valid — only the wrapper is the problem.
+    itself is complete and valid - only the wrapper is the problem.
     """
     if not isinstance(content, str):
         return content

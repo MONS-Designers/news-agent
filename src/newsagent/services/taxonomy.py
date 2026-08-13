@@ -18,18 +18,18 @@ from newsagent.models.pending_taxonomy_suggestion import (
 from newsagent.suggestions.errors import SuggestionError
 from newsagent.suggestions.factory import get_suggestion_source
 
-# Role picker cap (Story: Role and Prompt Suggestions) — curated Roles always
+# Role picker cap (Story: Role and Prompt Suggestions) - curated Roles always
 # shown first, LLM-invented names fill any remaining slots up to this count.
 ROLE_SUGGESTION_CAP = 10
 
-# Mirrors services/profile.py's MAX_NAME_LENGTH — an LLM-suggested name past
+# Mirrors services/profile.py's MAX_NAME_LENGTH - an LLM-suggested name past
 # this (or blank) would fail save_profile's own check anyway, so it is
 # filtered out here rather than offered as a chip that can't actually be saved.
 ROLE_NAME_MAX_LENGTH = 100
 
 
 # Generic starter Field content (PRD: PM authors initial seed, no real
-# dogfood-user data available yet) — mirrors DEFAULT_SOURCES's role in sources.py.
+# dogfood-user data available yet) - mirrors DEFAULT_SOURCES's role in sources.py.
 DEFAULT_FIELDS: list[str] = ["Tech", "Finance", "Healthcare", "Education", "Design"]
 
 # Starter Role content per Field, from the approved UX mockup. Admin curates
@@ -48,7 +48,7 @@ def normalize_taxonomy_text(text: str) -> str:
     one Pending Taxonomy Suggestion instead of several.
 
     Beyond case and whitespace this strips Unicode format characters (category
-    `Cf` — the invisible RLM/LRM marks a Hebrew or Arabic IME inserts) and
+    `Cf` - the invisible RLM/LRM marks a Hebrew or Arabic IME inserts) and
     unifies composition to NFC (macOS submits decomposed text, so "Café" would
     otherwise arrive as two different byte sequences). Both produce rows that
     look identical in the admin queue but never merge.
@@ -76,7 +76,7 @@ def list_fields(db: Session) -> list[Field]:
 
 
 def find_field_by_name(db: Session, name: str) -> Field | None:
-    """Resolve a stored field_name against the curated list (AD-6 — the match is
+    """Resolve a stored field_name against the curated list (AD-6 - the match is
     a name-lookup at use time, never a stored foreign key).
 
     Compared in Python rather than SQL: the curated list is a handful of rows,
@@ -92,7 +92,7 @@ def find_field_by_name(db: Session, name: str) -> Field | None:
 def add_role(db: Session, field: Field, name: str) -> tuple[Role, bool]:
     """Get-or-create a Role by (field_id, name). Returns (role, created).
 
-    Scoped to the Field, not global — "Researcher" exists under both Healthcare
+    Scoped to the Field, not global - "Researcher" exists under both Healthcare
     and Education, and they are different rows.
     """
     existing = db.scalar(select(Role).where(Role.field_id == field.id, Role.name == name))
@@ -110,7 +110,7 @@ def list_roles(db: Session, field_id: int) -> list[Role]:
 
 
 def find_role_by_name(db: Session, field_id: int, name: str) -> Role | None:
-    """Resolve a stored role_name against the curated list for one Field — the
+    """Resolve a stored role_name against the curated list for one Field - the
     Role counterpart to find_field_by_name, same normalized name-lookup (AD-6)."""
     normalized = normalize_taxonomy_text(name)
     for role in list_roles(db, field_id):
@@ -121,7 +121,7 @@ def find_role_by_name(db: Session, field_id: int, name: str) -> Role | None:
 
 @dataclass(frozen=True)
 class RoleSuggestionView:
-    """One Role option shown in the Step 1 Role picker — either curated (already
+    """One Role option shown in the Step 1 Role picker - either curated (already
     a `Role` row) or LLM-invented and not yet reviewed. The router serializes
     this, never a raw `Role`, so an uncurated suggestion has somewhere to live
     without a real `Role.id` (AD-1)."""
@@ -136,9 +136,9 @@ def suggest_roles_for_field(db: Session, field: Field) -> list[RoleSuggestionVie
     curated Role (`normalize_taxonomy_text`, AD-6), filling any remaining slots.
 
     If curated Roles alone already reach the cap, they are capped at exactly
-    `ROLE_SUGGESTION_CAP` and the LLM is not called at all — there is nothing
+    `ROLE_SUGGESTION_CAP` and the LLM is not called at all - there is nothing
     for it to contribute. If the LLM call fails, the curated list is still
-    returned in full (up to the cap) — a suggestion failure never blocks Role
+    returned in full (up to the cap) - a suggestion failure never blocks Role
     selection, it just means no new names this time.
     """
     curated = list_roles(db, field.id)
@@ -188,7 +188,7 @@ def seed_default_fields(db: Session) -> SeedReport:
 
 
 def seed_default_roles(db: Session) -> SeedReport:
-    """Load DEFAULT_ROLES under their Fields, creating any missing Field first —
+    """Load DEFAULT_ROLES under their Fields, creating any missing Field first -
     mirrors seed_default_sources's topic-then-source shape."""
     report = SeedReport()
     for field_name, role_names in DEFAULT_ROLES.items():
@@ -211,7 +211,7 @@ def record_pending_suggestion(db: Session, *, kind: str, field_id: int | None, t
     submissions only bump the count, so the display form stays stable while the
     suggestion sits in the queue.
 
-    Deliberately does NOT commit — the calling service owns the transaction, so
+    Deliberately does NOT commit - the calling service owns the transaction, so
     a profile save and its suggestion writes land (or roll back) together.
     """
     normalized = normalize_taxonomy_text(text)
@@ -243,7 +243,7 @@ def record_pending_suggestion(db: Session, *, kind: str, field_id: int | None, t
 
 @dataclass(frozen=True)
 class PendingSuggestionView:
-    """One row of the admin Taxonomy Curation Queue — the plain-data unit the
+    """One row of the admin Taxonomy Curation Queue - the plain-data unit the
     router renders, so no model instance crosses the router boundary (AD-1).
     Same role TopicChoice plays for the preferences page."""
 
@@ -262,8 +262,8 @@ def list_pending_suggestions(db: Session) -> list[PendingSuggestionView]:
     (AD-8), so re-aggregating here would be a second, divergent definition of
     "the same submission".
 
-    Ordered most-requested first — submission_count is the demand signal the
-    admin is here to read — with the oldest as a stable tiebreak.
+    Ordered most-requested first - submission_count is the demand signal the
+    admin is here to read - with the oldest as a stable tiebreak.
     """
     rows = db.scalars(
         select(PendingTaxonomySuggestion)
@@ -294,7 +294,7 @@ def list_pending_suggestions(db: Session) -> list[PendingSuggestionView]:
 class SuggestionNotPendingError(ValueError):
     """Raised when a decision targets an already-approved/rejected suggestion.
 
-    Decided rows are terminal (AD-8) — a resubmission opens a fresh pending row
+    Decided rows are terminal (AD-8) - a resubmission opens a fresh pending row
     rather than reopening this one. Carries a stable `detail` dict so callers
     identify the failure by code, not by string (same shape as
     preferences.TopicCapExceededError)."""
@@ -308,7 +308,7 @@ class RoleHasNoFieldError(ValueError):
     """Raised when promoting a Role suggestion that has no Field to live under.
 
     A Role typed as "Other" underneath a Field that was itself uncurated "Other"
-    text carries no field_id, and Role.field_id is a non-nullable FK — there is
+    text carries no field_id, and Role.field_id is a non-nullable FK - there is
     no correct row to write. The admin promotes the parent Field first."""
 
     def __init__(self) -> None:
@@ -325,7 +325,7 @@ def decide_pending_suggestion(
     row, and it transitions the suggestion to `approved`. Dismissing only does
     the latter, with `rejected`.
 
-    `name` lets the admin correct the curated spelling before it is written —
+    `name` lets the admin correct the curated spelling before it is written -
     rows predating the `raw_text` column carry only casefolded text, which would
     otherwise mint a lowercase Field. The suggestion row itself is never
     rewritten; it stays a record of what the user actually typed.
@@ -333,7 +333,7 @@ def decide_pending_suggestion(
     Deliberately does NOT touch User.field_name/role_name: promotion does not
     migrate earlier free-text submitters (PRD FR-7, AD-6).
 
-    Returns the updated view, or None if the id doesn't exist — same contract as
+    Returns the updated view, or None if the id doesn't exist - same contract as
     sources.set_source_status, which the router already 404s on.
     """
     row = db.get(PendingTaxonomySuggestion, suggestion_id)

@@ -25,11 +25,11 @@ class Identity:
 
 
 def resolve_identity(db: Session, email: str, name: str | None = None, cap: int = 10) -> Identity | None:
-    """Map a verified Google email to our seeded Admin/User rows — or, for a
+    """Map a verified Google email to our seeded Admin/User rows - or, for a
     brand-new email with room under the registration cap, create one (FR1).
 
     Returns None only when the email is brand-new *and* the cap is already
-    full — the caller then routes to the waitlist (FR11) instead of signing
+    full - the caller then routes to the waitlist (FR11) instead of signing
     anyone in. This is the only place a User row is created from an
     unauthenticated-until-this-point request; reached only after Google's
     OAuth callback has already verified the email.

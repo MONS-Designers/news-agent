@@ -1,4 +1,4 @@
-"""Focused unit tests for LLMSuggestionSource — offline via httpx.MockTransport,
+"""Focused unit tests for LLMSuggestionSource - offline via httpx.MockTransport,
 never real network. Mirrors tests/suggestions/test_popularity.py's style."""
 
 import json
@@ -52,7 +52,7 @@ def test_suggest_roles_parses_response():
 
 def test_suggest_roles_includes_existing_roles_in_the_prompt():
     """existing_roles is context for the model, not something enforced
-    client-side — this just proves it reaches the request body."""
+    client-side - this just proves it reaches the request body."""
     captured: dict[str, str] = {}
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -119,7 +119,7 @@ def test_suggest_topics_parses_response():
 
 def test_suggest_topics_filters_ids_not_in_candidates():
     """The prompt tells the model to only pick from CANDIDATE_TOPICS, but that
-    instruction alone isn't enforceable — a hallucinated id (999, not in
+    instruction alone isn't enforceable - a hallucinated id (999, not in
     POPULARITY) must be dropped rather than returned as a real suggestion."""
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -159,7 +159,7 @@ def test_suggest_new_topics_parses_response():
 
 def test_suggest_new_topics_includes_existing_topic_names_in_the_prompt():
     """existing_topic_names is context for the model, not something enforced
-    client-side — this just proves it reaches the request body."""
+    client-side - this just proves it reaches the request body."""
     captured: dict[str, str] = {}
 
     def handler(request: httpx.Request) -> httpx.Response:

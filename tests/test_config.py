@@ -11,7 +11,7 @@ from newsagent.config import Settings
 
 def test_database_url_default_is_postgres():
     """Checks the field default directly rather than instantiating Settings()
-    — a real .env in this repo overrides database_url with a live Neon
+    - a real .env in this repo overrides database_url with a live Neon
     connection string, and this test must never load or touch that value."""
     assert Settings.model_fields["database_url"].default.startswith("postgresql")
 

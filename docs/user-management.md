@@ -1,6 +1,6 @@
 # User management
 
-Who can sign in is controlled entirely by the database — Google OAuth only authenticates; it never
+Who can sign in is controlled entirely by the database - Google OAuth only authenticates; it never
 creates accounts. A Google account can access the app only if its email exists in the `admins`
 table (grants `/admin`) and/or the `users` table (grants `/preferences`). Emails are normalized to
 lowercase before storage and matching.
@@ -15,7 +15,7 @@ bootstrapped.
 python -m newsagent.cli add-admin someone@example.com
 ```
 
-Grants access to the admin panel (`/admin`) — source approval.
+Grants access to the admin panel (`/admin`) - source approval.
 
 ## Add a regular user
 
@@ -28,7 +28,7 @@ in digest delivery.
 
 ## Notes
 
-- Both commands are idempotent — running them again with the same email prints
+- Both commands are idempotent - running them again with the same email prints
   `Already exists` and changes nothing, so they're safe to use in seed scripts.
 - The same email can be both an admin and a user (add it with both commands).
 - The email must be the exact Google account the person signs in with.

@@ -1,4 +1,4 @@
-"""Domain service for the self-registration waitlist (FR11) — captures a
+"""Domain service for the self-registration waitlist (FR11) - captures a
 brand-new email that arrived after the registration cap was full, so a
 capacity-full sign-in attempt leaves a real trace instead of nothing.
 """
@@ -12,7 +12,7 @@ from newsagent.models import Waitlist
 
 
 def _insert_for_dialect(dialect_name: str):
-    """The dialect-specific `insert()` with on-conflict support — SQLAlchemy
+    """The dialect-specific `insert()` with on-conflict support - SQLAlchemy
     has no generic on-conflict API, so callers must pick the dialect's own.
     Postgres in real use, SQLite under the test fixtures; anything else is a
     dialect this codebase has never run against and shouldn't guess at.
@@ -25,7 +25,7 @@ def _insert_for_dialect(dialect_name: str):
 
 
 def capture_to_waitlist(db: Session, email: str, name: str | None) -> Waitlist:
-    """Add (or refresh) a waitlist entry for `email` — one atomic upsert, not
+    """Add (or refresh) a waitlist entry for `email` - one atomic upsert, not
     a select-then-branch (the TOCTOU pattern already flagged elsewhere in
     this codebase for get-or-create helpers). A repeat attempt for the same
     email updates `name`/`captured_at` in place rather than creating a
@@ -41,5 +41,5 @@ def capture_to_waitlist(db: Session, email: str, name: str | None) -> Waitlist:
     db.execute(stmt)
     db.commit()
     entry = db.scalar(select(Waitlist).where(Waitlist.email == normalized))
-    assert entry is not None  # just upserted — must exist
+    assert entry is not None  # just upserted - must exist
     return entry

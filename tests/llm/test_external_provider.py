@@ -170,7 +170,7 @@ def _summarize_returning(content: str) -> ExternalLLMProvider:
 
 def test_fenced_json_now_parses_successfully(caplog):
     """GH #40: z-ai/glm-5.2 wraps its JSON in a ```json fence about half the
-    time despite the prompt forbidding it — measured as 100% of GH #38's
+    time despite the prompt forbidding it - measured as 100% of GH #38's
     sampled failures. The fence is stripped before parsing, so this is a
     success path now, and it must log nothing."""
     provider = _summarize_returning(
@@ -196,7 +196,7 @@ def test_fenced_json_now_parses_successfully(caplog):
 
 
 def test_prose_before_the_json_still_logs_the_json_stage(caplog):
-    """Fence stripping must not paper over genuinely unparseable output — the
+    """Fence stripping must not paper over genuinely unparseable output - the
     diagnostics still have to fire for anything it cannot rescue."""
     provider = _summarize_returning('Sure! Here you go:\n{"summary_he": "x"}')
 
@@ -221,7 +221,7 @@ def test_truncated_json_logs_the_json_stage_and_the_length(caplog):
 
 
 def test_schema_failure_logs_the_schema_stage_not_the_json_stage(caplog):
-    """Valid JSON, empty bullets_he — a different bug from a parse failure, and
+    """Valid JSON, empty bullets_he - a different bug from a parse failure, and
     the log has to say so or the 33 failures stay indistinguishable."""
     provider = _summarize_returning(
         json.dumps(
@@ -312,7 +312,7 @@ def test_non_string_content_stays_inside_the_llm_error_hierarchy(content, caplog
     filtered completions, and reasoning models that answer in a sibling field.
     If that escapes as a bare TypeError it sails past summarize's `except
     LLMError` and aborts the whole stage, leaving the article unmarked so the
-    next run crashes on it again — one article poisons every other."""
+    next run crashes on it again - one article poisons every other."""
 
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json={"choices": [{"message": {"content": content}}]})
@@ -361,7 +361,7 @@ def test_result_is_unchanged_when_the_backend_reports_no_usage():
 
 def test_json_stage_failure_still_records_usage_for_draining():
     """GH #19: the fix's core acceptance criterion. HTTP 200 with a valid
-    usage block, but content that fails json.loads (GH #38's stage=json) —
+    usage block, but content that fails json.loads (GH #38's stage=json) -
     the call was billed and must be counted, not silently zero."""
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -407,7 +407,7 @@ def test_schema_stage_failure_still_records_usage_for_draining():
 
 def test_successful_call_does_not_double_count_usage():
     """The success path attaches Usage to the result AND records it once for
-    draining — these must be the same single billed call, not two counts."""
+    draining - these must be the same single billed call, not two counts."""
 
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(
@@ -428,7 +428,7 @@ def test_successful_call_does_not_double_count_usage():
 
 
 def test_auth_failure_records_no_usage():
-    """A 401/403 never reaches a JSON body with a usage block — nothing was
+    """A 401/403 never reaches a JSON body with a usage block - nothing was
     billed, so drain_usage() must stay empty."""
 
     def handler(request: httpx.Request) -> httpx.Response:

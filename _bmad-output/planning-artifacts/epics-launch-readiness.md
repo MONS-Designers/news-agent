@@ -13,7 +13,7 @@ inputDocuments:
 
 ## Overview
 
-This document covers the work between the current build and a **friends-scale launch** —
+This document covers the work between the current build and a **friends-scale launch** -
 roughly ten self-registered users, technical and non-technical, receiving a weekly Hebrew
 digest they judge on content quality alone.
 
@@ -32,8 +32,8 @@ invariants (`AD-1`, `AD-4`) are carried in, because they govern anything built i
 
 ### The audience change that drives this epic
 
-The MVP was specified for **2 seeded dogfood users**. The actual target is now **friends —
-technical and non-technical — who want fast, simple signup and content that matches their
+The MVP was specified for **2 seeded dogfood users**. The actual target is now **friends -
+technical and non-technical - who want fast, simple signup and content that matches their
 interests**. This resolves, in favour of the original idea document, the "Known drift to
 resolve" that `CLAUDE.md` has carried since 2026-07-17: self-registration is in, seeded-only
 is out.
@@ -44,7 +44,7 @@ is out.
 
 FR1: A visitor whose email matches no existing `Admin` or `User` row can sign in with Google and have a `User` row created automatically on first successful authentication, with no admin action and no separate registration form.
 FR2: Self-registration is capped at a configurable maximum number of users (10 at launch). Once the cap is reached, a first-time sign-in is refused; users who already have an account are never affected by the cap.
-FR3: The cap check and the user-row insert are atomic — two concurrent first-time sign-ins can never both pass the check and push the total past the cap.
+FR3: The cap check and the user-row insert are atomic - two concurrent first-time sign-ins can never both pass the check and push the total past the cap.
 FR4: The pipeline can deliver a digest through a real email provider selected by the existing `NEWSAGENT_EMAIL_SENDER` configuration value, with no change to `pipeline/send.py` or any other pipeline module.
 FR5: For an article that has already passed relevance filtering, the system fetches the source page and extracts the full article text, storing it in the existing `Article.full_text` column before the summarize stage runs.
 FR6: Full-text extraction failure is non-fatal: the article keeps a null `full_text`, `summarize` falls back to `rss_summary` exactly as it does today, and the run continues.
@@ -52,47 +52,47 @@ FR7: Digest selection guarantees at least one slot per subscribed topic that has
 FR8: An article whose summarize call fails is retried a bounded number of times and then reaches a terminal state, after which it is never selected for summarization again.
 FR9: Token usage for every LLM call is recorded per pipeline run and is readable after the run without re-reading raw logs.
 FR10: Topic-suggestion computation runs its two independent LLM calls concurrently rather than sequentially.
-FR11: A visitor who authenticates with Google after the cap is full has their email (and any name Google provides) captured in a waitlist, rather than being shown a message with nothing recorded. Added 2026-08-07 — Nomi rejected a message-only capacity screen as "letting them log in for free with nothing to show for it."
-FR12: Every article and preferences link inside a sent digest is wrapped so that a click is recorded (which digest, which link, when) before the recipient is redirected to the real, unchanged destination. Added 2026-08-11, surfaced during Story B.1's live-inbox verification — Nomi asked "is there a way to check if the user clicked the links?" and confirmed no such mechanism exists today.
-FR13: Digest engagement (whether a digest was opened, and which links in it were clicked) is viewable without a manual DB query — some operator-facing screen or report surfaces it. Added 2026-08-11, same session — open-tracking (`Digest.opened_at`) already exists and is even fed into ranking, but nothing lets an operator actually see the data.
+FR11: A visitor who authenticates with Google after the cap is full has their email (and any name Google provides) captured in a waitlist, rather than being shown a message with nothing recorded. Added 2026-08-07 - Nomi rejected a message-only capacity screen as "letting them log in for free with nothing to show for it."
+FR12: Every article and preferences link inside a sent digest is wrapped so that a click is recorded (which digest, which link, when) before the recipient is redirected to the real, unchanged destination. Added 2026-08-11, surfaced during Story B.1's live-inbox verification - Nomi asked "is there a way to check if the user clicked the links?" and confirmed no such mechanism exists today.
+FR13: Digest engagement (whether a digest was opened, and which links in it were clicked) is viewable without a manual DB query - some operator-facing screen or report surfaces it. Added 2026-08-11, same session - open-tracking (`Digest.opened_at`) already exists and is even fed into ranking, but nothing lets an operator actually see the data.
 
 ### NonFunctional Requirements
 
-NFR1: The profile picker is fully usable on a phone viewport (320px and up) — layout, touch targets, and every affordance that is hover-only today.
+NFR1: The profile picker is fully usable on a phone viewport (320px and up) - layout, touch targets, and every affordance that is hover-only today.
 NFR2: Topic suggestions are ready within 8 seconds for a typical first-run profile. This is the abandonment threshold the scope decision set, not a stretch goal.
 NFR3: Full-text extraction must not silently multiply LLM spend: extracted text is length-capped before it reaches a prompt, and FR9's accounting must be in place before extraction ships.
-NFR4: Opening registration exposes the app to anyone with the link. No unauthenticated route may create rows, and the cap is the only admission control at launch — this is accepted deliberately, not overlooked.
+NFR4: Opening registration exposes the app to anyone with the link. No unauthenticated route may create rows, and the cap is the only admission control at launch - this is accepted deliberately, not overlooked.
 NFR5: Email-provider credentials are read from configuration only, never logged and never committed (extends `#17`'s rule to the new adapter).
-NFR6: Full-text fetching must respect the source site — a per-request timeout, a bounded number of concurrent fetches, and a real user agent — so a pipeline run can neither hang nor look like a scraper.
+NFR6: Full-text fetching must respect the source site - a per-request timeout, a bounded number of concurrent fetches, and a real user agent - so a pipeline run can neither hang nor look like a scraper.
 
 ### Additional Requirements
 
-- `AD-1` (Spine) — thin-router / domain-service layering: routers validate and delegate, services own business rules and idempotency, services raise `ValueError` and routers translate to `HTTPException`. Applies to the registration path and the user-cap check.
-- `AD-4` (Spine) — every schema change ships as a new Alembic revision. Applies to the summarize terminal-state column and to any usage-accounting table.
-- `mail/base.py` already defines the `EmailSender` ABC and `EmailSendError`; `mail/factory.py` selects by config and currently raises for anything but `console`. FR4 is a new adapter plus one factory branch — the pipeline contract is already correct and must not change.
+- `AD-1` (Spine) - thin-router / domain-service layering: routers validate and delegate, services own business rules and idempotency, services raise `ValueError` and routers translate to `HTTPException`. Applies to the registration path and the user-cap check.
+- `AD-4` (Spine) - every schema change ships as a new Alembic revision. Applies to the summarize terminal-state column and to any usage-accounting table.
+- `mail/base.py` already defines the `EmailSender` ABC and `EmailSendError`; `mail/factory.py` selects by config and currently raises for anything but `console`. FR4 is a new adapter plus one factory branch - the pipeline contract is already correct and must not change.
 - `api/auth.py::resolve_identity` returns `None` for any email with no `Admin`/`User` row, and the caller rejects the login. This is the single change point for FR1, and it inverts a deliberate original decision: OAuth authenticates but never creates.
 - `models/article.py` already has a `full_text` column and `pipeline/summarize.py:63` already reads `article.full_text or article.rss_summary or article.title`. Nothing populates `full_text` today, so the fallback is always taken. FR5 fills an existing, already-wired seam.
-- `pipeline/relevance.py:81` reads `article.rss_summary or article.title` and does **not** consult `full_text`. This is correct and must stay: extraction runs after relevance, so relevance necessarily judges on the snippet. [OPEN] — see Open Questions.
+- `pipeline/relevance.py:81` reads `article.rss_summary or article.title` and does **not** consult `full_text`. This is correct and must stay: extraction runs after relevance, so relevance necessarily judges on the snippet. [OPEN] - see Open Questions.
 - The LLM base class already exposes `_record_usage`, and reports already carry `usage_input_units` / `usage_output_units`. FR9 is persistence and reporting, not new instrumentation.
 - The select-then-insert TOCTOU pattern is already documented three times in `deferred-work.md` (`add_topic`, `add_field`, `add_source`). FR3 makes it reachable from the open internet for the first time, which is why FR3 states atomicity rather than inheriting the existing pattern.
 - `services/profile.py::_compute_and_store_suggestions` is being changed under `GH #36` in a parallel work stream, including a new `pending_slow` suggestion status. FR10 must be reconciled with that work rather than duplicating it.
-- `api/routers/tracking.py` already implements the open-tracking pixel (`GET /t/{token}.gif`, unauthenticated, token-as-credential) and sets `Digest.opened_at` on first hit; `pipeline/ranking.py` already reads `opened_at` as a ranking signal. FR13 is about exposing this existing data, not rebuilding the pixel mechanism. FR12 (click tracking) is genuinely new — no redirect/click mechanism exists anywhere in the codebase today; the natural design mirrors the existing pixel's shape (unguessable per-link token, unauthenticated redirect endpoint).
+- `api/routers/tracking.py` already implements the open-tracking pixel (`GET /t/{token}.gif`, unauthenticated, token-as-credential) and sets `Digest.opened_at` on first hit; `pipeline/ranking.py` already reads `opened_at` as a ranking signal. FR13 is about exposing this existing data, not rebuilding the pixel mechanism. FR12 (click tracking) is genuinely new - no redirect/click mechanism exists anywhere in the codebase today; the natural design mirrors the existing pixel's shape (unguessable per-link token, unauthenticated redirect endpoint).
 
 ### UX Design Requirements
 
 UX-DR1: Responsive breakpoint behavior for the Field/Role chip rows and the Topic pill grid below 640px, including verified flex-wrap behavior down to 320px (`EXPERIENCE.md` § Responsive & Platform is currently unspecified here).
-UX-DR2: Touch equivalents for every hover-only affordance in the picker — chip, topic-pill, and button lift-and-brighten states have no defined touch behavior.
+UX-DR2: Touch equivalents for every hover-only affordance in the picker - chip, topic-pill, and button lift-and-brighten states have no defined touch behavior.
 UX-DR3: Decide and implement the parallax behavior on touch devices: the mouse-position half of the background-orb parallax is meaningless without a pointer, and blur-heavy fixed backgrounds carry unverified mobile GPU cost.
-UX-DR4: Resolve whether the picker follows `PreferencesView.vue`'s existing Tailwind responsive convention (`sm:flex-row` and similar) or defines its own breakpoints — one convention, decided explicitly.
-UX-DR5: A "capacity reached" screen for a visitor who authenticates with Google after the user cap is full, which also confirms their email was captured to a waitlist (FR11) — not a dead-end message with nothing recorded.
-UX-DR6: A first-run state for a freshly self-registered user, who lands with no profile, no topics, and no digest history — distinct from the returning-user summary that `HomeView.vue` shows today.
+UX-DR4: Resolve whether the picker follows `PreferencesView.vue`'s existing Tailwind responsive convention (`sm:flex-row` and similar) or defines its own breakpoints - one convention, decided explicitly.
+UX-DR5: A "capacity reached" screen for a visitor who authenticates with Google after the user cap is full, which also confirms their email was captured to a waitlist (FR11) - not a dead-end message with nothing recorded.
+UX-DR6: A first-run state for a freshly self-registered user, who lands with no profile, no topics, and no digest history - distinct from the returning-user summary that `HomeView.vue` shows today.
 UX-DR7: Touch-target sizing across the picker meets a minimum tap area, alongside the semantic-control work already tracked as `#31`.
 
 ### Open Questions
 
-- **OQ1 — What does user #11 see? RESOLVED 2026-08-07.** A message-only capacity screen was rejected: "אין טעם לאפשר למשתמש לבצע לוגין לחינם, אלא אם כן ניתן להכניס אותו לרשימת המתנה" — if the login can't result in an account, it must at least result in a captured waitlist entry. `FR11` added. Admin visibility into the waitlist (a list view, a manual promote-from-waitlist action) is deliberately deferred as a fast-follow, not built in this epic — DB storage only for launch.
-- **OQ2 — Does relevance ever get the full text?** Extraction currently must run after relevance filtering, precisely so full-text fetching is limited to articles worth fetching. That means relevance is permanently judged on an RSS snippet — sometimes on a headline alone. Accepted for this epic, but it caps how good relevance can get, and a future re-score pass after extraction is the obvious lever.
-- **OQ3 — Is the 8s budget met by concurrency alone?** `#36` measures the two calls at ~11.4s and ~14.0s, both against `LOCAL_LLM_BASE_URL` pointed at a remote OpenRouter model (`local` names a config, not a physical machine — see AD-3). Concurrency alone yields ~14s, still above NFR2's 8 seconds. **RESOLVED for this epic (2026-08-07):** self-hosted-on-own-hardware inference is deliberately deferred to a later stage — it mainly removes the network hop, not the compute time, and needs its own hardware/ops decision this epic doesn't own. NFR2 must be met within this epic by the levers that don't wait on hardware: a smaller/faster model on the existing remote provider, prompt/context trimming, and/or partial rendering (surface Role suggestions as soon as they arrive instead of blocking on both calls).
+- **OQ1 - What does user #11 see? RESOLVED 2026-08-07.** A message-only capacity screen was rejected: "אין טעם לאפשר למשתמש לבצע לוגין לחינם, אלא אם כן ניתן להכניס אותו לרשימת המתנה" - if the login can't result in an account, it must at least result in a captured waitlist entry. `FR11` added. Admin visibility into the waitlist (a list view, a manual promote-from-waitlist action) is deliberately deferred as a fast-follow, not built in this epic - DB storage only for launch.
+- **OQ2 - Does relevance ever get the full text?** Extraction currently must run after relevance filtering, precisely so full-text fetching is limited to articles worth fetching. That means relevance is permanently judged on an RSS snippet - sometimes on a headline alone. Accepted for this epic, but it caps how good relevance can get, and a future re-score pass after extraction is the obvious lever.
+- **OQ3 - Is the 8s budget met by concurrency alone?** `#36` measures the two calls at ~11.4s and ~14.0s, both against `LOCAL_LLM_BASE_URL` pointed at a remote OpenRouter model (`local` names a config, not a physical machine - see AD-3). Concurrency alone yields ~14s, still above NFR2's 8 seconds. **RESOLVED for this epic (2026-08-07):** self-hosted-on-own-hardware inference is deliberately deferred to a later stage - it mainly removes the network hop, not the compute time, and needs its own hardware/ops decision this epic doesn't own. NFR2 must be met within this epic by the levers that don't wait on hardware: a smaller/faster model on the existing remote provider, prompt/context trimming, and/or partial rendering (surface Role suggestions as soon as they arrive instead of blocking on both calls).
 
 ### FR Coverage Map
 
@@ -128,17 +128,17 @@ UX-DR7: Epic E - Touch-target sizing across the picker
 ## Epic List
 
 ### Epic E: The wizard works on a phone and doesn't make you wait
-Any visitor — not just desktop users — can complete the Field/Role/Experience/Topics
+Any visitor - not just desktop users - can complete the Field/Role/Experience/Topics
 picker on a phone from 320px up, with real touch equivalents for every hover-only
 affordance, and see Topic suggestions inside 8 seconds. Concurrent suggestion-source
 calls (tracked in GH #36, already in flight in a parallel work stream) are verified and
-integrated here rather than rebuilt. No dependency on any other epic in this document —
+integrated here rather than rebuilt. No dependency on any other epic in this document -
 runs first per the approved build order.
 **Covers:** FR10, NFR1, NFR2, UX-DR1, UX-DR2, UX-DR3, UX-DR4, UX-DR7
 
 ### Epic A: Any friend can get in
 A visitor with no seeded account can sign in with Google and land with a working
-account immediately — no admin step, no separate registration form. Registration is
+account immediately - no admin step, no separate registration form. Registration is
 open but hard-capped at 10 total users; a visitor arriving after the cap is full is
 captured to a waitlist rather than shown a dead-end message, and a freshly-created user
 sees a first-run state instead of the returning-user summary. Standalone: touches only
@@ -148,7 +148,7 @@ is a deliberate fast-follow, not built here.
 
 ### Epic B: The digest actually lands in an inbox
 A user's weekly digest is delivered through a real email provider, configured the same
-way every other swappable adapter in this codebase is configured — no code change
+way every other swappable adapter in this codebase is configured - no code change
 outside `mail/`. Standalone: one new adapter class plus one factory branch. Story B.2
 (click tracking + an engagement view) was added 2026-08-11 during B.1's live-inbox
 verification and is not required for B.1 to ship.
@@ -165,7 +165,7 @@ spend per article.
 **Covers:** FR8, FR9
 
 ### Epic D: Every digest is worth reading
-Summaries are written from the actual article, not a headline — full article text is
+Summaries are written from the actual article, not a headline - full article text is
 fetched and extracted for any article that already passed relevance filtering, with a
 non-fatal fallback to today's RSS-snippet behavior on failure. Digest selection
 guarantees at least one slot per subscribed topic that has an eligible candidate, so a
@@ -176,15 +176,15 @@ before Epic C is done.
 
 **Approved build order:** E → A → B → C → D. This is one deliberate change from the
 build order approved earlier in conversation (which had Epic D's #9 before Epic C's
-#19) — corrected per NFR3, approved 2026-08-07.
+#19) - corrected per NFR3, approved 2026-08-07.
 
 ## Epic E: The wizard works on a phone and doesn't make you wait
 
-Any visitor — not just desktop users — can complete the Field/Role/Experience/Topics
+Any visitor - not just desktop users - can complete the Field/Role/Experience/Topics
 picker on a phone from 320px up, with real touch equivalents for every hover-only
 affordance, and see Topic suggestions inside 8 seconds. Concurrent suggestion-source
 calls (tracked in GH #36, already in flight in a parallel work stream) are verified and
-integrated here rather than rebuilt. No dependency on any other epic — runs first per
+integrated here rather than rebuilt. No dependency on any other epic - runs first per
 the approved build order.
 
 ### Story E.1: Responsive breakpoints for the profile picker
@@ -274,7 +274,7 @@ So that I don't abandon the wizard while waiting.
 ## Epic A: Any friend can get in
 
 A visitor with no seeded account can sign in with Google and land with a working
-account immediately — no admin step, no separate registration form. Registration is
+account immediately - no admin step, no separate registration form. Registration is
 open but hard-capped at 10 total users; a visitor arriving after the cap is full is
 captured to a waitlist rather than shown a dead-end message, and a freshly-created user
 sees a first-run state instead of the returning-user summary. Standalone: touches only
@@ -301,11 +301,11 @@ So that I don't need Nomi to manually add me before I can use the product.
 
 **Given** two visitors authenticate with Google at the same moment when exactly 1 slot remains under the cap
 **When** both requests race to create their `User` row
-**Then** exactly one of them succeeds and the other is treated as arriving after the cap was full — never both, never neither (FR3's atomicity, enforced at the DB level, not by an application-level count check)
+**Then** exactly one of them succeeds and the other is treated as arriving after the cap was full - never both, never neither (FR3's atomicity, enforced at the DB level, not by an application-level count check)
 
 **Given** an email that already matches an existing `Admin` or `User` row
 **When** that email signs in
-**Then** existing sign-in behavior is unchanged — the cap and the create-on-first-sign-in logic never apply to it
+**Then** existing sign-in behavior is unchanged - the cap and the create-on-first-sign-in logic never apply to it
 
 **Given** the cap value
 **When** it needs to change
@@ -313,7 +313,7 @@ So that I don't need Nomi to manually add me before I can use the product.
 
 **Given** an unauthenticated request to any route
 **When** it is made
-**Then** no `User` row can be created — row creation happens only inside `resolve_identity`, reached only from a successful Google auth callback, never from any other code path (NFR4's "the cap is the only admission control" holds only if nothing else can create a row)
+**Then** no `User` row can be created - row creation happens only inside `resolve_identity`, reached only from a successful Google auth callback, never from any other code path (NFR4's "the cap is the only admission control" holds only if nothing else can create a row)
 
 ### Story A.2: Waitlist capture when the cap is full
 
@@ -329,15 +329,15 @@ So that there's a chance I get invited when a slot opens up.
 
 **Given** I attempted to register and was captured to the waitlist
 **When** I view the result
-**Then** I see a screen that plainly states capacity is full **and** that my email was saved for future priority — not a generic error, not a blank page
+**Then** I see a screen that plainly states capacity is full **and** that my email was saved for future priority - not a generic error, not a blank page
 
 **Given** I already exist on the waitlist
 **When** I try to sign in again
-**Then** no duplicate waitlist row is created for the same email — the timestamp updates instead
+**Then** no duplicate waitlist row is created for the same email - the timestamp updates instead
 
 **Given** the waitlist is stored in the DB
 **When** this epic is done
-**Then** there is no admin screen to view it — that is a declared fast-follow, not a forgotten gap
+**Then** there is no admin screen to view it - that is a declared fast-follow, not a forgotten gap
 
 ### Story A.3: First-run state for a freshly self-registered user
 
@@ -358,10 +358,10 @@ So that I'm not looking at a blank returning-user summary with no history to sum
 ## Epic B: The digest actually lands in an inbox
 
 A user's weekly digest is delivered through a real email provider, configured the same
-way every other swappable adapter in this codebase is configured — no code change
+way every other swappable adapter in this codebase is configured - no code change
 outside `mail/`. Standalone: one new adapter class plus one factory branch. Story B.2
 (click tracking + an engagement view) was added 2026-08-11 during B.1's live-inbox
-verification — genuinely useful, but not required for B.1 to ship.
+verification - genuinely useful, but not required for B.1 to ship.
 
 ### Story B.1: Real email delivery adapter
 
@@ -370,7 +370,7 @@ So that the product works end-to-end instead of writing HTML to a local folder.
 
 **Acceptance Criteria:**
 
-**Given** `NEWSAGENT_EMAIL_SENDER` is set to the new provider's config value **[provider: TBD — Nomi to confirm before implementation]**
+**Given** `NEWSAGENT_EMAIL_SENDER` is set to the new provider's config value **[provider: TBD - Nomi to confirm before implementation]**
 **When** `send_pending_digests` calls `sender.send(to, subject, html_body)`
 **Then** the email is sent through the provider's API, implementing the existing `EmailSender` ABC exactly as-is, with no change to `pipeline/send.py` or any other pipeline module
 
@@ -384,11 +384,11 @@ So that the product works end-to-end instead of writing HTML to a local folder.
 
 **Given** the digest is Hebrew RTL HTML
 **When** it's sent through the new adapter
-**Then** rendering in a real inbox is manually verified at least once before this story is considered done (the exact gap GH #23 flags — this story closes it for the email-rendering slice only, not the full dogfood run)
+**Then** rendering in a real inbox is manually verified at least once before this story is considered done (the exact gap GH #23 flags - this story closes it for the email-rendering slice only, not the full dogfood run)
 
 **Given** the console sender remains available
 **When** `NEWSAGENT_EMAIL_SENDER=console`
-**Then** behavior is completely unchanged — the new adapter is additive, not a replacement of the existing dev path
+**Then** behavior is completely unchanged - the new adapter is additive, not a replacement of the existing dev path
 
 ### Story B.2: Know if anyone's reading the digest
 
@@ -400,31 +400,31 @@ So that I can tell whether the product is actually being used, not just sent.
 
 **Given** the existing open-tracking pixel (`GET /t/{token}.gif`, `Digest.opened_at`)
 **When** this story is scoped
-**Then** it is reused as-is — this story is about exposing that data and adding click
+**Then** it is reused as-is - this story is about exposing that data and adding click
 tracking, not rebuilding the open-tracking mechanism itself
 
 **Given** a sent digest contains links to articles and to preferences
 **When** the recipient clicks any of those links
 **Then** the click is recorded (which digest, which link, when) before redirecting them
-to the real, unchanged destination — the same shape as the existing pixel: an
+to the real, unchanged destination - the same shape as the existing pixel: an
 unguessable per-link token, an unauthenticated redirect endpoint, no visible difference
 to the recipient
 
 **Given** an operator wants to know whether digests are being read
 **When** they check
 **Then** they see, per digest (or aggregated per user/run), whether it was opened and
-which links were clicked — without writing a manual DB query. Exact surface (a CLI
+which links were clicked - without writing a manual DB query. Exact surface (a CLI
 report mirroring GH #19's `usage-report`, or a small admin screen) is an open
 implementation decision, not fixed by this story
 
 **Given** `pipeline/ranking.py` already reads `Digest.opened_at` as a signal
 **When** this story ships
-**Then** that usage is unaffected — no change to the ranking/affinity calculation
+**Then** that usage is unaffected - no change to the ranking/affinity calculation
 
 **Given** "how much of the digest was read" (scroll depth, time spent) was also asked
 about live
 **When** this story is scoped
-**Then** it is explicitly out of scope — a single open pixel is binary (opened /
+**Then** it is explicitly out of scope - a single open pixel is binary (opened /
 not-opened) by nature; scroll/attention tracking would need different instrumentation
 entirely and is not part of this story
 
@@ -448,13 +448,13 @@ So that a handful of bad articles don't burn LLM spend indefinitely.
 
 **Given** a new `summarize_attempts` integer column added to `Article` via an Alembic migration (AD-4), defaulting to 0 for every existing row
 **When** the migration runs
-**Then** no existing article's `summary_status` changes — this only adds the counter, and existing rows start fresh with it
+**Then** no existing article's `summary_status` changes - this only adds the counter, and existing rows start fresh with it
 
 **Given** an article's summarize call raises `LLMError`
 **When** the `summarize` pipeline stage handles it
 **Then** `summarize_attempts` increments by 1, in addition to today's existing `summary_status = "error"` handling
 
-**Given** an article's `summarize_attempts` reaches a configured max (3, matching `LLMProvider`'s own internal retry default — consistency, not a separate justification)
+**Given** an article's `summarize_attempts` reaches a configured max (3, matching `LLMProvider`'s own internal retry default - consistency, not a separate justification)
 **When** the failing attempt is recorded
 **Then** `summary_status` is set to a new terminal value (`"failed"`) instead of `"error"`, and `_SUMMARIZABLE` no longer selects it on any future run
 
@@ -484,19 +484,19 @@ So that I can see spend without re-reading raw logs, especially before Epic D ad
 
 **Given** usage rows exist across multiple past runs
 **When** the operator wants to see spend
-**Then** a new CLI command (e.g. `python -m newsagent.cli usage-report`) prints a summary — total units per stage, and/or per day — without opening any log file
+**Then** a new CLI command (e.g. `python -m newsagent.cli usage-report`) prints a summary - total units per stage, and/or per day - without opening any log file
 
 **Given** a stage's LLM calls partially fail (matching FR8's retries)
 **When** usage is recorded
-**Then** failed attempts' usage is included exactly as it already is in `provider.drain_usage()` today — no double-counting, no silent zero; this story persists what's already computed, it doesn't change the accounting mechanic itself
+**Then** failed attempts' usage is included exactly as it already is in `provider.drain_usage()` today - no double-counting, no silent zero; this story persists what's already computed, it doesn't change the accounting mechanic itself
 
 **Given** this table exists
 **When** Epic D's full-text extraction ships next
-**Then** it already gives visibility into whether extraction meaningfully raised spend per article — this is what makes Epic D buildable per the approved order
+**Then** it already gives visibility into whether extraction meaningfully raised spend per article - this is what makes Epic D buildable per the approved order
 
 ## Epic D: Every digest is worth reading
 
-Summaries are written from the actual article, not a headline — full article text is
+Summaries are written from the actual article, not a headline - full article text is
 fetched and extracted for any article that already passed relevance filtering, with a
 non-fatal fallback to today's RSS-snippet behavior on failure. Digest selection
 guarantees at least one slot per subscribed topic that has an eligible candidate, so a
@@ -504,7 +504,7 @@ high-volume topic can no longer take every slot in a week. Depends on Epic C: NF
 requires usage accounting to exist before extraction can ship, so this epic cannot start
 before Epic C is done. Split into three stories rather than two after final validation
 flagged the original D.1 as oversized (new dependency + fetch/parse/store/retry logic +
-concurrency/timeout/politeness all in one story) — D.2 now carries the
+concurrency/timeout/politeness all in one story) - D.2 now carries the
 networking-politeness concern on its own.
 
 ### Story D.1: Full-text extraction with a terminal failure state and a spend cap
@@ -514,25 +514,25 @@ So that the digest actually reflects what happened.
 
 **Acceptance Criteria:**
 
-**Given** new columns on `Article` — `extraction_status` (`pending`/`done`/`failed`, same shape as `relevance_status`/`summary_status`) and `extraction_attempts` (integer, default 0) — added via an Alembic migration
+**Given** new columns on `Article` - `extraction_status` (`pending`/`done`/`failed`, same shape as `relevance_status`/`summary_status`) and `extraction_attempts` (integer, default 0) - added via an Alembic migration
 **When** the migration runs
 **Then** existing articles start at `pending`/`0`, and no other status column changes
 
 **Given** an article with `relevance_status == relevant` and `extraction_status == pending`
 **When** the new `extract` CLI stage runs
-**Then** the source page is fetched and parsed, and on success the extracted text — length-capped before it could ever reach a prompt (NFR3; cap value documented in the story's implementation notes) — is stored in `full_text`, and `extraction_status` becomes `done`
+**Then** the source page is fetched and parsed, and on success the extracted text - length-capped before it could ever reach a prompt (NFR3; cap value documented in the story's implementation notes) - is stored in `full_text`, and `extraction_status` becomes `done`
 
 **Given** the fetch or extraction fails
 **When** that happens
-**Then** `extraction_attempts` increments, `full_text` stays null, and the run continues to the next article without aborting (FR6). Once `extraction_attempts` reaches a configured cap (2), `extraction_status` becomes `failed` and is never re-fetched again — the same pattern as Story C.1, applied here so this story doesn't reintroduce the exact endless-retry problem Epic C exists to fix
+**Then** `extraction_attempts` increments, `full_text` stays null, and the run continues to the next article without aborting (FR6). Once `extraction_attempts` reaches a configured cap (2), `extraction_status` becomes `failed` and is never re-fetched again - the same pattern as Story C.1, applied here so this story doesn't reintroduce the exact endless-retry problem Epic C exists to fix
 
 **Given** an article whose extraction never ran, or failed permanently
 **When** `summarize` runs
-**Then** the fallback to `rss_summary`/title is exactly what it is today — `summarize.py` itself is unchanged; this AC exists to catch a regression, not to add new behavior
+**Then** the fallback to `rss_summary`/title is exactly what it is today - `summarize.py` itself is unchanged; this AC exists to catch a regression, not to add new behavior
 
 **Given** this story introduces a new production dependency (e.g. `trafilatura`) to do the extraction
 **When** implementation begins
-**Then** that dependency is confirmed explicitly before it's added — flagged here so it isn't discovered mid-implementation
+**Then** that dependency is confirmed explicitly before it's added - flagged here so it isn't discovered mid-implementation
 
 ### Story D.2: Bounded, polite concurrent fetching
 
@@ -544,11 +544,11 @@ So that a pipeline run can't hang on one slow source or get an approved source's
 
 **Given** Story D.1's `extract` stage exists
 **When** it fetches an article whose source is slow or unresponsive
-**Then** a per-request timeout is enforced — a request that hangs past the timeout is treated as a failure, incrementing `extraction_attempts` exactly per D.1's existing mechanic
+**Then** a per-request timeout is enforced - a request that hangs past the timeout is treated as a failure, incrementing `extraction_attempts` exactly per D.1's existing mechanic
 
 **Given** the `extract` stage processes many articles in one invocation
 **When** it fetches sources
-**Then** concurrent in-flight fetches are bounded to a configured limit — not fully serial, not unbounded
+**Then** concurrent in-flight fetches are bounded to a configured limit - not fully serial, not unbounded
 
 **Given** a request is sent to a source's site
 **When** it's made
@@ -572,16 +572,16 @@ So that one high-volume topic can't win every slot in my digest.
 
 **Given** more topics with candidates than available slots (N > L)
 **When** `select_top` runs
-**Then** the guaranteed slots go to the topics ranked by their single best-scoring candidate — not by raw global score — until slots run out; any remaining slots are filled by global score among the leftover candidates
+**Then** the guaranteed slots go to the topics ranked by their single best-scoring candidate - not by raw global score - until slots run out; any remaining slots are filled by global score among the leftover candidates
 
 **Given** a subscribed topic has zero eligible candidates this run
 **When** `select_top` runs
-**Then** no slot is wasted trying to cover it — the guarantee applies only to topics that have something to show
+**Then** no slot is wasted trying to cover it - the guarantee applies only to topics that have something to show
 
 **Given** a same-day rerun that already attached some articles to this digest (`digest.py`'s existing `already_attached` accounting)
 **When** the rerun fills the remaining slots
-**Then** the diversity floor is computed against topics not yet represented among the digest's already-attached articles — not recomputed from zero
+**Then** the diversity floor is computed against topics not yet represented among the digest's already-attached articles - not recomputed from zero
 
 **Given** all eligible candidates belong to a single topic (as in the existing fixtures in `test_ranking.py`, which default to `source_id=1`)
 **When** `select_top` runs
-**Then** behavior is identical to today's pure top-N-by-score selection, and the existing tests for that behavior continue to pass unchanged — a single topic gives the diversity floor nothing to do
+**Then** behavior is identical to today's pure top-N-by-score selection, and the existing tests for that behavior continue to pass unchanged - a single topic gives the diversity floor nothing to do

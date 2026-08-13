@@ -103,7 +103,7 @@ def test_find_field_by_name_returns_none_for_uncurated_text(db: Session):
 
 
 def test_record_pending_suggestion_does_not_commit(db: Session):
-    """profile.save_profile owns the single commit — this helper must only stage
+    """profile.save_profile owns the single commit - this helper must only stage
     the write, so a later failure rolls the whole save back (AC #9)."""
     record_pending_suggestion(db, kind="field", field_id=None, text="Marine Biology")
     db.rollback()
@@ -143,7 +143,7 @@ def test_seed_default_roles_is_idempotent(db: Session):
 
 
 def test_normalize_strips_invisible_bidi_marks():
-    """A Hebrew/Arabic IME inserts category-Cf marks that render as nothing —
+    """A Hebrew/Arabic IME inserts category-Cf marks that render as nothing -
     without stripping them the queue grows lookalike duplicate rows."""
     with_rlm = "‏Tech‎"
     assert normalize_taxonomy_text(with_rlm) == normalize_taxonomy_text("Tech")
@@ -156,7 +156,7 @@ def test_normalize_unifies_unicode_composition():
 
 
 def test_open_suggestions_are_unique_per_field_row(db: Session):
-    """The partial unique index must cover kind='field' rows too — their
+    """The partial unique index must cover kind='field' rows too - their
     field_id is always NULL, and NULLs never collide in a plain unique index."""
     record_pending_suggestion(db, kind="field", field_id=None, text="Marine Biology")
     db.commit()
@@ -194,7 +194,7 @@ def test_open_suggestions_are_unique_per_role_row(db: Session):
 
 def test_decided_suggestions_are_exempt_from_the_unique_index(db: Session):
     """The same text may legitimately be rejected, resubmitted and rejected
-    again — only open rows are constrained."""
+    again - only open rows are constrained."""
     normalized = normalize_taxonomy_text("Marine Biology")
     for _ in range(2):
         db.add(
@@ -273,7 +273,7 @@ def test_list_pending_suggestions_excludes_decided_rows(db: Session):
 
 
 def test_list_pending_suggestions_groups_normalized_variants_with_a_count(db: Session):
-    """AC #2 — the queue must never show the same normalized text twice; the
+    """AC #2 - the queue must never show the same normalized text twice; the
     write side already merged them (AD-8), so the read side just reports."""
     record_pending_suggestion(db, kind="field", field_id=None, text="Marine Biology")
     record_pending_suggestion(db, kind="field", field_id=None, text="  marine   biology ")
@@ -297,7 +297,7 @@ def test_list_pending_suggestions_ranks_most_requested_first(db: Session):
 
 
 def test_list_pending_suggestions_falls_back_to_normalized_text(db: Session):
-    """raw_text is nullable — rows written before that column existed have none,
+    """raw_text is nullable - rows written before that column existed have none,
     and an admin still needs something readable to decide on."""
     db.add(
         PendingTaxonomySuggestion(
@@ -414,7 +414,7 @@ def test_promoting_with_a_name_override_curates_the_edited_name(db: Session):
     decide_pending_suggestion(db, suggestion_id, status="approved", name="Marine Biology")
 
     assert [f.name for f in list_fields(db)] == ["Marine Biology"]
-    # The queue row itself is a record of what the user typed — never rewritten.
+    # The queue row itself is a record of what the user typed - never rewritten.
     assert db.get(PendingTaxonomySuggestion, suggestion_id).normalized_text == "marine biology"
 
 
@@ -474,7 +474,7 @@ def test_resubmitting_decided_text_opens_a_fresh_row(db: Session):
 
 
 class _FakeSource:
-    """Minimal double standing in for get_suggestion_source()'s return value —
+    """Minimal double standing in for get_suggestion_source()'s return value -
     only suggest_roles is exercised here, matching how LLMSuggestionSource's
     own contract tests avoid spinning up the real HTTP path where possible."""
 
@@ -540,7 +540,7 @@ def test_suggest_roles_for_field_caps_curated_alone_at_ten_and_skips_llm_call(
 
     assert len(views) == ROLE_SUGGESTION_CAP
     assert all(v.is_curated for v in views)
-    assert source.calls == []  # LLM never called — nothing for it to contribute
+    assert source.calls == []  # LLM never called - nothing for it to contribute
 
 
 def test_suggest_roles_for_field_caps_curated_plus_llm_fill_at_ten(

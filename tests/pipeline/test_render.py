@@ -103,7 +103,7 @@ def test_total_reading_time_sums_displayed_articles(db: Session):
 
 
 def test_render_does_not_recap_or_drop_articles(db: Session):
-    # Selection/capping happens at build time (#25) — render must show
+    # Selection/capping happens at build time (#25) - render must show
     # digest.articles as-is, however many there are, with nothing dropped.
     articles = [add_article(db, url_suffix=str(i), minutes=1) for i in range(8)]
     digest = build_digest(db, articles)
@@ -114,7 +114,7 @@ def test_render_does_not_recap_or_drop_articles(db: Session):
 def test_reading_time_grouped_with_its_hebrew_unit_in_one_bidi_isolate(db: Session):
     """A bare digit isolated on its own (<bdi>1</bdi> דק' קריאה) could drift
     away from its Hebrew unit during bidi resolution and end up positioned
-    next to the wrong neighbor — reported live as "1 · TechCrunch דק' קריאה"
+    next to the wrong neighbor - reported live as "1 · TechCrunch דק' קריאה"
     instead of "TechCrunch · 1 דק' קריאה". Grouping the digit and its unit
     into a single isolate keeps them atomic."""
     digest = build_digest(db, [add_article(db, url_suffix="a", minutes=1)])
@@ -199,7 +199,7 @@ def test_lead_image_rendered_when_present(db: Session):
 
 
 def test_lead_image_alt_is_plain_title_not_markup(db: Session):
-    # alt must be plain text — the <bdi>/<strong> markup that title_he carries
+    # alt must be plain text - the <bdi>/<strong> markup that title_he carries
     # cannot live inside an HTML attribute.
     digest = build_digest(db, [add_article(db, url_suffix="a", image_url="https://img/x.jpg")])
     html = render_digest_html(digest, db)

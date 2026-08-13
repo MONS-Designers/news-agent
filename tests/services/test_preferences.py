@@ -75,7 +75,7 @@ def test_list_topic_choices_marks_subscribed_vs_not(multi_topic_db: Session):
 
 def test_list_topic_choices_hides_other_users_pending_topic(multi_topic_db: Session):
     """A pending Topic created by one user must not leak into a different
-    user's preferences grid — status only gates visibility to *other* users,
+    user's preferences grid - status only gates visibility to *other* users,
     and this grid is also what Step 3's failed-suggestion fallback renders."""
     multi_topic_db.add(User(email="creator@example.com"))
     multi_topic_db.commit()
@@ -164,7 +164,7 @@ def test_set_preferences_over_cap_raises(five_topic_db: Session):
 
 def test_set_preferences_cap_checked_before_unknown_id(five_topic_db: Session):
     """A request with both an over-cap count and an unknown id reports the cap
-    violation, not the unknown-id one — the two checks' order is deterministic."""
+    violation, not the unknown-id one - the two checks' order is deterministic."""
     user = _user(five_topic_db)
     ids = [t for (t,) in five_topic_db.execute(select(Topic.id))][: MAX_TOPICS + 1]
     ids[-1] = 999999  # swap in an unknown id, keeping the count over the cap
@@ -174,7 +174,7 @@ def test_set_preferences_cap_checked_before_unknown_id(five_topic_db: Session):
 
 
 def test_set_preferences_zero_ids_still_succeeds(five_topic_db: Session):
-    """The cap is a maximum, not a minimum — saving nothing stays allowed."""
+    """The cap is a maximum, not a minimum - saving nothing stays allowed."""
     user = _user(five_topic_db)
     choices = set_preferences(five_topic_db, user, [])
     assert all(not c.subscribed for c in choices)
@@ -193,7 +193,7 @@ def test_set_preferences_creates_pending_topic_from_new_name(multi_topic_db: Ses
 
 
 def test_set_preferences_new_name_reuses_existing_topic(multi_topic_db: Session):
-    """get-or-create by exact name (whitespace-strip only) — a new-name pick
+    """get-or-create by exact name (whitespace-strip only) - a new-name pick
     that matches an existing Topic must not create a duplicate row."""
     user = _user(multi_topic_db)
     ai_id = _topic_id(multi_topic_db, "AI")
@@ -235,7 +235,7 @@ def test_set_preferences_three_ids_plus_two_new_names_over_cap_raises(five_topic
 
 def test_set_preferences_over_cap_new_names_create_no_orphan_topics(multi_topic_db: Session):
     """A save rejected for exceeding the cap must not leave any invented Topic
-    row committed — the cap check runs before any Topic is created, not after."""
+    row committed - the cap check runs before any Topic is created, not after."""
     user = _user(multi_topic_db)
 
     with pytest.raises(TopicCapExceededError):
@@ -251,7 +251,7 @@ def test_set_preferences_over_cap_new_names_create_no_orphan_topics(multi_topic_
 
 def test_set_preferences_oversized_new_name_list_creates_no_topics(multi_topic_db: Session):
     """An unbounded new_topic_names list must not be able to create an
-    unbounded number of pending Topic rows — the cap check runs first."""
+    unbounded number of pending Topic rows - the cap check runs first."""
     user = _user(multi_topic_db)
     names = [f"Topic {i}" for i in range(50)]
 
@@ -274,7 +274,7 @@ def test_set_preferences_new_name_too_long_raises(multi_topic_db: Session):
 
 def test_set_preferences_duplicate_ids_in_topic_ids_not_double_counted(multi_topic_db: Session):
     """Repeats of the same id in topic_ids must count once toward the cap, not
-    once per repetition — the pre-resolution cap check dedupes before counting."""
+    once per repetition - the pre-resolution cap check dedupes before counting."""
     user = _user(multi_topic_db)
     ai_id = _topic_id(multi_topic_db, "AI")
 

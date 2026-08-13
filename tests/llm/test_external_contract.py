@@ -1,4 +1,4 @@
-"""ExternalLLMProvider passing the shared contract suite (CAP-5) — offline via
+"""ExternalLLMProvider passing the shared contract suite (CAP-5) - offline via
 httpx.MockTransport, keyed on each fixed input article's title so every
 contract scenario gets the canned response it needs."""
 

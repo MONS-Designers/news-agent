@@ -16,7 +16,7 @@ def create_app() -> FastAPI:
         domain=settings.session_cookie_domain or None,
     )
     # Needed once frontend and backend are split across subdomains (e.g.
-    # app.example.com / api.example.com) — same-origin deploys work fine
+    # app.example.com / api.example.com) - same-origin deploys work fine
     # without this, since the browser never treats same-origin requests as
     # cross-site to begin with.
     app.add_middleware(

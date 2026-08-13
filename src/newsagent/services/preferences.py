@@ -11,12 +11,12 @@ from newsagent.models.topic import STATUS_APPROVED as TOPIC_STATUS_APPROVED
 from newsagent.models.topic import STATUS_PENDING as TOPIC_STATUS_PENDING
 from newsagent.services import sources
 
-# Platform-wide hard cap (FR-10), enforced here — the single mutation point
-# for UserTopicPreference — so every save path (old raw toggle grid, new
+# Platform-wide hard cap (FR-10), enforced here - the single mutation point
+# for UserTopicPreference - so every save path (old raw toggle grid, new
 # guided flow) shares one rule (AD-9).
 MAX_TOPICS = 4
 
-# Mirrors services/profile.py's MAX_NAME_LENGTH — an invented Topic name is
+# Mirrors services/profile.py's MAX_NAME_LENGTH - an invented Topic name is
 # just as unbounded an input as a Field/Role "Other" submission, so it gets
 # the same cap rather than being stored without one.
 MAX_NAME_LENGTH = 100
@@ -36,7 +36,7 @@ class TopicCapExceededError(ValueError):
 
 @dataclass(frozen=True)
 class TopicChoice:
-    """A topic paired with whether the user is currently subscribed — the unit
+    """A topic paired with whether the user is currently subscribed - the unit
     the preferences page renders as one toggle."""
 
     topic_id: int
@@ -46,7 +46,7 @@ class TopicChoice:
 
 def list_topic_choices(db: Session, user: User) -> list[TopicChoice]:
     """Every `approved` Topic, plus any `pending`/`rejected` Topic this user is
-    personally subscribed to — status only gates visibility to *other* users,
+    personally subscribed to - status only gates visibility to *other* users,
     never the owning user's own pick (spec boundary), so an other user's still-
     pending Topic must not leak into this list."""
     subscribed_ids = {pref.topic_id for pref in user.topic_preferences}
@@ -65,15 +65,15 @@ def set_preferences(
     ``new_topic_names``.
 
     Idempotent and source-agnostic: the ids may come from a human toggle or a
-    future LLM suggestion — this function doesn't care. Each name in
+    future LLM suggestion - this function doesn't care. Each name in
     ``new_topic_names`` is resolved to a real `Topic` row via `add_topic`'s
     get-or-create-by-exact-name idempotency (whitespace-strip only, no fuzzy
     matching), created as `status='pending'` if new, and folded into the
-    desired id set before the cap/known-id checks below — so the cap counts
+    desired id set before the cap/known-id checks below - so the cap counts
     the combined set of existing-id picks and new-name picks correctly.
 
     The cap (and the per-name length check) is evaluated on the raw,
-    pre-resolution counts *before* any `Topic` row is created — a rejected
+    pre-resolution counts *before* any `Topic` row is created - a rejected
     over-cap save must never leave an orphan `pending` Topic committed with
     no owning preference, and an oversized ``new_topic_names`` list must be
     rejected before it can create an unbounded number of rows. Raises
@@ -117,7 +117,7 @@ def subscribe(db: Session, email: str, topic_name: str) -> tuple[UserTopicPrefer
     """Get-or-create a subscription. Raises ValueError for unknown user/topic."""
     user = db.scalar(select(User).where(User.email == email.strip().lower()))
     if user is None:
-        raise ValueError(f"No user with email {email!r} — add them with add-user first")
+        raise ValueError(f"No user with email {email!r} - add them with add-user first")
     topic = db.scalar(select(Topic).where(Topic.name == topic_name))
     if topic is None:
         known = ", ".join(t.name for t in db.scalars(select(Topic)))

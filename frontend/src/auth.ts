@@ -1,4 +1,4 @@
-// Shared auth state — single owner of "who is signed in" for the whole app.
+// Shared auth state - single owner of "who is signed in" for the whole app.
 // Views and the router guard read from here instead of fetching /auth/me themselves.
 import { ref } from "vue";
 import { getMe, logout, type Me } from "@/api/client";

@@ -138,7 +138,7 @@ def test_other_role_suggestion_is_scoped_to_the_curated_field(db: Session):
 
 
 def test_other_role_under_uncurated_other_field_gets_null_field_id(db: Session):
-    """AC #5 — an unmatchable Field must not lose the Role submission."""
+    """AC #5 - an unmatchable Field must not lose the Role submission."""
     user = _user(db)
 
     _save(
@@ -233,7 +233,7 @@ def test_experience_bucket_none_leaves_existing_value_untouched(db: Session):
 
 
 def test_experience_bucket_never_creates_a_suggestion(db: Session):
-    """No 'Other' concept for buckets — a fixed set has nothing to queue."""
+    """No 'Other' concept for buckets - a fixed set has nothing to queue."""
     add_field(db, "Tech")
     user = _user(db)
     _save(db, user, experience_bucket="10+")
@@ -263,7 +263,7 @@ def test_blank_interest_free_text_stores_none(db: Session, blank: str):
 
 
 def test_interest_free_text_none_leaves_existing_value_untouched(db: Session):
-    """None means 'not submitted' — distinct from submitting blank text."""
+    """None means 'not submitted' - distinct from submitting blank text."""
     add_field(db, "Tech")
     user = _user(db)
     _save(db, user, interest_free_text="something")
@@ -422,7 +422,7 @@ def test_other_text_is_stored_trimmed(db: Session):
 
 
 def test_rejected_save_persists_nothing(db: Session):
-    """AC #9 — the profile write and its suggestion upserts share one commit."""
+    """AC #9 - the profile write and its suggestion upserts share one commit."""
     user = _user(db)
 
     with pytest.raises(ValueError):
@@ -466,7 +466,7 @@ def test_second_successful_save_bumps_seq_again(db: Session):
 
 
 class _FakeSource:
-    """Minimal double for get_suggestion_source()'s return value — only
+    """Minimal double for get_suggestion_source()'s return value - only
     suggest_prompts is exercised here."""
 
     def __init__(self, texts: list[str] | None = None, error: Exception | None = None):
@@ -510,7 +510,7 @@ def test_suggest_prompts_for_user_returns_empty_on_suggestion_error(
 
 def test_suggest_prompts_for_user_caps_at_three(db: Session, monkeypatch: pytest.MonkeyPatch):
     """FR-5: "up to 3" is a contract of the service, not just a frontend
-    .slice(0, 3) — the API itself must not return more."""
+    .slice(0, 3) - the API itself must not return more."""
     user = _user(db)
     source = _FakeSource(texts=[f"Prompt {i}" for i in range(5)])
     monkeypatch.setattr(profile_module, "get_suggestion_source", lambda: source)

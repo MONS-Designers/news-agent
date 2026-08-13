@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from newsagent.models.user_topic_preference import UserTopicPreference
 
 # Topic.status values (plain string column, mirrors Source.status). REJECTED is
-# unused by this spec — defined now so the deferred admin-approval follow-up
+# unused by this spec - defined now so the deferred admin-approval follow-up
 # needs no further migration.
 STATUS_PENDING = "pending"
 STATUS_APPROVED = "approved"

@@ -26,7 +26,7 @@ class Digest(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     date: Mapped[date_] = mapped_column(Date)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
-    # Opaque, unguessable — never the sequential id — so the public open-tracking
+    # Opaque, unguessable - never the sequential id - so the public open-tracking
     # endpoint can't be walked to forge opens for other users' digests.
     tracking_token: Mapped[str] = mapped_column(
         String, unique=True, default=_generate_tracking_token

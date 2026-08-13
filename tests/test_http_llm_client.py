@@ -1,4 +1,4 @@
-"""Unit tests for the shared chat-completions HTTP helper — offline only, via
+"""Unit tests for the shared chat-completions HTTP helper - offline only, via
 httpx.MockTransport. No error mapping happens here (that's each adapter's own
 job); this only checks the request shape and that httpx errors propagate raw.
 """
@@ -31,7 +31,7 @@ def test_happy_path_returns_the_content():
 
 
 def test_token_counts_are_read_from_the_usage_block():
-    """GH #19: the counts were already flowing through the reports and the CLI —
+    """GH #19: the counts were already flowing through the reports and the CLI -
     the real provider just never populated them, so runs printed 0 in / 0 out."""
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -63,7 +63,7 @@ def test_token_counts_are_read_from_the_usage_block():
 )
 def test_missing_or_malformed_usage_degrades_to_none(body_extra):
     """A good completion must never fail because the backend omitted or
-    mangled its accounting block — local models routinely do."""
+    mangled its accounting block - local models routinely do."""
 
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(
@@ -130,7 +130,7 @@ def test_request_shape_includes_model_messages_and_auth_header():
 def test_envelope_without_choices_logs_the_body_and_reraises(caplog):
     """OpenRouter reports upstream provider failures as HTTP 200 with an
     {"error": ...} body and no "choices". The caller only ever sees a KeyError,
-    so this layer — the last one holding the body — has to log it."""
+    so this layer - the last one holding the body - has to log it."""
 
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json={"error": {"message": "upstream is down"}})
@@ -214,7 +214,7 @@ def test_on_usage_fires_even_when_choices_extraction_fails(caplog):
 
 def test_on_usage_does_not_fire_when_no_json_body_was_parsed():
     """A non-JSON response (e.g. an HTML error page from a proxy) never
-    reaches the usage-extraction step — there is nothing to report."""
+    reaches the usage-extraction step - there is nothing to report."""
     calls = []
 
     def handler(request: httpx.Request) -> httpx.Response:

@@ -1,6 +1,6 @@
 """Abstract contract test suite (CAP-5).
 
-Every adapter — including the mock — must pass these. A new adapter earns
+Every adapter - including the mock - must pass these. A new adapter earns
 trust by subclassing and providing an instance via the `provider` fixture;
 nothing here may depend on adapter internals.
 """

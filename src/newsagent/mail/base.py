@@ -1,4 +1,4 @@
-"""Email sender contract — same swappable-adapter pattern as newsagent.llm.
+"""Email sender contract - same swappable-adapter pattern as newsagent.llm.
 
 The pipeline sends only through this interface; a real provider (Resend, SES,
 SMTP) is added later as another adapter with no pipeline changes.

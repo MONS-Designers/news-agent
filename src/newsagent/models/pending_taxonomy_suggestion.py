@@ -22,7 +22,7 @@ KIND_ROLE = "role"
 class PendingTaxonomySuggestion(Base):
     """A free-text "Other" Field or Role submission, queued for admin review.
 
-    One row per unique (kind, field_id, normalized_text, status) — a resubmission
+    One row per unique (kind, field_id, normalized_text, status) - a resubmission
     matching an existing *pending* row increments its submission_count; a
     resubmission matching an already-decided (approved/rejected) row creates a
     fresh pending row instead of reopening or mutating the decided one.
@@ -32,11 +32,11 @@ class PendingTaxonomySuggestion(Base):
 
     # DB backstop for AD-8's "one pending row per normalized text" rule: the
     # service's SELECT-then-INSERT is not atomic, so two concurrent submissions
-    # would otherwise create two count=1 rows instead of one at 2 — corrupting
+    # would otherwise create two count=1 rows instead of one at 2 - corrupting
     # the demand signal Epic 2 ranks by.
     #
     # COALESCE, not a bare field_id: NULLs never compare equal in a unique
-    # index, and kind='field' rows always carry field_id=NULL — a plain
+    # index, and kind='field' rows always carry field_id=NULL - a plain
     # three-column index would silently protect Role rows only.
     #
     # Partial (WHERE status='pending') so decided rows stay outside it: the same

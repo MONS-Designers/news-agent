@@ -27,7 +27,7 @@ class DigestEngagement:
 
 
 def list_digest_engagement(db: Session, limit: int = 100) -> list[DigestEngagement]:
-    """Sent digests, most recent first. Unsent digests are excluded — their
+    """Sent digests, most recent first. Unsent digests are excluded - their
     links don't exist yet (created at render time, immediately before send)."""
     digests = db.scalars(
         select(Digest)

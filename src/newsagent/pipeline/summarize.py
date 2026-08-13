@@ -3,7 +3,7 @@ relevant articles through the LLM provider.
 
 Twin of the relevance stage: same state machine shape (pending/error enter;
 summarized/refused terminal), same per-article commit, same usage aggregation.
-Gated on relevance_status == relevant — summarizing anything else is waste.
+Gated on relevance_status == relevant - summarizing anything else is waste.
 All four SummaryResult fields are persisted onto Article so digest rendering
 (#13) never recomputes anything.
 """
@@ -27,7 +27,7 @@ SUMMARY_PENDING = "pending"
 SUMMARY_DONE = "summarized"
 SUMMARY_REFUSED = "refused"
 SUMMARY_ERROR = "error"
-# Terminal like refused — reached once summarize_attempts hits the configured
+# Terminal like refused - reached once summarize_attempts hits the configured
 # max (Epic C, Story C.1). Deliberately excluded from _SUMMARIZABLE below.
 SUMMARY_FAILED = "failed"
 
@@ -44,8 +44,8 @@ class SummarizeReport:
 
 
 def _accumulate_usage(report: SummarizeReport, provider: LLMProvider) -> None:
-    """Drain whatever the provider billed for the article just processed —
-    success or failure — so a malformed-output error doesn't read as free."""
+    """Drain whatever the provider billed for the article just processed -
+    success or failure - so a malformed-output error doesn't read as free."""
     for usage in provider.drain_usage():
         report.usage_input_units += usage.input_units
         report.usage_output_units += usage.output_units
@@ -53,10 +53,10 @@ def _accumulate_usage(report: SummarizeReport, provider: LLMProvider) -> None:
 
 def _record_failure(article: Article, report: SummarizeReport) -> None:
     """Increment the bounded-retry counter for a failed attempt (LLMError, or
-    the empty-summary-without-refusal provider bug below — both are "the call
+    the empty-summary-without-refusal provider bug below - both are "the call
     didn't produce a usable result"). Once the counter reaches the configured
     max, the article's status becomes the terminal "failed" instead of
-    "error" so _SUMMARIZABLE stops selecting it — never retried, never billed
+    "error" so _SUMMARIZABLE stops selecting it - never retried, never billed
     for again."""
     article.summarize_attempts += 1
     if article.summarize_attempts >= settings.max_summarize_attempts:
@@ -69,7 +69,7 @@ def _record_failure(article: Article, report: SummarizeReport) -> None:
 def summarize_relevant_articles(db: Session, provider: LLMProvider) -> SummarizeReport:
     report = SummarizeReport()
 
-    # Skip articles whose source's topic nobody is subscribed to (GH #45) —
+    # Skip articles whose source's topic nobody is subscribed to (GH #45) -
     # this is the paid LLM stage, so it's the most expensive place this
     # waste could otherwise happen.
     subscribed_topic_ids = select(UserTopicPreference.topic_id)
@@ -103,7 +103,7 @@ def summarize_relevant_articles(db: Session, provider: LLMProvider) -> Summarize
         elif not result.summary_he.strip():
             # An empty summary without a Refusal is a provider bug, not a value.
             _record_failure(article, report)
-            logger.warning("Empty summary for article %s — treating as error", article.id)
+            logger.warning("Empty summary for article %s - treating as error", article.id)
         else:
             article.summary_he = result.summary_he
             article.title_he = result.title_he

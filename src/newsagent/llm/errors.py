@@ -1,6 +1,6 @@
 """Interface-owned error hierarchy, classified by origin.
 
-Adapters translate vendor-specific exceptions into these — no vendor exception
+Adapters translate vendor-specific exceptions into these - no vendor exception
 type may cross the interface boundary. `transient` marks errors the base class
 retries internally before surfacing.
 """

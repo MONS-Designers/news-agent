@@ -1,4 +1,4 @@
-"""Digest delivery opt-out (GH #46) — a self-service on/off switch,
+"""Digest delivery opt-out (GH #46) - a self-service on/off switch,
 independent of *which* topics a user picks (that's services/preferences.py).
 """
 

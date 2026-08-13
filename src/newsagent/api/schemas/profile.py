@@ -20,7 +20,7 @@ class ProfileOut(BaseModel):
 
 
 class TopicSuggestionsOut(BaseModel):
-    """GET /me/topic-suggestions — the only read path for suggestion state
+    """GET /me/topic-suggestions - the only read path for suggestion state
     (AD-7). Deliberately not merged into ProfileOut."""
 
     model_config = ConfigDict(from_attributes=True)

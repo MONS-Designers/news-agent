@@ -4,7 +4,7 @@ every field rendered here was persisted by #11/#12/#25, so nothing is
 recomputed or re-selected.
 
 Keyword emphasis is applied safely: bullet text is HTML-escaped first, then
-``**markdown**`` markers become ``<strong>`` — provider output can never inject
+``**markdown**`` markers become ``<strong>`` - provider output can never inject
 markup.
 """
 
@@ -35,17 +35,17 @@ _HEBREW_MONTHS = [
 
 # Per-topic category tag: Hebrew label + accent color. Unknown topics fall back.
 # Colors chosen (and verified) to clear WCAG AA 4.5:1 against the #0b1020 email
-# background — see DESIGN.md.Colors in the ux-news-agent-2026-07-20 spine.
+# background - see DESIGN.md.Colors in the ux-news-agent-2026-07-20 spine.
 _TOPIC_LABELS = {"AI": "בינה מלאכותית", "Cybersecurity": "סייבר", "Space": "חלל"}
 _TOPIC_COLORS = {"AI": "#4ade80", "Cybersecurity": "#f87171", "Space": "#818cf8"}
 _DEFAULT_TOPIC_COLOR = "#94a3b8"
 
 # Punchline legibility cap (DESIGN.md: Gveret Levin is a connected handwriting
-# face — keep it short so it stays charming instead of straining to read).
+# face - keep it short so it stays charming instead of straining to read).
 _MAX_PUNCHLINE_CHARS = 60
 
 _BOLD = re.compile(r"\*\*(.+?)\*\*")
-# Embedded LTR runs inside Hebrew copy (brand names, "GPT-4", "40%") — wrapped in
+# Embedded LTR runs inside Hebrew copy (brand names, "GPT-4", "40%") - wrapped in
 # <bdi> so mixed-direction text doesn't reorder unpredictably next to Hebrew
 # punctuation/numerals.
 _LATIN_RUN = re.compile(r"[A-Za-z][A-Za-z0-9%$.,'\-]*|\d+%")
@@ -57,7 +57,7 @@ def _hebrew_date(value) -> str:
 
 def _wrap_bidi_runs(text: str) -> str:
     """Escape text to HTML, wrapping embedded Latin runs in <bdi> for bidi
-    safety. Splits and escapes each segment separately on the RAW text first —
+    safety. Splits and escapes each segment separately on the RAW text first -
     running the Latin regex on already-escaped text would match letters inside
     entity references (e.g. "lt" in "&lt;") and corrupt them."""
     parts = []
@@ -72,7 +72,7 @@ def _wrap_bidi_runs(text: str) -> str:
 
 def _emphasize(text: str) -> Markup:
     """Escape + bidi-wrap, then turn **markdown** into <strong>. Safe for
-    provider output — escaping always happens before any tag is inserted, so
+    provider output - escaping always happens before any tag is inserted, so
     nothing the provider writes can inject markup."""
     bidi_safe = _wrap_bidi_runs(text)
     return Markup(_BOLD.sub(lambda m: f"<strong>{m.group(1)}</strong>", bidi_safe))

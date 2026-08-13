@@ -136,7 +136,7 @@ def test_usage_is_aggregated(db: Session):
 class BillsThenFailsProvider(MockLLMProvider):
     """Simulates GH #19's actual gap: the provider billed real tokens for this
     call (a valid HTTP 200 with a usage block) but the call still ends in
-    LLMProviderError — e.g. GH #38's malformed-output cases. Before this fix
+    LLMProviderError - e.g. GH #38's malformed-output cases. Before this fix
     such a call reported 0 usage, hiding exactly the failures most likely to
     be expensive (see #41's 67k-char runaway)."""
 
@@ -200,7 +200,7 @@ def test_empty_summary_also_counts_toward_terminal_state(
     db: Session, monkeypatch: pytest.MonkeyPatch
 ):
     """The empty-summary-without-refusal branch is a provider bug indistinguishable
-    from a deterministic LLMError from the retry-bound's point of view — it must
+    from a deterministic LLMError from the retry-bound's point of view - it must
     count toward the same terminal state, or a provider that always returns an
     empty string would retry an article forever."""
     monkeypatch.setattr(settings, "max_summarize_attempts", 1)
@@ -212,7 +212,7 @@ def test_empty_summary_also_counts_toward_terminal_state(
 
 
 def test_articles_with_no_subscribed_topic_are_skipped(db: Session):
-    """GH #45: summarizing is the paid LLM stage — skipping it for a topic
+    """GH #45: summarizing is the paid LLM stage - skipping it for a topic
     nobody subscribes to is where the waste this issue names matters most."""
     unsubscribed_topic = Topic(name="Space")
     db.add(unsubscribed_topic)

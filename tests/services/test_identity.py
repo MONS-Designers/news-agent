@@ -73,7 +73,7 @@ def test_register_user_if_capacity_boundary_exact_cap(db: Session):
 
 
 def test_register_user_if_capacity_concurrent_race_never_exceeds_cap(tmp_path):
-    """FR3: two callers racing for the last slot — exactly one must win.
+    """FR3: two callers racing for the last slot - exactly one must win.
 
     Uses a real file-backed SQLite DB (not :memory:) with two independent
     connections/sessions on separate threads, synchronized with a barrier so
@@ -86,7 +86,7 @@ def test_register_user_if_capacity_concurrent_race_never_exceeds_cap(tmp_path):
     engine = create_engine(f"sqlite:///{db_path}")
     Base.metadata.create_all(engine)
 
-    cap = 1  # exactly one slot — the scenario the AC describes
+    cap = 1  # exactly one slot - the scenario the AC describes
     barrier = threading.Barrier(2)
     results: list[object] = [None, None]
 

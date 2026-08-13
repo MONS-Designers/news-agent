@@ -54,7 +54,7 @@ def test_me_returns_identity(as_admin: TestClient):
 
 
 def test_login_without_config_returns_503(client: TestClient, monkeypatch: pytest.MonkeyPatch):
-    # Force unconfigured OAuth regardless of the local .env — clear error, not a crash.
+    # Force unconfigured OAuth regardless of the local .env - clear error, not a crash.
     monkeypatch.setattr(settings, "google_client_id", "")
     response = client.get("/auth/login")
     assert response.status_code == 503

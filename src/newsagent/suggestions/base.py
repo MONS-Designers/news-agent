@@ -1,6 +1,6 @@
 """Abstract Suggestion Source provider contract.
 
-Sibling to `newsagent.llm.base` (AD-3) — same template-method shape (hybrid
+Sibling to `newsagent.llm.base` (AD-3) - same template-method shape (hybrid
 retry: transient errors retried internally with backoff, then a typed error
 surfaces), deliberately not importing from or importing into `newsagent.llm`.
 Adapters implement the raw `_suggest_*` operations only.

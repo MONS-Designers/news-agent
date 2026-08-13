@@ -1,7 +1,7 @@
 """Thin shared HTTP transport for OpenAI-compatible chat-completions endpoints.
 
 Domain-free: no article/topic/suggestion language, no error wrapping. Every
-`httpx`/JSON-parsing exception propagates untouched — callers (`llm/external.py`,
+`httpx`/JSON-parsing exception propagates untouched - callers (`llm/external.py`,
 `suggestions/llm.py`) each map failures to their own error hierarchy.
 """
 
@@ -40,7 +40,7 @@ def send_chat_completion(
     client: httpx.Client | None = None,
 ) -> ChatCompletion:
     """`on_usage`, if given, fires with (prompt_tokens, completion_tokens) the
-    moment a `usage` block is found in the response body — before `content` is
+    moment a `usage` block is found in the response body - before `content` is
     even extracted. This is what lets a caller account for a call that billed
     tokens but then failed to yield usable content (e.g. GH #38's malformed-
     output cases): by the time this function raises, on_usage has already run.
@@ -88,7 +88,7 @@ def send_chat_completion(
         # OpenRouter reports upstream provider failures as HTTP 200 with an
         # {"error": ...} body and no "choices", so this is a normal-looking
         # response that never carried content. Callers only see the exception
-        # type, and by then the body is gone — log it here, the one place that
+        # type, and by then the body is gone - log it here, the one place that
         # still has it. The exception propagates untouched: this module maps
         # nothing, by contract.
         logger.warning(

@@ -39,7 +39,7 @@ def as_user(client: TestClient) -> TestClient:
 
 @pytest.fixture
 def seeded_db() -> Iterator[Session]:
-    """An in-memory DB with one user and the 3 dogfood topics — for endpoints
+    """An in-memory DB with one user and the 3 dogfood topics - for endpoints
     (like /me/preferences) that read/write real rows, not just check auth."""
     engine = create_engine(
         "sqlite:///:memory:",

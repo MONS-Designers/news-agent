@@ -165,6 +165,6 @@ def test_cap_selects_top_n_and_leaves_rest_undelivered(db: Session):
     leftover_ids = {a.id for a in articles} - attached_ids
     assert len(leftover_ids) == len(articles) - settings.digest_max_articles
 
-    # Leftover candidates weren't dropped — they're still eligible next run.
+    # Leftover candidates weren't dropped - they're still eligible next run.
     report2 = build_digests(db, MockLLMProvider(), for_date=date(2026, 7, 21))
     assert report2.articles_added == len(leftover_ids)

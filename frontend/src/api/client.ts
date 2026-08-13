@@ -71,7 +71,7 @@ export interface ProfileUpdate {
 }
 
 export interface TopicSuggestions {
-  // "pending_slow" is non-terminal like "pending" — the backend is still
+  // "pending_slow" is non-terminal like "pending" - the backend is still
   // working, but one of its two concurrent calls already failed and it is
   // waiting out the other's retries (GH #36). Keep polling through it.
   suggestion_status: "none" | "pending" | "pending_slow" | "ready" | "failed";
@@ -201,7 +201,7 @@ export async function getMyProfile(): Promise<Profile> {
 }
 
 export async function updateMyProfile(update: ProfileUpdate): Promise<Profile> {
-  // Only include keys the caller actually set — e.g. InterestsStep saves
+  // Only include keys the caller actually set - e.g. InterestsStep saves
   // interest_free_text alone; sending undefined Field/Role keys would falsely
   // resubmit "not provided" as an explicit part of the request.
   const body: Record<string, unknown> = {};

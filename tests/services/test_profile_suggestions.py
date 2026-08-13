@@ -1,4 +1,4 @@
-"""The async suggestion-computation BackgroundTask body (Story 1.6) — a
+"""The async suggestion-computation BackgroundTask body (Story 1.6) - a
 distinct concern from save_profile's own validation, covered separately from
 test_profile.py."""
 
@@ -103,7 +103,7 @@ def test_computes_and_stores_ready_suggestions(db: Session):
 
 
 def test_stale_seq_discards_the_result(db: Session):
-    """AC #3 — the race guard: a newer save happened while this computation
+    """AC #3 - the race guard: a newer save happened while this computation
     was 'running', so its result must not overwrite the current state."""
     user = _user(db)
     user.suggestion_request_seq = 2  # a later save already advanced this
@@ -303,7 +303,7 @@ class _PartialFailureSource(SuggestionSource):
 def _spy_on_pending_slow(
     monkeypatch: pytest.MonkeyPatch, observed: list[str], gate: threading.Event | None = None
 ) -> None:
-    """Wrap the real interim write so a test can see the status it committed —
+    """Wrap the real interim write so a test can see the status it committed -
     reading it from another thread would mean sharing the Session, which is
     exactly what this feature must never do. Releasing `gate` here (after the
     write) lets the blocked survivor finish."""
@@ -354,7 +354,7 @@ def test_a_failure_in_either_call_alone_still_fails_the_run(
     _compute_and_store_suggestions(db, user.id, expected_seq=1)
 
     assert user.suggestion_status == SUGGESTION_STATUS_FAILED
-    # Both stored fields, not just the ids — the Boundary names both, and a
+    # Both stored fields, not just the ids - the Boundary names both, and a
     # regression that nulls only the names would slip past a one-field check.
     assert user.suggested_topic_ids == [999]
     assert user.suggested_new_topic_names == ["Kept"]
@@ -421,7 +421,7 @@ class _FailsLastSource(SuggestionSource):
     def _suggest_new_topics(self, *, field_name, role_name, interest_free_text, existing_topic_names):
         assert self._ranking_returned.wait(timeout=5)
         # The event fires just *before* the sibling returns, so give the
-        # executor a moment to mark that future done — otherwise this raises
+        # executor a moment to mark that future done - otherwise this raises
         # into a still-"running" sibling and the assertion below is testing a
         # different scenario than the one it names.
         time.sleep(0.05)
@@ -445,7 +445,7 @@ def test_no_pending_slow_when_the_failure_arrives_last(
 
 
 def test_stale_seq_skips_the_pending_slow_write(db: Session, monkeypatch: pytest.MonkeyPatch):
-    """The interim write is seq-guarded like the final one — a superseded
+    """The interim write is seq-guarded like the final one - a superseded
     computation must not stamp a status onto a newer request."""
     gate = threading.Event()
     monkeypatch.setattr(

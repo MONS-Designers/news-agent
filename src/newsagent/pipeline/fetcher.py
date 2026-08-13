@@ -1,5 +1,5 @@
 """RSS fetch stage (issue #8): poll approved sources, insert new articles,
-dedupe by URL. A broken feed is logged and skipped — one bad source never
+dedupe by URL. A broken feed is logged and skipped - one bad source never
 kills the run."""
 
 import logging
@@ -65,7 +65,7 @@ def extract_image_url(entry: Any) -> str | None:
     """Pick a lead image from an RSS entry, in priority order:
     ``media:content`` -> ``media:thumbnail`` -> an image ``enclosure``.
 
-    Returns None when the feed carries no image — the article then renders as a
+    Returns None when the feed carries no image - the article then renders as a
     text-only card (issue #24). The article-page ``og:image`` fallback is left to
     #9 (full-text extraction), which owns the page fetch; wiring it in here is a
     one-line addition once that lands."""
@@ -127,7 +127,7 @@ def fetch_source(db: Session, source: Source, parse: ParseFunc = feedparser.pars
 
 def fetch_approved_sources(db: Session, parse: ParseFunc = feedparser.parse) -> FetchReport:
     """Approved sources whose topic nobody is subscribed to are skipped
-    entirely (GH #45) — fetching them for no one is pure waste that then
+    entirely (GH #45) - fetching them for no one is pure waste that then
     compounds through relevance-scoring and summarize's paid LLM calls."""
     report = FetchReport()
     subscribed_topic_ids = select(UserTopicPreference.topic_id)

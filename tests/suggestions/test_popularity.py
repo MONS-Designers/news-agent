@@ -54,7 +54,7 @@ def test_suggest_topics_with_no_profile_match_returns_non_empty_ranked_list():
 
 def test_suggest_topics_ignores_profile_data():
     """Two different profiles against the same popularity data get the same
-    result — the fallback genuinely doesn't key off Field/Role/interest text."""
+    result - the fallback genuinely doesn't key off Field/Role/interest text."""
     provider = PopularitySuggestionSource()
     no_profile = provider.suggest_topics(
         field_name=None, role_name=None, interest_free_text=None, popularity=POPULARITY
@@ -77,7 +77,7 @@ def test_suggest_topics_keeps_zero_selection_candidates():
 
 def test_suggest_topics_empty_popularity_returns_empty():
     """Not this provider's job to guarantee non-emptiness against an empty
-    input — that's the calling service's query responsibility (Story 1.6)."""
+    input - that's the calling service's query responsibility (Story 1.6)."""
     result = PopularitySuggestionSource().suggest_topics(
         field_name=None, role_name=None, interest_free_text=None, popularity=[]
     )
@@ -85,7 +85,7 @@ def test_suggest_topics_empty_popularity_returns_empty():
 
 
 def test_suggest_new_topics_returns_empty():
-    """No connected LLM-backed source, so nothing to invent — mirrors
+    """No connected LLM-backed source, so nothing to invent - mirrors
     suggest_roles/suggest_prompts's empty-return stance for this provider."""
     assert (
         PopularitySuggestionSource().suggest_new_topics(
@@ -103,7 +103,7 @@ def test_suggest_new_topics_returns_empty():
 
 class _FlakySource(SuggestionSource):
     """Minimal SuggestionSource double with fail-injection knobs, analogous to
-    MockLLMProvider — exists only to exercise base.py's shared _run retry
+    MockLLMProvider - exists only to exercise base.py's shared _run retry
     loop. PopularitySuggestionSource has no real failure mode of its own."""
 
     def __init__(self, *, fail_transient: int = 0, fail_permanent: bool = False, **kwargs: object):

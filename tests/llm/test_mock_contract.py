@@ -27,7 +27,7 @@ class TestMockDeterminism:
 
 
 class TestRetryMechanics:
-    """CAP-3: hybrid retry is owned by the base class — verified through the
+    """CAP-3: hybrid retry is owned by the base class - verified through the
     mock's failure-injection knobs."""
 
     def test_transient_failures_are_retried_then_succeed(self):

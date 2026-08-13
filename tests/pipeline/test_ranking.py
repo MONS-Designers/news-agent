@@ -165,7 +165,7 @@ def test_repeat_opener_bias_ranks_preferred_topic_higher(db: Session):
 def test_diversity_floor_guarantees_low_volume_topic_a_slot(db: Session):
     """Without the floor, Topic A's 10 higher-scoring candidates alone would
     fill every slot in the default digest_max_articles=7 cap, leaving Topic
-    B's subscriber with nothing from that topic — GH #37."""
+    B's subscriber with nothing from that topic - GH #37."""
     user = db.get(User, 1)
     topic_a_articles = [
         add_article(db, source_id=1, url_suffix=f"a{i}", relevance_score=0.9) for i in range(10)
@@ -180,7 +180,7 @@ def test_diversity_floor_guarantees_low_volume_topic_a_slot(db: Session):
 
 def test_diversity_floor_ranks_guaranteed_slots_by_each_topics_best_score(db: Session):
     """N (3 topics) > L (2 slots): the guaranteed slots go to the two topics
-    whose single best candidate scores highest — not to the two
+    whose single best candidate scores highest - not to the two
     highest-scoring candidates overall, which could both come from one topic."""
     user = db.get(User, 1)
     topic_c = Topic(id=3, name="Climate")
@@ -214,7 +214,7 @@ def test_zero_candidate_topic_wastes_no_slot(db: Session):
 def test_diversity_floor_skips_already_represented_topics_on_rerun(db: Session):
     """A same-day rerun where Topic A already has an attached article: Topic
     A's higher-scoring candidate must NOT take the single remaining guaranteed
-    slot over Topic B, which has none yet — the floor isn't recomputed from
+    slot over Topic B, which has none yet - the floor isn't recomputed from
     zero (GH #37 AC4)."""
     user = db.get(User, 1)
     candidate_a = add_article(db, source_id=1, url_suffix="a0", relevance_score=0.9)

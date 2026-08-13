@@ -10,8 +10,8 @@ class FieldOut(BaseModel):
     name: str
 
 class RoleOut(BaseModel):
-    """One Role option in the Step 1 picker — curated or LLM-suggested
-    (serialized from `taxonomy.RoleSuggestionView`, not a raw `Role` — an
+    """One Role option in the Step 1 picker - curated or LLM-suggested
+    (serialized from `taxonomy.RoleSuggestionView`, not a raw `Role` - an
     uncurated suggestion has no real `Role.id`, so this carries no `id` at
     all rather than a fake/optional one)."""
 
@@ -36,7 +36,7 @@ class PendingTaxonomySuggestionOut(BaseModel):
 class TaxonomySuggestionDecision(BaseModel):
     """Promote (`approved`) or dismiss (`rejected`) one queued suggestion.
 
-    `name` overrides the curated Field/Role name that gets written — rows
+    `name` overrides the curated Field/Role name that gets written - rows
     predating the `raw_text` column carry only casefolded text, so the admin
     corrects the spelling before it becomes a user-visible option.
     """

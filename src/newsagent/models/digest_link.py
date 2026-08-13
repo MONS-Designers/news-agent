@@ -23,7 +23,7 @@ def _generate_link_token() -> str:
 class DigestLink(Base):
     """A click-trackable link embedded in a sent digest (FR12). Same shape as
     Digest.opened_at: an unguessable per-link token, and clicked_at set once on
-    first click. One row per (digest, kind, article) — get-or-created at render
+    first click. One row per (digest, kind, article) - get-or-created at render
     time so a retried send reuses the same token instead of minting a new one."""
 
     __tablename__ = "digest_links"

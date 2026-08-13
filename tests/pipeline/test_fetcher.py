@@ -104,7 +104,7 @@ def test_only_approved_sources_are_fetched(db: Session):
 
 
 def test_sources_with_no_subscribed_topic_are_skipped(db: Session):
-    """GH #45: fetching a source nobody subscribes to is pure waste — the
+    """GH #45: fetching a source nobody subscribes to is pure waste - the
     approved-but-unsubscribed source must never even be polled."""
     unsubscribed_topic = Topic(name="Space")
     db.add(unsubscribed_topic)

@@ -1,4 +1,4 @@
-"""Log destination selection — pointing logs somewhere else is a one-line config
+"""Log destination selection - pointing logs somewhere else is a one-line config
 change (NEWSAGENT_LOG_DESTINATION), no code edit at any call site.
 
 Called once per process from every runnable entrypoint: cli.main(),
@@ -31,7 +31,7 @@ def _build_handler() -> logging.Handler:
         stream = sys.stderr if destination == "stderr" else sys.stdout
         # Windows consoles use a legacy code page (cp1255 on this project's dev
         # machines). sys.stdout encodes strictly, so a Chinese or Russian source
-        # title raises inside emit() and the record is lost outright — sys.stderr
+        # title raises inside emit() and the record is lost outright - sys.stderr
         # already defaults to backslashreplace. Degrade to escapes rather than
         # dropping the record. The file destination pins utf-8 and needs none of this.
         if getattr(stream, "errors", None) not in ("backslashreplace", "replace") and hasattr(
@@ -98,8 +98,8 @@ def configure_logging() -> None:
 
     force=True closes and removes any handlers already on root, so calling this
     twice in one process leaves exactly one handler rather than duplicating
-    output. Note it also discards handlers owned by others — including pytest's
-    caplog — so tests that capture logs around an entrypoint must reconfigure.
+    output. Note it also discards handlers owned by others - including pytest's
+    caplog - so tests that capture logs around an entrypoint must reconfigure.
     """
     level = _resolve_level()
     logging.basicConfig(handlers=[_build_handler()], level=level, format=_FORMAT, force=True)
@@ -107,7 +107,7 @@ def configure_logging() -> None:
         server_logger = logging.getLogger(name)
         # No handlers *and* propagate off is uvicorn's signature for an explicit
         # operator opt-out (`--no-access-log`). Re-pointing it would silently
-        # resurrect records they asked not to produce — access lines carry the
+        # resurrect records they asked not to produce - access lines carry the
         # tracking-pixel URLs, which embed user and article ids.
         if not server_logger.handlers and not server_logger.propagate:
             continue

@@ -1,4 +1,4 @@
-"""Production email sender: real SMTP delivery via stdlib smtplib — same
+"""Production email sender: real SMTP delivery via stdlib smtplib - same
 adapter shape as ConsoleEmailSender, no new dependency, no vendor SDK."""
 
 import smtplib

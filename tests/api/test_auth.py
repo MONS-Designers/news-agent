@@ -44,7 +44,7 @@ def test_unknown_email_self_registers_when_cap_allows(db: Session):
 
 def test_unknown_email_resolves_to_none_when_cap_is_full(db: Session):
     # The cap counts the `users` table only (self-registered friends), not
-    # admins — db already has 1 User row from the fixture, so cap=1 is full.
+    # admins - db already has 1 User row from the fixture, so cap=1 is full.
     assert resolve_identity(db, "stranger@example.com", cap=1) is None
     assert db.scalar(select(User).where(User.email == "stranger@example.com")) is None
 
