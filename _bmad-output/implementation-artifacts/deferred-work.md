@@ -148,6 +148,21 @@
   summary: `newsagent.suggestions` has no `Refusal`-equivalent outcome, so `LLMSuggestionSource` has no cheap way to decline degenerate input (blank `field_name`, empty `popularity`) before hitting the real network/paid endpoint.
   evidence: `suggestions/types.py` and `suggestions/base.py` were designed before any adapter made a real network call — `PopularitySuggestionSource` never needed to decline anything, so the gap was free until now. Adding it is an interface change (`SuggestionSource`/`SuggestionSuggestion` contract) out of scope for this story; a future story should decide whether to mirror `llm/`'s `Refusal` type or take a different approach.
 
+## Deferred from: code review of spec-postgres-default-db (2026-08-13)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-postgres-default-db.md`
+  summary: Three existing Alembic migrations (`a3f6c9d1e442_digest_delivery_tracking.py`, `b2c3d4e5f6a7_role_and_user_role_name.py`, `f9c2d7e0b118_drop_digest_article_summary.py`) use `op.batch_alter_table` — a SQLite-only rewrite strategy — and have never been run against Postgres, so it is unconfirmed whether `alembic upgrade head` applies cleanly against the Neon branch.
+  evidence: Raised by adversarial review. This spec's own Boundaries explicitly forbid running any migration against a real database, so this diff ships the dialect-default flip with zero evidence the migration chain actually works on Postgres — must be verified (dry-run or on the Neon test branch) before treating `alembic upgrade head` as a working onboarding step.
+- source_spec: `_bmad-output/implementation-artifacts/spec-postgres-default-db.md`
+  summary: `Settings.database_url`'s new default is a placeholder that looks like a real connection string (`postgresql+psycopg://user:password@host/dbname`); if left unset, the app boots successfully (SQLAlchemy's `create_engine` is lazy) and only fails opaquely — a DNS lookup on literal host `host` — on the first real query, far from the actual misconfiguration.
+  evidence: Raised independently by both review passes. A fail-fast check (e.g. a Pydantic validator rejecting the exact placeholder value) would need a decision on where it lives and how it interacts with test/CI runs that have no `.env` at all — out of scope for this narrow chore.
+- source_spec: `_bmad-output/implementation-artifacts/spec-postgres-default-db.md`
+  summary: Flipping the default off SQLite removes the zero-setup local dev database with no replacement offered — a new contributor or a future CI run without a Neon account now has no offline dev-database story.
+  evidence: Raised by adversarial review. This is an accepted tradeoff of the user's explicit product decision (full switch to Postgres as default), not a code defect, but worth a deliberate decision later (e.g. a local Postgres via Docker Compose) if onboarding friction becomes a real problem.
+- source_spec: `_bmad-output/implementation-artifacts/spec-postgres-default-db.md`
+  summary: `news-agent-infra` (Moshe's repo, per `CLAUDE.md`) may carry assumptions tied to the old "SQLite for MVP" decision (backups, health checks, default source list tooling) that are now stale now that news-agent's default DB is Postgres.
+  evidence: Raised by adversarial review. Cross-repo concern outside this diff's blast radius — needs a conversation with Moshe, not a code change here.
+
 ## Deferred from: code review of spec-gh-25-weighted-digest-ranking (2026-07-31)
 
 - source_spec: `_bmad-output/implementation-artifacts/spec-gh-25-weighted-digest-ranking.md`

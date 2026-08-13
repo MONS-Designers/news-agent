@@ -1,10 +1,12 @@
 import pytest
 from sqlalchemy import create_engine, select
+from sqlalchemy.dialects.postgresql import insert as postgresql_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session
 
 from newsagent.models import Waitlist
 from newsagent.models.base import Base
-from newsagent.services.waitlist import capture_to_waitlist
+from newsagent.services.waitlist import _insert_for_dialect, capture_to_waitlist
 
 
 @pytest.fixture
@@ -42,3 +44,16 @@ def test_repeat_capture_refreshes_name(db: Session):
     capture_to_waitlist(db, "friend@example.com", None)
     second = capture_to_waitlist(db, "friend@example.com", "Friend Now")
     assert second.name == "Friend Now"
+
+
+def test_insert_for_dialect_picks_postgresql():
+    assert _insert_for_dialect("postgresql") is postgresql_insert
+
+
+def test_insert_for_dialect_picks_sqlite():
+    assert _insert_for_dialect("sqlite") is sqlite_insert
+
+
+def test_insert_for_dialect_rejects_unsupported_dialect():
+    with pytest.raises(NotImplementedError):
+        _insert_for_dialect("mysql")

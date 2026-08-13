@@ -5,7 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_prefix="NEWSAGENT_", extra="ignore")
 
-    database_url: str = "sqlite:///./newsagent.db"
+    database_url: str = "postgresql+psycopg://user:password@host/dbname"
 
     # Which LLM provider adapter the pipeline uses (see newsagent.llm.factory)
     llm_provider: str = "mock"

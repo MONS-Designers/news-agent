@@ -11,7 +11,7 @@ relevance per topic, summarizes and translates to Hebrew, and delivers a weekly 
 
 ## Architecture
 
-- **Backend** — FastAPI + SQLAlchemy, SQLite for MVP
+- **Backend** — FastAPI + SQLAlchemy, Postgres (Neon)
 - **Frontend** — Vue, three surfaces: admin source approval, admin taxonomy queue, and the user
   profile picker + topic preferences
 - **Auth** — Google OAuth (admin email allowlist / matched seeded user email), no separate
@@ -47,16 +47,17 @@ python -m venv .venv
 pip install -r requirements-dev.txt
 pip install -e .
 
-# create the SQLite database (newsagent.db) from the migrations
+# point NEWSAGENT_DATABASE_URL (in .env) at your Postgres DB, then create the schema
 alembic upgrade head
 ```
 
 Configuration is read from environment variables (or a local `.env` file, not committed) with the
-`NEWSAGENT_` prefix. Defaults work out of the box for local dev:
+`NEWSAGENT_` prefix. `NEWSAGENT_DATABASE_URL` has no usable default and must be set; the rest work
+out of the box for local dev:
 
 | Variable                      | Default                    | Purpose                                            |
 | ----------------------------- | -------------------------- | -------------------------------------------------- |
-| `NEWSAGENT_DATABASE_URL`      | `sqlite:///./newsagent.db` | SQLAlchemy database URL                            |
+| `NEWSAGENT_DATABASE_URL`      | _(none — required)_        | SQLAlchemy database URL (Postgres, e.g. a Neon branch) |
 | `NEWSAGENT_LOG_DESTINATION`   | `stderr`                   | Where log records go: `stderr`, `stdout`, or `file` |
 | `NEWSAGENT_LOG_LEVEL`         | `WARNING`                  | Root log level (`DEBUG`, `INFO`, `WARNING`, ...)   |
 | `NEWSAGENT_LOG_FILE`          | _(unset)_                  | Log file path — required when destination is `file` |

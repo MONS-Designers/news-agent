@@ -5,7 +5,7 @@ Claude Code sessions opened in either repo — Claude Code reads CLAUDE.md files
 directories automatically.
 
 **news-agent/** — Nomi (dev). The content engine + user-facing app: fetch, filter,
-  summarize/translate, build digest, send. Backend FastAPI + SQLAlchemy (SQLite for MVP),
+  summarize/translate, build digest, send. Backend FastAPI + SQLAlchemy (Postgres, via Neon),
   frontend Vue (admin source-approval + user preferences), auth via Google OAuth. Pipeline is a
   separate scheduled process from the API, reads/writes the DB directly. Repo:
   github.com/MONS-Designers/news-agent
