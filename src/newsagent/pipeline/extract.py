@@ -7,13 +7,20 @@ full_text when present.
 A source that can't be fetched or parsed doesn't abort the run (FR6); it's
 retried up to a configured cap, then reaches a terminal "failed" state so a
 deterministically-broken source stops being fetched forever — same pattern
-as Story C.1's summarize retries. No timeout/concurrency bound here by
-design: that's Story D.2's networking-politeness concern.
+as Story C.1's summarize retries.
+
+Fetching (Story D.2) uses `httpx` directly instead of trafilatura's own
+downloader, so timeout/User-Agent are ours to configure, and runs through a
+bounded ThreadPoolExecutor so one slow source can't stall the whole run.
+Workers receive plain URLs only — the SQLAlchemy Session is never touched
+off the calling thread, same discipline as GH #36's concurrent LLM calls.
 """
 
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 
+import httpx
 import trafilatura
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -37,14 +44,28 @@ class ExtractReport:
     failed: int = 0
 
 
-def _fetch_and_extract(url: str) -> str | None:
+def _fetch_html(url: str) -> str | None:
+    """No DB access — safe to run off the main thread in the bounded
+    ThreadPoolExecutor below."""
     try:
-        downloaded = trafilatura.fetch_url(url)
-        if downloaded is None:
-            return None
-        return trafilatura.extract(downloaded)
-    except Exception as error:  # fetch/parse errors vary across trafilatura/httpx/lxml
-        logger.warning("Fetch/extract error for %s: %s", url, error)
+        response = httpx.get(
+            url,
+            timeout=settings.extraction_timeout_seconds,
+            headers={"User-Agent": settings.extraction_user_agent},
+            follow_redirects=True,
+        )
+        response.raise_for_status()
+        return response.text
+    except (httpx.TimeoutException, httpx.TransportError, httpx.HTTPStatusError) as error:
+        logger.warning("Fetch failed for %s: %s", url, error)
+        return None
+
+
+def _extract_text(html: str) -> str | None:
+    try:
+        return trafilatura.extract(html)
+    except Exception as error:  # parse errors vary across trafilatura/lxml
+        logger.warning("Extraction error: %s", error)
         return None
 
 
@@ -58,8 +79,11 @@ def extract_relevant_articles(db: Session) -> ExtractReport:
         )
     ).all()
 
-    for article in articles:
-        text = _fetch_and_extract(article.url)
+    with ThreadPoolExecutor(max_workers=settings.extraction_concurrency) as executor:
+        htmls = list(executor.map(_fetch_html, (article.url for article in articles)))
+
+    for article, html in zip(articles, htmls, strict=True):
+        text = _extract_text(html) if html is not None else None
 
         if not text:
             article.extraction_attempts += 1

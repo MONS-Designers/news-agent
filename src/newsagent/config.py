@@ -28,6 +28,12 @@ class Settings(BaseSettings):
     # Extracted full_text is truncated to this length before it's ever stored,
     # so it's already bounded before it could reach an LLM prompt (NFR3).
     extraction_max_chars: int = 10_000
+    # Polite, bounded fetching (Epic D, Story D.2) — a slow/unresponsive source
+    # can't stall the run, and a bounded worker pool can't hammer many sources
+    # at once or look like a scraper.
+    extraction_timeout_seconds: float = 10.0
+    extraction_concurrency: int = 5
+    extraction_user_agent: str = "NewsAgent/1.0 (+https://github.com/MONS-Designers/news-agent)"
 
     # Weighted digest ranking (issue #25): final_score = relevance_weight*relevance
     # + recency_weight*recency + interest_weight*interest. Weight trio sums to 1.0.

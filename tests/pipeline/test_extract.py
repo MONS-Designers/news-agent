@@ -1,3 +1,4 @@
+import httpx
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
@@ -48,28 +49,23 @@ def add_article(
     return article
 
 
-def _mock_success(monkeypatch: pytest.MonkeyPatch, text: str = "The full article body." * 10):
-    monkeypatch.setattr(
-        "newsagent.pipeline.extract.trafilatura.fetch_url", lambda url: "<html>...</html>"
-    )
-    monkeypatch.setattr("newsagent.pipeline.extract.trafilatura.extract", lambda html: text)
+def _mock_fetch_success(monkeypatch: pytest.MonkeyPatch, html: str = "<html>...</html>"):
+    monkeypatch.setattr("newsagent.pipeline.extract._fetch_html", lambda url: html)
 
 
 def _mock_fetch_failure(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr("newsagent.pipeline.extract.trafilatura.fetch_url", lambda url: None)
+    monkeypatch.setattr("newsagent.pipeline.extract._fetch_html", lambda url: None)
 
 
-def _mock_extract_failure(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(
-        "newsagent.pipeline.extract.trafilatura.fetch_url", lambda url: "<html>...</html>"
-    )
-    monkeypatch.setattr("newsagent.pipeline.extract.trafilatura.extract", lambda html: None)
+def _mock_extract_text(monkeypatch: pytest.MonkeyPatch, text: str | None):
+    monkeypatch.setattr("newsagent.pipeline.extract.trafilatura.extract", lambda html: text)
 
 
 def test_successful_extraction_stores_full_text_and_marks_done(
     db: Session, monkeypatch: pytest.MonkeyPatch
 ):
-    _mock_success(monkeypatch, text="Real article content.")
+    _mock_fetch_success(monkeypatch)
+    _mock_extract_text(monkeypatch, "Real article content.")
     article = add_article(db)
 
     report = extract_relevant_articles(db)
@@ -111,7 +107,8 @@ def test_terminal_failed_state_reached_at_configured_max(
 
 
 def test_failed_articles_are_never_reselected(db: Session, monkeypatch: pytest.MonkeyPatch):
-    _mock_success(monkeypatch)
+    _mock_fetch_success(monkeypatch)
+    _mock_extract_text(monkeypatch, "content")
     add_article(db, extraction_status=EXTRACTION_FAILED, extraction_attempts=2)
 
     report = extract_relevant_articles(db)
@@ -121,7 +118,8 @@ def test_failed_articles_are_never_reselected(db: Session, monkeypatch: pytest.M
 
 
 def test_irrelevant_articles_are_not_selected(db: Session, monkeypatch: pytest.MonkeyPatch):
-    _mock_success(monkeypatch)
+    _mock_fetch_success(monkeypatch)
+    _mock_extract_text(monkeypatch, "content")
     add_article(db, relevance_status="irrelevant")
 
     report = extract_relevant_articles(db)
@@ -131,10 +129,12 @@ def test_irrelevant_articles_are_not_selected(db: Session, monkeypatch: pytest.M
 
 
 def test_empty_extraction_result_counts_as_failure(db: Session, monkeypatch: pytest.MonkeyPatch):
-    """extract() returning None is a parse failure, not "no article" — must count
-    toward the same bounded-retry terminal state as a fetch failure."""
+    """trafilatura.extract() returning None is a parse failure, not "no
+    article" — must count toward the same bounded-retry terminal state as a
+    fetch failure."""
     monkeypatch.setattr(settings, "max_extraction_attempts", 1)
-    _mock_extract_failure(monkeypatch)
+    _mock_fetch_success(monkeypatch)
+    _mock_extract_text(monkeypatch, None)
     article = add_article(db)
 
     report = extract_relevant_articles(db)
@@ -148,9 +148,84 @@ def test_extracted_text_is_truncated_to_configured_cap(
     db: Session, monkeypatch: pytest.MonkeyPatch
 ):
     monkeypatch.setattr(settings, "extraction_max_chars", 20)
-    _mock_success(monkeypatch, text="x" * 100)
+    _mock_fetch_success(monkeypatch)
+    _mock_extract_text(monkeypatch, "x" * 100)
     article = add_article(db)
 
     extract_relevant_articles(db)
 
     assert article.full_text == "x" * 20
+
+
+# -- Story D.2: timeout, User-Agent, bounded concurrency ---------------------
+
+
+def test_fetch_sends_configured_timeout_and_user_agent(monkeypatch: pytest.MonkeyPatch):
+    from newsagent.pipeline.extract import _fetch_html
+
+    monkeypatch.setattr(settings, "extraction_timeout_seconds", 7.5)
+    monkeypatch.setattr(settings, "extraction_user_agent", "TestAgent/1.0")
+    captured = {}
+
+    def fake_get(url, *, timeout, headers, follow_redirects):
+        captured["timeout"] = timeout
+        captured["headers"] = headers
+        captured["follow_redirects"] = follow_redirects
+        return httpx.Response(200, text="<html>ok</html>", request=httpx.Request("GET", url))
+
+    monkeypatch.setattr("newsagent.pipeline.extract.httpx.get", fake_get)
+
+    result = _fetch_html("https://example.com/article")
+
+    assert result == "<html>ok</html>"
+    assert captured["timeout"] == 7.5
+    assert captured["headers"] == {"User-Agent": "TestAgent/1.0"}
+    assert captured["follow_redirects"] is True
+
+
+def test_fetch_timeout_is_treated_as_failure(monkeypatch: pytest.MonkeyPatch):
+    from newsagent.pipeline.extract import _fetch_html
+
+    def raise_timeout(url, **kwargs):
+        raise httpx.TimeoutException("timed out")
+
+    monkeypatch.setattr("newsagent.pipeline.extract.httpx.get", raise_timeout)
+
+    assert _fetch_html("https://example.com/slow") is None
+
+
+def test_fetch_http_error_status_is_treated_as_failure(monkeypatch: pytest.MonkeyPatch):
+    from newsagent.pipeline.extract import _fetch_html
+
+    def fake_get(url, **kwargs):
+        request = httpx.Request("GET", url)
+        return httpx.Response(404, text="not found", request=request)
+
+    monkeypatch.setattr("newsagent.pipeline.extract.httpx.get", fake_get)
+
+    assert _fetch_html("https://example.com/missing") is None
+
+
+def test_concurrent_fetches_are_bounded_by_configured_limit(
+    db: Session, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setattr(settings, "extraction_concurrency", 3)
+    _mock_fetch_success(monkeypatch)
+    _mock_extract_text(monkeypatch, "content")
+    add_article(db, url_suffix="1")
+    add_article(db, url_suffix="2")
+
+    captured_max_workers = {}
+    from newsagent.pipeline import extract as extract_module
+
+    real_executor = extract_module.ThreadPoolExecutor
+
+    def spying_executor(*, max_workers):
+        captured_max_workers["value"] = max_workers
+        return real_executor(max_workers=max_workers)
+
+    monkeypatch.setattr("newsagent.pipeline.extract.ThreadPoolExecutor", spying_executor)
+
+    extract_relevant_articles(db)
+
+    assert captured_max_workers["value"] == 3
