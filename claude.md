@@ -46,6 +46,18 @@ sources** from user interests. The news-agent README (2026-07-17) describes a na
 MVP scope-cut or accidental drift - resolve explicitly in the PRD rather than assuming either
 version.
 
+## Cross-repo integration
+
+Before hardcoding or changing anything that assumes a particular deployment topology (API base
+URL, cookie domain, CORS origins) - check with news-agent-infra on the actual deployed shape,
+or make it configurable rather than assumed. `frontend/src/api/client.ts`'s `API_BASE` was a
+hardcoded relative path since the original frontend scaffold commit, which silently broke
+OAuth login once infra deployed the frontend and backend on split subdomains - nobody's job
+was to check that assumption against the real deploy shape before it shipped. Full writeup (in
+news-agent-infra): `_bmad-output/implementation-artifacts/retro-mvp-deploy-2026-08-16.md`. When
+a change touches how the frontend finds the backend, a two-line message to Moshe before
+assuming a deployment shape is cheaper than discovering the gap after a deploy.
+
 ## Where to look for more
 
 Full decision log: news-agent-infra/_bmad-output/forge/daily-digest-agent/forged-idea.md
