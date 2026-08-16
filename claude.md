@@ -20,11 +20,15 @@ A news digest agent for Hebrew-speaking readers: pulls articles from RSS/web sou
 source language), summarizes and translates to Hebrew, categorizes by topic, and delivers as a
 weekly email. Output language is Hebrew; source language is irrelevant.
 
-## Current MVP scope (per news-agent/README.md, 2026-07-17; cadence updated 2026-08-07)
+## Current scope (superseded 2026-08-07 per launch-readiness decision; see
+news-agent/_bmad-output/planning-artifacts/epics-launch-readiness.md)
 
-**Weekly** email digest only, for 2 seeded dogfood users - **not** self-registered
-Admin approves RSS sources and sets user topic preferences via a small web UI
-Public signup and WhatsApp delivery are explicitly out of scope for MVP
+**Weekly** email digest, delivered via a real email provider (SMTP adapter shipped)
+Self-registration via Google OAuth is **in**: a new visitor gets an account automatically,
+  hard-capped at a configurable max (10 at launch); overflow visitors are captured to a waitlist
+Admin still curates RSS sources and the Field/Role taxonomy; users set their own preferences via
+  a guided profile picker (Field/Role/Experience/Interests -> suggested Topics)
+WhatsApp delivery remains out of scope for this stage
 
 ## Locked product decisions (per BMad forge-idea, 2026-07-14)
 
@@ -38,13 +42,15 @@ Delivery: daily email for MVP; WhatsApp is phase 2; a pull-model website was rej
 Open technical risk (unresolved, carried to build): how the agent judges source quality when
   discovering sources from a user's stated interests (vs. picking a random low-quality blog)
 
-## ⚠️ Known drift to resolve
+## Resolved drift (2026-08-07)
 
-The BMad idea doc (2026-07-14) describes **self-registration** and the agent **auto-discovering
-sources** from user interests. The news-agent README (2026-07-17) describes a narrower MVP:
-**seeded users, admin-curated sources, no auto-discovery**. Unclear if this is a deliberate
-MVP scope-cut or accidental drift - resolve explicitly in the PRD rather than assuming either
-version.
+The self-registration question flagged below was resolved in favor of the original idea doc:
+self-registration (Google OAuth, capped at 10 users, waitlist on overflow) is **in**, per the
+2026-08-07 launch-readiness scope decision - see
+`news-agent/_bmad-output/planning-artifacts/epics-launch-readiness.md`. Source auto-discovery
+from user interests remains **out**: RSS sources stay admin-curated; only the separate
+Field/Role taxonomy has a user-facing "Other" suggestion path, reviewed by admins before
+promotion.
 
 ## Cross-repo integration
 
@@ -63,4 +69,5 @@ assuming a deployment shape is cheaper than discovering the gap after a deploy.
 Full decision log: news-agent-infra/_bmad-output/forge/daily-digest-agent/forged-idea.md
 Market research: news-agent-infra/_bmad-output/planning-artifacts/research/
 Informal architecture flow diagram: news-agent-infra/_bmad-output/planning-artifacts/architecture-flow-diagram-2026-07-14.md
+Current scope decisions: news-agent/_bmad-output/planning-artifacts/epics-launch-readiness.md
 Nomi's backlog: GitHub issues on news-agent

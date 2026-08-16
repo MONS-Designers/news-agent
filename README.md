@@ -3,11 +3,14 @@
 An automated news digest agent: fetches articles from admin-curated RSS sources, filters for
 relevance per topic, summarizes and translates to Hebrew, and delivers a weekly digest by email.
 
-## MVP scope
+## Scope (updated 2026-08-07 launch-readiness decision)
 
-- Weekly email digest only, for 2 dogfood users (seeded, not self-registered)
-- Admin source approval and user topic preferences via a small web UI
-- Public signup and WhatsApp delivery are explicitly out of scope for MVP
+- Weekly email digest, delivered via a real email provider (SMTP)
+- Self-registration via Google OAuth, hard-capped at a configurable max (10 at launch);
+  overflow visitors are captured to a waitlist
+- Admin curates RSS sources and the Field/Role taxonomy; users set preferences via a guided
+  profile picker (Field/Role/Experience/Interests -> suggested Topics) or the classic Topic grid
+- WhatsApp delivery is explicitly out of scope for this stage
 
 ## Architecture
 
@@ -16,8 +19,8 @@ relevance per topic, summarizes and translates to Hebrew, and delivers a weekly 
   profile picker + topic preferences
 - **Auth** - Google OAuth (admin email allowlist / matched seeded user email), no separate
   login/password system
-- **Pipeline** - scheduled process (fetch → filter → summarize/translate → build digest → send),
-  separate from the API and reading/writing the DB directly
+- **Pipeline** - scheduled process (fetch → filter → extract → summarize/translate → build
+  digest → send), separate from the API and reading/writing the DB directly
 
 ### Schedule (decided 2026-08-07)
 
@@ -26,7 +29,7 @@ scrolls off an RSS feed unseen, and only the last two stages run weekly.
 
 | Stage(s)                             | Cadence | Why                                                       |
 | ------------------------------------ | ------- | --------------------------------------------------------- |
-| `fetch`, `filter`, `summarize`       | daily   | RSS feeds hold only the latest ~20–50 items and roll the rest off |
+| `fetch`, `filter`, `extract`, `summarize` | daily | RSS feeds hold only the latest ~20–50 items and roll the rest off |
 | `build-digests`, `send-digests`      | weekly  | one email per user per week                               |
 
 That means two scheduled jobs, not one - see `news-agent-infra` for the cron definitions.
@@ -123,15 +126,15 @@ The pipeline stages are built and run from the CLI, independently of the API:
 ```bash
 python -m newsagent.cli fetch          # pull new articles from approved RSS sources
 python -m newsagent.cli filter         # score each article's relevance to its topic
+python -m newsagent.cli extract        # fetch + extract full article text (relevant articles only)
 python -m newsagent.cli summarize      # summarize + translate to Hebrew
 python -m newsagent.cli build-digests  # rank and select each user's articles
 python -m newsagent.cli send-digests   # render and send
 ```
 
-The first three run daily and the last two weekly - see [Schedule](#schedule-decided-2026-08-07).
-`newsagent.cli --help` lists the seeding and user-management commands too. Remaining gaps are
-tracked as [open issues](https://github.com/MONS-Designers/news-agent/issues) - most notably
-there is no real email sender yet (`NEWSAGENT_EMAIL_SENDER` only accepts `console`).
+The first four run daily and the last two weekly - see [Schedule](#schedule-decided-2026-08-07).
+`newsagent.cli --help` lists the seeding, user-management, and `usage-report` commands too.
+See [Status](#status) for the current gap list.
 
 ## Development
 
@@ -145,16 +148,25 @@ between backend and frontend.
 
 ## Status
 
-All product logic is built - the full pipeline, both admin surfaces, and the user profile picker.
-What stands between here and a live MVP is delivery and operations, not features:
+The self-registration -> profile -> weekly-digest loop is built and shippable end to end,
+including real SMTP delivery, full-text extraction, click/open tracking, and per-run LLM usage
+accounting (the 2026-08-07 launch-readiness epics - see
+`_bmad-output/planning-artifacts/epics-launch-readiness.md`). Known remaining gaps:
 
-- **No real email sender.** `newsagent.mail` only ships the `console` adapter, so no digest can
-  actually be delivered. The `EmailSender` interface is in place; a real adapter is one class.
+- **Never run end to end** against real users
+  ([#23](https://github.com/MONS-Designers/news-agent/issues/23)).
+- **Silent empty digest** if a user subscribes to a Topic with zero admin-approved Sources
+  ([#48](https://github.com/MONS-Designers/news-agent/issues/48)).
+- **Accessibility remediation incomplete** on the profile picker, despite being scoped as a
+  baseline requirement ([#31](https://github.com/MONS-Designers/news-agent/issues/31)).
 - **No scheduler, hosting target, or secrets management** - tracked in `news-agent-infra`
   (issues [#15](https://github.com/MONS-Designers/news-agent/issues/15),
   [#17](https://github.com/MONS-Designers/news-agent/issues/17),
   [#18](https://github.com/MONS-Designers/news-agent/issues/18)).
-- **Never run end to end** against real users
-  ([#23](https://github.com/MONS-Designers/news-agent/issues/23)).
+- Minor polish: digest email font/positioning
+  ([#50](https://github.com/MONS-Designers/news-agent/issues/50)), missing lead-image fallback
+  ([#49](https://github.com/MONS-Designers/news-agent/issues/49)), and test-coverage gaps
+  ([#42](https://github.com/MONS-Designers/news-agent/issues/42),
+  [#43](https://github.com/MONS-Designers/news-agent/issues/43)).
 
 See open issues for the rest.
