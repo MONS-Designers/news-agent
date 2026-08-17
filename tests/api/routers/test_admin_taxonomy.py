@@ -48,6 +48,7 @@ def test_admin_gets_empty_queue(as_admin: TestClient):
 
 def test_admin_sees_pending_suggestions_ranked_by_count(as_admin: TestClient, db_session: Session):
     tech, _ = add_field(db_session, "Tech")
+    db_session.flush()
     record_pending_suggestion(db_session, kind="role", field_id=tech.id, text="DevRel")
     record_pending_suggestion(db_session, kind="field", field_id=None, text="Marine Biology")
     record_pending_suggestion(db_session, kind="field", field_id=None, text="marine biology")

@@ -178,6 +178,10 @@ watch([fieldName, fieldIsOther], async () => {
 
   const field = selectedField.value;
   if (!field) {
+    // A stale in-flight fetch from a previously-selected curated Field would
+    // otherwise never reach its own `finally` (its token no longer matches),
+    // leaving the "טוען תפקידים…" placeholder stuck on forever.
+    rolesLoading.value = false;
     if (rolePrefill !== null) captureSnapshot(); // "Other" Field pre-fill, no Role row to resolve
     return; // an "Other" Field has no curated roles by definition
   }

@@ -1,6 +1,10 @@
 # Deferred Work
 
-## Deferred from: live manual testing of Story A.1 (2026-08-11)
+## Deferred from: live manual testing of the Taxonomy Curation Queue cascade fix (2026-08-17)
+
+- source_spec: none
+  summary: Consider a WebSocket/push-based update for `TaxonomyQueueView.vue` instead of the current full-list reload after every approve/reject decision, to remove the brief loading flash without giving up server-authoritative state.
+  evidence: Added after `decide_pending_suggestion` gained cascade side-effects (approving a Field unblocks its linked pending Roles via `parent_suggestion_id`; rejecting one cascades to reject them) - the frontend cannot derive these locally without duplicating the same linkage logic client-side, so `decide()` was changed to call `loadSuggestions()` (a full GET) after every decision rather than locally filtering the one decided row. The user confirmed this works but dislikes the loading flash it introduces; declined a client-side-only fix as duplicated business logic (the same field/role linkage ambiguity that motivated the `parent_suggestion_id` migration in the first place). A push-based approach (e.g. the decide endpoint's response, or a WebSocket, telling the client exactly which suggestion ids changed) would let the client patch state surgically without re-deriving the cascade rule itself. Low priority - this is a low-traffic admin-only screen.
 
 - source_spec: `_bmad-output/planning-artifacts/epics-launch-readiness.md` (Epic A, Story A.1)
   summary: Google sign-in intermittently fails on the first attempt with an OAuth-related error, then succeeds immediately on retry with no other change. Confirmed by the user as pre-existing - reproduced before any of Story A.1's self-registration changes landed, so it is not caused by `resolve_identity`'s new registration logic.

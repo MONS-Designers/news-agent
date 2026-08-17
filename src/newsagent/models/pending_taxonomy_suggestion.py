@@ -41,11 +41,15 @@ class PendingTaxonomySuggestion(Base):
     #
     # Partial (WHERE status='pending') so decided rows stay outside it: the same
     # text may legitimately be rejected, resubmitted, and rejected again.
+    # parent_suggestion_id is folded in so two orphan Role rows with identical
+    # text but different parent Field suggestions stay distinct (GH admin
+    # feedback, 2026-08-17) - otherwise a cascade could not tell them apart.
     __table_args__ = (
         Index(
             "uq_pending_taxonomy_suggestions_open",
             "kind",
             text("COALESCE(field_id, -1)"),
+            text("COALESCE(parent_suggestion_id, -1)"),
             "normalized_text",
             unique=True,
             sqlite_where=text("status = 'pending'"),
@@ -56,6 +60,14 @@ class PendingTaxonomySuggestion(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     kind: Mapped[str] = mapped_column(String, index=True)
     field_id: Mapped[int | None] = mapped_column(ForeignKey("fields.id"), nullable=True)
+    # Set only for a Role suggestion submitted alongside an uncurated Field
+    # (field_id above is None until that Field is curated) - points at the
+    # sibling Field suggestion so deciding it can cascade to just its own
+    # Roles instead of every open Role suggestion (GH admin feedback,
+    # 2026-08-17). Never set for a "field" kind row.
+    parent_suggestion_id: Mapped[int | None] = mapped_column(
+        ForeignKey("pending_taxonomy_suggestions.id"), nullable=True
+    )
     normalized_text: Mapped[str] = mapped_column(String, index=True)
     # The submission as typed. normalized_text is the dedupe key and is
     # casefolded, so promoting a suggestion without this would mint a lowercase

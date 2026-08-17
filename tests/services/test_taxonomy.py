@@ -45,6 +45,16 @@ def test_add_field_is_idempotent(db: Session):
     assert created_again is False
 
 
+def test_add_field_does_not_commit(db: Session):
+    """decide_pending_suggestion owns the single commit (GH #34) - this helper
+    must only stage the write, so a failure between it and the suggestion's
+    status transition rolls both back together."""
+    add_field(db, "Marine Biology")
+    db.rollback()
+
+    assert db.scalar(select(Field)) is None
+
+
 def test_list_fields_ordered_by_name(db: Session):
     add_field(db, "Finance")
     add_field(db, "Design")
@@ -61,6 +71,18 @@ def test_add_role_is_idempotent(db: Session):
     assert created is True
     _, created_again = add_role(db, field, "Software Engineer")
     assert created_again is False
+
+
+def test_add_role_does_not_commit(db: Session):
+    """Same reasoning as test_add_field_does_not_commit (GH #34)."""
+    field, _ = add_field(db, "Tech")
+    db.commit()
+
+    add_role(db, field, "Software Engineer")
+    db.rollback()
+
+    assert db.scalar(select(Role)) is None
+    assert db.scalar(select(Field)) is not None  # the earlier commit stands
 
 
 def test_same_role_name_coexists_under_two_fields(db: Session):
@@ -176,6 +198,7 @@ def test_open_suggestions_are_unique_per_field_row(db: Session):
 
 def test_open_suggestions_are_unique_per_role_row(db: Session):
     field, _ = add_field(db, "Tech")
+    db.flush()
     record_pending_suggestion(db, kind="role", field_id=field.id, text="DevRel")
     db.commit()
 
@@ -367,6 +390,85 @@ def test_promoting_a_role_without_a_field_is_refused_and_writes_nothing(db: Sess
     assert raised.value.detail == {"error": "role_has_no_field"}
     assert db.query(Role).count() == 0
     assert db.get(PendingTaxonomySuggestion, suggestion_id).status == "pending"
+
+
+def test_approving_a_field_unblocks_its_linked_pending_roles(db: Session):
+    """The Role stays pending (the admin still decides it separately) - only
+    its field_id is backfilled, which is what un-orphans it in the queue."""
+    field_suggestion_id = record_pending_suggestion(
+        db, kind="field", field_id=None, text="Marine Biology"
+    )
+    role_suggestion_id = record_pending_suggestion(
+        db,
+        kind="role",
+        field_id=None,
+        text="Reef Survey Lead",
+        parent_suggestion_id=field_suggestion_id,
+    )
+    db.commit()
+
+    decide_pending_suggestion(db, field_suggestion_id, status="approved")
+
+    role_row = db.get(PendingTaxonomySuggestion, role_suggestion_id)
+    field = db.scalar(select(Field).where(Field.name == "Marine Biology"))
+    assert role_row.status == "pending"
+    assert role_row.field_id == field.id
+
+
+def test_rejecting_a_field_cascades_to_its_linked_pending_roles(db: Session):
+    field_suggestion_id = record_pending_suggestion(
+        db, kind="field", field_id=None, text="Marine Biology"
+    )
+    role_suggestion_id = record_pending_suggestion(
+        db,
+        kind="role",
+        field_id=None,
+        text="Reef Survey Lead",
+        parent_suggestion_id=field_suggestion_id,
+    )
+    db.commit()
+
+    decide_pending_suggestion(db, field_suggestion_id, status="rejected")
+
+    assert db.get(PendingTaxonomySuggestion, role_suggestion_id).status == "rejected"
+
+
+def test_deciding_a_role_never_affects_its_linked_field(db: Session):
+    field_suggestion_id = record_pending_suggestion(
+        db, kind="field", field_id=None, text="Marine Biology"
+    )
+    role_suggestion_id = record_pending_suggestion(
+        db,
+        kind="role",
+        field_id=None,
+        text="Reef Survey Lead",
+        parent_suggestion_id=field_suggestion_id,
+    )
+    db.commit()
+
+    decide_pending_suggestion(db, role_suggestion_id, status="rejected")
+
+    assert db.get(PendingTaxonomySuggestion, field_suggestion_id).status == "pending"
+
+
+def test_a_fields_decision_does_not_touch_a_different_fields_linked_role(db: Session):
+    """The scenario the parent_suggestion_id link exists for: two Fields open
+    at once, each with their own Role - deciding one must never bleed into
+    the other's Role just because both were, at some point, uncurated."""
+    marine_id = record_pending_suggestion(db, kind="field", field_id=None, text="Marine Biology")
+    astro_id = record_pending_suggestion(db, kind="field", field_id=None, text="Astrophysics")
+    marine_role_id = record_pending_suggestion(
+        db, kind="role", field_id=None, text="Reef Survey Lead", parent_suggestion_id=marine_id
+    )
+    astro_role_id = record_pending_suggestion(
+        db, kind="role", field_id=None, text="Telescope Operator", parent_suggestion_id=astro_id
+    )
+    db.commit()
+
+    decide_pending_suggestion(db, marine_id, status="rejected")
+
+    assert db.get(PendingTaxonomySuggestion, marine_role_id).status == "rejected"
+    assert db.get(PendingTaxonomySuggestion, astro_role_id).status == "pending"
 
 
 def test_dismissing_creates_no_curated_row(db: Session):

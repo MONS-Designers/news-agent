@@ -169,8 +169,11 @@ def _apply(
         # value that never matches "Tech" again.
         user.field_name = field.name if field is not None and not field_is_other else field_name
 
+        field_suggestion_id = None
         if field_is_other:
-            taxonomy.record_pending_suggestion(db, kind=KIND_FIELD, field_id=None, text=field_name)
+            field_suggestion_id = taxonomy.record_pending_suggestion(
+                db, kind=KIND_FIELD, field_id=None, text=field_name
+            )
 
         if role_name is not None:
             role = (
@@ -184,13 +187,16 @@ def _apply(
             if role_is_other:
                 # A Role suggestion records which Field it was submitted under so the
                 # admin queue can scope it. The Field itself may be uncurated "Other"
-                # text with no row to point at - then field_id stays None rather than
-                # dropping the submission.
+                # text with no row to point at - then field_id stays None, and
+                # parent_suggestion_id links it to that Field's own pending
+                # suggestion instead, so approving/rejecting the Field can
+                # cascade to just this Role (GH admin feedback, 2026-08-17).
                 taxonomy.record_pending_suggestion(
                     db,
                     kind=KIND_ROLE,
                     field_id=field.id if field is not None else None,
                     text=role_name,
+                    parent_suggestion_id=field_suggestion_id if field is None else None,
                 )
 
     if interest_free_text is not None:

@@ -11,9 +11,11 @@ from sqlalchemy.orm import Session, selectinload
 
 from newsagent.models import Field, PendingTaxonomySuggestion, Role
 from newsagent.models.pending_taxonomy_suggestion import (
+    KIND_FIELD,
     KIND_ROLE,
     STATUS_APPROVED,
     STATUS_PENDING,
+    STATUS_REJECTED,
 )
 from newsagent.suggestions.errors import SuggestionError
 from newsagent.suggestions.factory import get_suggestion_source
@@ -60,13 +62,17 @@ def normalize_taxonomy_text(text: str) -> str:
 
 
 def add_field(db: Session, name: str) -> tuple[Field, bool]:
-    """Get-or-create a Field by name. Returns (field, created)."""
+    """Get-or-create a Field by name. Returns (field, created).
+
+    Deliberately does NOT commit (GH #34) - the calling service owns the
+    transaction, so e.g. decide_pending_suggestion's curated-row upsert and its
+    suggestion-status transition land, or roll back, together.
+    """
     existing = db.scalar(select(Field).where(Field.name == name))
     if existing is not None:
         return existing, False
     field = Field(name=name)
     db.add(field)
-    db.commit()
     return field, True
 
 
@@ -94,13 +100,14 @@ def add_role(db: Session, field: Field, name: str) -> tuple[Role, bool]:
 
     Scoped to the Field, not global - "Researcher" exists under both Healthcare
     and Education, and they are different rows.
+
+    Deliberately does NOT commit (GH #34) - same reasoning as add_field.
     """
     existing = db.scalar(select(Role).where(Role.field_id == field.id, Role.name == name))
     if existing is not None:
         return existing, False
     role = Role(field_id=field.id, name=name)
     db.add(role)
-    db.commit()
     return role, True
 
 
@@ -179,17 +186,20 @@ class SeedReport:
 
 
 def seed_default_fields(db: Session) -> SeedReport:
-    """Load DEFAULT_FIELDS as curated Fields."""
+    """Load DEFAULT_FIELDS as curated Fields. Commits once at the end (GH #34) -
+    add_field itself no longer does, so this owns the transaction."""
     report = SeedReport()
     for name in DEFAULT_FIELDS:
         _, created = add_field(db, name)
         report.fields_created += int(created)
+    db.commit()
     return report
 
 
 def seed_default_roles(db: Session) -> SeedReport:
     """Load DEFAULT_ROLES under their Fields, creating any missing Field first -
-    mirrors seed_default_sources's topic-then-source shape."""
+    mirrors seed_default_sources's topic-then-source shape. Commits once at the
+    end (GH #34), same reasoning as seed_default_fields."""
     report = SeedReport()
     for field_name, role_names in DEFAULT_ROLES.items():
         field, created = add_field(db, field_name)
@@ -197,15 +207,27 @@ def seed_default_roles(db: Session) -> SeedReport:
         for role_name in role_names:
             _, created = add_role(db, field, role_name)
             report.roles_created += int(created)
+    db.commit()
     return report
 
 
-def record_pending_suggestion(db: Session, *, kind: str, field_id: int | None, text: str) -> None:
-    """Stage a Pending Taxonomy Suggestion for admin review (AD-8).
+def record_pending_suggestion(
+    db: Session,
+    *,
+    kind: str,
+    field_id: int | None,
+    text: str,
+    parent_suggestion_id: int | None = None,
+) -> int:
+    """Stage a Pending Taxonomy Suggestion for admin review (AD-8). Returns its
+    id, so a Role submitted alongside an uncurated Field can record that
+    Field's suggestion id as its own `parent_suggestion_id`.
 
-    Matching is scoped to `status='pending'` rows with the same kind and
-    field_id, so a resubmission of text that was already approved/rejected
-    creates a fresh pending row rather than reopening the decided one.
+    Matching is scoped to `status='pending'` rows with the same kind, field_id
+    and parent_suggestion_id, so a resubmission of text that was already
+    approved/rejected creates a fresh pending row rather than reopening the
+    decided one - and an orphan Role submitted under a *different* uncurated
+    Field never merges with one that happens to share its text.
 
     The first submitter's spelling is kept as `raw_text`; later matching
     submissions only bump the count, so the display form stays stable while the
@@ -221,24 +243,29 @@ def record_pending_suggestion(db: Session, *, kind: str, field_id: int | None, t
             PendingTaxonomySuggestion.field_id.is_(field_id)
             if field_id is None
             else PendingTaxonomySuggestion.field_id == field_id,
+            PendingTaxonomySuggestion.parent_suggestion_id.is_(parent_suggestion_id)
+            if parent_suggestion_id is None
+            else PendingTaxonomySuggestion.parent_suggestion_id == parent_suggestion_id,
             PendingTaxonomySuggestion.normalized_text == normalized,
             PendingTaxonomySuggestion.status == STATUS_PENDING,
         )
     )
     if pending is not None:
         pending.submission_count += 1
-        return
+        return pending.id
 
-    db.add(
-        PendingTaxonomySuggestion(
-            kind=kind,
-            field_id=field_id,
-            normalized_text=normalized,
-            raw_text=text.strip(),
-            submission_count=1,
-            status=STATUS_PENDING,
-        )
+    row = PendingTaxonomySuggestion(
+        kind=kind,
+        field_id=field_id,
+        parent_suggestion_id=parent_suggestion_id,
+        normalized_text=normalized,
+        raw_text=text.strip(),
+        submission_count=1,
+        status=STATUS_PENDING,
     )
+    db.add(row)
+    db.flush()
+    return row.id
 
 
 @dataclass(frozen=True)
@@ -316,6 +343,22 @@ class RoleHasNoFieldError(ValueError):
         super().__init__("Cannot promote a role suggestion that has no curated field.")
 
 
+def _linked_pending_roles(
+    db: Session, field_suggestion_id: int
+) -> list[PendingTaxonomySuggestion]:
+    """Pending Role suggestions submitted alongside Field suggestion
+    `field_suggestion_id` while it was still uncurated (`parent_suggestion_id`,
+    GH admin feedback 2026-08-17)."""
+    return list(
+        db.scalars(
+            select(PendingTaxonomySuggestion).where(
+                PendingTaxonomySuggestion.parent_suggestion_id == field_suggestion_id,
+                PendingTaxonomySuggestion.status == STATUS_PENDING,
+            )
+        )
+    )
+
+
 def decide_pending_suggestion(
     db: Session, suggestion_id: int, *, status: str, name: str | None = None
 ) -> PendingSuggestionView | None:
@@ -323,7 +366,9 @@ def decide_pending_suggestion(
 
     Promoting does two separate things (AD-2): it upserts the real Field/Role
     row, and it transitions the suggestion to `approved`. Dismissing only does
-    the latter, with `rejected`.
+    the latter, with `rejected`. Both writes land in the single `db.commit()`
+    below - add_field/add_role stage without committing, so a failure between
+    the two can never leave one durable without the other (GH #34).
 
     `name` lets the admin correct the curated spelling before it is written -
     rows predating the `raw_text` column carry only casefolded text, which would
@@ -354,7 +399,19 @@ def decide_pending_suggestion(
                 raise RoleHasNoFieldError()
             add_role(db, field, curated_name)
         else:
-            add_field(db, curated_name)
+            field, _ = add_field(db, curated_name)
+            # Unblocks (does not auto-approve) every Role suggestion submitted
+            # alongside this Field while it was still uncurated - the admin
+            # still decides each one individually (GH admin feedback,
+            # 2026-08-17).
+            for linked in _linked_pending_roles(db, row.id):
+                linked.field_id = field.id
+    elif status == STATUS_REJECTED and row.kind == KIND_FIELD:
+        # Cascades to just this Field's own Role suggestions - never the
+        # reverse, deciding a Role never touches its Field (GH admin
+        # feedback, 2026-08-17).
+        for linked in _linked_pending_roles(db, row.id):
+            linked.status = STATUS_REJECTED
 
     row.status = status
     db.commit()
