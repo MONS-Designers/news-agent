@@ -1,5 +1,20 @@
 # Deferred Work
 
+## Deferred from: frontend component test coverage expansion, GH #42 and beyond (2026-08-17)
+
+- source_spec: none
+  summary: A returning user whose saved Field is uncurated ("Other" text, e.g. "ביולוגיה ימית") is saved and reloaded correctly, but the prefill renders with no chip visibly selected and no free-text input shown - the value is functionally present (`canContinue`/save both see it) but invisible until the user touches the Field row themselves.
+  evidence: Reproduced in `frontend/src/components/profile-picker/__tests__/AboutYouStep.spec.ts` ("functionally captures an uncurated Field prefill..."). Root cause: `AboutYouStep.vue`'s `onMounted` prefill sets `fieldName.value` directly to the actual field-name string while also setting `fieldIsOther.value = true`, but `ChipRow.vue`'s `otherButtonActive` computed (`isOther.value && selectedName.value === null`) requires `selectedName` to be `null` to show the free-text input or mark "אחר" selected - a real value in `selectedName` alongside `isOther=true` is a state `ChipRow`'s own `selectOther()` never produces itself, only this prefill path does. Needs a decision: either the prefill should route through `ChipRow`'s own Other-selection shape (`selectedName=null`, `otherText=<value>`), or `otherButtonActive` should also accept a non-null `selectedName` when it doesn't match any curated chip.
+- source_spec: none
+  summary: The identical bug, independently, for an uncurated Role prefill (`role_name` that doesn't match any fetched curated Role for the selected Field) - same invisible-but-functional state.
+  evidence: Reproduced in the same spec file ("documents current behavior: an uncurated Role prefill..."). Same root cause as above, in the sibling `watch([fieldName, fieldIsOther])` handler's `pendingRolePrefill` no-match branch (`AboutYouStep.vue`). Worth fixing both call sites together, since they're the same defect in two places rather than two separate bugs.
+- source_spec: none
+  summary: `PreferencesView.vue`'s template has two independent `v-if` chains - the first gates the loading/error/summary panel, the second independently gates the subscription-toggle box vs. `ProfilePickerShell`. Since `showSummary` is false whenever `profile` hasn't successfully loaded (including while `loading` is true, or after a load error), the second chain's `v-else` renders `ProfilePickerShell` *underneath* the loading spinner or the error banner rather than being suppressed by either.
+  evidence: Reproduced in `frontend/src/views/__tests__/PreferencesView.spec.ts` ("documents current behavior: the profile wizard also renders underneath an error banner..."). Not visually validated against the real page (only asserted via the DOM in jsdom), so the practical severity (does it read as broken, or just as extra whitespace/an odd flash) needs an eyeball check before deciding whether this is cosmetic or worth a `v-if="!loading && !errorMessage"` guard added to the second chain.
+- source_spec: none
+  summary: After a brand-new user completes the profile wizard for the first time, `PreferencesView.vue` stays on the wizard instead of switching to the returning-user summary - `TopicsStep.vue`'s `saved` event only triggers `refreshPreferencesQuietly()` (re-fetches `preferences`), never re-fetching `profile`, so `profile.value.field_name` stays `null` client-side even though the wizard's own steps already saved a real `field_name`/`role_name` server-side.
+  evidence: Reproduced in the same spec file ("after first completing the wizard as a new user, does not switch to the summary view..."). The user only sees the summary after a full page reload. Needs a decision: have `refreshPreferencesQuietly` (or a renamed equivalent) also re-fetch `profile`, or have `TopicsStep.vue`'s `saved` event carry enough data to flip `showSummary` locally.
+
 ## Deferred from: live manual testing of the Taxonomy Curation Queue cascade fix (2026-08-17)
 
 - source_spec: none
