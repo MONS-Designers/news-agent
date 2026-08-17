@@ -18,11 +18,32 @@ def db() -> Session:
         yield session
 
 
-def test_admin_email_resolves_as_admin(db: Session):
-    identity = resolve_identity(db, "admin@example.com")
+def test_admin_email_also_self_registers_when_cap_allows(db: Session):
+    identity = resolve_identity(db, "admin@example.com", name="Admin", cap=10)
+    assert identity is not None
+    assert identity.is_admin is True
+    assert identity.user_id is not None
+    created = db.scalar(select(User).where(User.email == "admin@example.com"))
+    assert created is not None
+
+
+def test_admin_still_signs_in_when_cap_is_full(db: Session):
+    # The cap gates self-registration, never login: an Admin must always be
+    # able to sign in, even with no room left to also become a User.
+    identity = resolve_identity(db, "admin@example.com", cap=1)
     assert identity is not None
     assert identity.is_admin is True
     assert identity.user_id is None
+
+
+def test_admin_with_existing_user_row_resolves_both(db: Session):
+    db.add(User(email="admin@example.com", name="Admin"))
+    db.commit()
+
+    identity = resolve_identity(db, "admin@example.com")
+    assert identity is not None
+    assert identity.is_admin is True
+    assert identity.user_id is not None
 
 
 def test_user_email_resolves_with_user_id(db: Session):
