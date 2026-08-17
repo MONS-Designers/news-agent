@@ -13,6 +13,9 @@ logs/
 .ruff_cache/
 dist/
 build/
+frontend/e2e/.tmp/
+frontend/test-results/
+frontend/playwright-report/
 .claude/settings.local.json
 .vscode/
 _bmad/*
