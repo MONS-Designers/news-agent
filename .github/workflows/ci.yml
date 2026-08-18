@@ -83,5 +83,3 @@ jobs:
       - name: Run E2E tests
         working-directory: frontend
         run: npm run test:e2e
-        env:
-          DEBUG: pw:webserver

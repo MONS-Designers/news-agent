@@ -61,7 +61,7 @@ export default defineConfig({
       stderr: "pipe",
     },
     {
-      command: `npm run dev -- --port ${FRONTEND_PORT} --strictPort`,
+      command: `npm run dev -- --port ${FRONTEND_PORT} --strictPort --host 127.0.0.1`,
       cwd: __dirname,
       url: FRONTEND_URL,
       env: { E2E_BACKEND_URL: BACKEND_URL },
