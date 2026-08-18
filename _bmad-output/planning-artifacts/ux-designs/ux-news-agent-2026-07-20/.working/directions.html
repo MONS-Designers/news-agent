@@ -1,0 +1,205 @@
+<!doctype html>
+<html dir="rtl" lang="he">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>שני כיווני עיצוב - מייל הדייג'סט</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 32px 16px 64px;
+    background: #e5e7eb;
+    font-family: 'Segoe UI', 'Rubik', Arial, sans-serif;
+    color: #111827;
+  }
+  .page-head { max-width: 1280px; margin: 0 auto 28px; text-align: center; }
+  .page-head h1 { font-size: 24px; margin: 0 0 6px; }
+  .page-head p { color: #6b7280; margin: 0; font-size: 14px; }
+  .stage {
+    display: flex; gap: 32px; justify-content: center;
+    align-items: flex-start; flex-wrap: wrap; max-width: 1320px; margin: 0 auto;
+  }
+  .col { flex: 0 1 600px; max-width: 600px; width: 100%; }
+  .col-label {
+    text-align: center; font-size: 13px; font-weight: 700; letter-spacing: 2px;
+    text-transform: uppercase; color: #374151; margin-bottom: 12px;
+  }
+  .col-label small { display:block; font-weight:400; letter-spacing:0; text-transform:none; color:#9ca3af; margin-top:4px; }
+  .email { border-radius: 16px; overflow: hidden; box-shadow: 0 20px 40px -12px rgba(0,0,0,.35); }
+
+  /* ---------------- Direction 1: MIDNIGHT ---------------- */
+  .m { background: #0b1020; color: #e8edf7; font-family: Georgia, 'Times New Roman', serif; }
+  .m-head { padding: 30px 30px 22px; border-bottom: 1px solid rgba(245,158,11,.25); position: relative; }
+  .m-kicker { font-family:'Segoe UI',sans-serif; font-size:11px; letter-spacing:4px; text-transform:uppercase; color:#f59e0b; }
+  .m-title { font-size: 34px; font-weight: 700; margin: 8px 0 4px; letter-spacing:-.5px; color:#fff; }
+  .m-meta { font-family:'Segoe UI',sans-serif; font-size:12px; color:#8a94ad; }
+  .m-intro { padding: 22px 30px 6px; font-size: 17px; line-height: 1.7; color:#cdd6ea; font-style: italic; }
+  .m-scan { margin: 18px 30px; padding: 16px 20px; border: 1px solid rgba(245,158,11,.3); border-radius: 12px; background: rgba(245,158,11,.05); }
+  .m-scan-h { font-family:'Segoe UI',sans-serif; font-size:11px; letter-spacing:2px; text-transform:uppercase; color:#f59e0b; margin-bottom:10px; }
+  .m-scan-item { font-family:'Segoe UI',sans-serif; font-size:14px; color:#dbe2f2; padding:4px 0; line-height:1.5; }
+  .m-scan-item b { color:#f59e0b; font-weight:700; }
+  .m-art { padding: 22px 30px 8px; }
+  .m-tag { font-family:'Segoe UI',sans-serif; display:inline-block; font-size:10px; letter-spacing:1px; text-transform:uppercase; padding:4px 12px; border-radius:20px; border:1px solid; }
+  .m-ah { font-size: 23px; font-weight:700; color:#fff; line-height:1.3; margin:12px 0 10px; }
+  .m-b { list-style:none; padding:0; margin:0; }
+  .m-b li { font-family:'Segoe UI',sans-serif; font-size:14.5px; color:#c3cde3; line-height:1.6; padding:3px 0 3px 0; padding-inline-start:18px; position:relative; }
+  .m-b li:before { content:'-'; position:absolute; inset-inline-start:0; color:#f59e0b; }
+  .m-b strong { color:#fff; }
+  .m-src { font-family:'Segoe UI',sans-serif; font-size:12px; color:#7a85a0; margin-top:12px; padding-top:10px; border-top:1px solid rgba(255,255,255,.07); }
+  .m-src a { color:#f59e0b; text-decoration:none; }
+  /* Midnight קינוח: neon fortune / magic-8-ball */
+  .m-fortune { margin: 26px 30px 20px; border-radius:16px; padding:26px 22px; text-align:center;
+    background: radial-gradient(circle at 50% 0%, #1e2a4a, #0b1020 70%);
+    border:1px solid rgba(245,158,11,.4); box-shadow: inset 0 0 40px rgba(245,158,11,.12); }
+  .m-fortune-k { font-family:'Segoe UI',sans-serif; font-size:11px; letter-spacing:3px; text-transform:uppercase; color:#f59e0b; }
+  .m-orb { width:64px; height:64px; margin:14px auto 12px; border-radius:50%;
+    background: radial-gradient(circle at 35% 30%, #fcd34d, #b45309 65%, #78350f);
+    box-shadow: 0 0 30px rgba(245,158,11,.5), inset -6px -8px 14px rgba(0,0,0,.4);
+    display:flex; align-items:center; justify-content:center; font-size:26px; }
+  .m-punch { font-size:19px; line-height:1.6; color:#fde9c7; max-width:420px; margin:0 auto; }
+  .m-foot { padding:20px 30px; font-family:'Segoe UI',sans-serif; font-size:12px; color:#6b7590; border-top:1px solid rgba(255,255,255,.07); }
+  .m-foot a { color:#a6b0c9; }
+
+  /* ---------------- Direction 2: BROADSHEET ---------------- */
+  .b { background: #faf7f0; color: #1a1a1a; font-family: 'Segoe UI', Arial, sans-serif; }
+  .b-head { padding: 28px 32px 18px; border-bottom: 3px double #1a1a1a; text-align:center; }
+  .b-kicker { font-size:11px; letter-spacing:5px; text-transform:uppercase; color:#c81e1e; font-weight:700; }
+  .b-title { font-family: Georgia, serif; font-size: 40px; font-weight:700; margin:6px 0 6px; letter-spacing:-1px; }
+  .b-meta { font-size:12px; color:#555; letter-spacing:.5px; }
+  .b-meta b { color:#c81e1e; }
+  .b-intro { padding: 22px 32px 4px; font-size:17px; line-height:1.7; color:#333; }
+  .b-intro:first-letter { font-family:Georgia,serif; font-size:44px; font-weight:700; float:right; line-height:.8; margin-inline-start:8px; color:#c81e1e; }
+  .b-scan { margin: 18px 32px; padding: 16px 0; border-top:1px solid #d6cfbf; border-bottom:1px solid #d6cfbf; }
+  .b-scan-h { font-size:11px; letter-spacing:3px; text-transform:uppercase; color:#c81e1e; font-weight:700; margin-bottom:10px; }
+  .b-scan-item { font-size:14.5px; color:#2a2a2a; padding:4px 0; line-height:1.5; }
+  .b-scan-item span { color:#c81e1e; font-weight:700; }
+  .b-art { padding: 20px 32px 6px; }
+  .b-tag { display:inline-block; font-size:10px; letter-spacing:1.5px; text-transform:uppercase; font-weight:700; padding:3px 0; border-bottom:2px solid; }
+  .b-ah { font-family:Georgia,serif; font-size:26px; font-weight:700; line-height:1.25; margin:8px 0 10px; }
+  .b-b { list-style:none; padding:0; margin:0; }
+  .b-b li { font-size:14.5px; color:#333; line-height:1.65; padding:3px 0; padding-inline-start:16px; position:relative; }
+  .b-b li:before { content:'▪'; position:absolute; inset-inline-start:0; color:#c81e1e; }
+  .b-src { font-size:12px; color:#777; margin-top:12px; padding-top:10px; border-top:1px solid #e6e0d3; }
+  .b-src a { color:#c81e1e; text-decoration:none; font-weight:600; }
+  /* Broadsheet קינוח: back-page scratch/lottery ticket */
+  .b-ticket { margin: 26px 32px 20px; position:relative; }
+  .b-ticket-inner { border:2px dashed #1a1a1a; border-radius:6px; padding:22px 20px; text-align:center; background:
+    repeating-linear-gradient(45deg, #fff 0 10px, #fbf3e6 10px 20px); }
+  .b-ticket-k { font-size:11px; letter-spacing:2px; text-transform:uppercase; color:#1a1a1a; font-weight:700; margin-bottom:4px; }
+  .b-ticket-sub { font-size:12px; color:#8a7a55; margin-bottom:14px; }
+  .b-foil { display:inline-block; padding:12px 22px; border-radius:4px; margin-bottom:14px;
+    background: linear-gradient(135deg,#b8b8b8,#e9e9e9 40%,#9a9a9a 60%,#cfcfcf);
+    color:#5a5a5a; font-size:12px; letter-spacing:3px; font-weight:700; text-transform:uppercase;
+    box-shadow: inset 0 2px 4px rgba(255,255,255,.6), inset 0 -2px 4px rgba(0,0,0,.2); }
+  .b-punch { font-family:Georgia,serif; font-size:19px; line-height:1.55; color:#1a1a1a; max-width:400px; margin:0 auto; }
+  .b-perf-l, .b-perf-r { position:absolute; top:50%; width:18px; height:18px; border-radius:50%; background:#faf7f0; transform:translateY(-50%); }
+  .b-perf-l { inset-inline-start:-9px; } .b-perf-r { inset-inline-end:-9px; }
+  .b-foot { padding:20px 32px; font-size:12px; color:#888; border-top:1px solid #d6cfbf; }
+  .b-foot a { color:#555; }
+
+  @media (max-width: 700px){ .stage{ gap:44px; } }
+</style>
+</head>
+<body>
+<div class="page-head">
+  <h1>שני כיווני עיצוב - מייל הדייג'סט</h1>
+  <p>אותו תוכן, שתי אישיויות. פתח, גלול, השווה. הקינוח בכל אחד בסגנון "גירוד לגילוי".</p>
+</div>
+
+<div class="stage">
+
+  <!-- ============ MIDNIGHT ============ -->
+  <div class="col">
+    <div class="col-label">כיוון 1 · חצות<small>כהה · פרימיום · תדרוך לילי</small></div>
+    <div class="email m">
+      <div class="m-head">
+        <div class="m-kicker">תדרוך יומי</div>
+        <div class="m-title">חדשות הבוקר</div>
+        <div class="m-meta">20 ביולי 2026 · 5 דקות קריאה</div>
+      </div>
+      <div class="m-intro">בוקר טוב, נעם. הלילה עולם ה־AI לא נתן לאף אחד לנוח - ריכזתי לך את מה שבאמת זז.</div>
+      <div class="m-scan">
+        <div class="m-scan-h">◆ 30 שניות על קצה המזלג</div>
+        <div class="m-scan-item"><b>OpenAI</b> חושפת מודל שמריץ סוכנים פי 10 מהר יותר</div>
+        <div class="m-scan-item"><b>ג'יימס וב</b> מזהה אטמוספירה על כוכב לכת רחוק</div>
+        <div class="m-scan-item"><b>מתקפת סייבר</b> משביתה רשת בתי חולים באירופה</div>
+      </div>
+      <div class="m-art">
+        <span class="m-tag" style="color:#4ade80;border-color:#4ade80;">בינה מלאכותית</span>
+        <div class="m-ah">OpenAI חושפת מודל שמריץ סוכנים פי 10 מהר יותר</div>
+        <ul class="m-b">
+          <li>המודל החדש <strong>מייעל את זמן ההסקה</strong> תוך שימוש בפחות משאבי חישוב.</li>
+          <li>מפתחים כבר מדווחים על <strong>סוכנים אוטונומיים</strong> שרצים בזמן אמת.</li>
+          <li>המחיר לטוקן <strong>צונח בכ־40%</strong> לעומת הדור הקודם.</li>
+        </ul>
+        <div class="m-src">TechCrunch · 2 דק׳ · <a href="#">למקור באנגלית ←</a></div>
+      </div>
+      <div class="m-art">
+        <span class="m-tag" style="color:#818cf8;border-color:#818cf8;">חלל</span>
+        <div class="m-ah">טלסקופ ג'יימס וב מזהה אטמוספירה על כוכב לכת רחוק</div>
+        <ul class="m-b">
+          <li>זוהו <strong>מולקולות מים</strong> באטמוספירה של כוכב במרחק 120 שנות אור.</li>
+          <li>הממצא <strong>מחזק את הסיכוי</strong> לתנאים תומכי־חיים.</li>
+        </ul>
+        <div class="m-src">NASA · 3 דק׳ · <a href="#">למקור באנגלית ←</a></div>
+      </div>
+      <div class="m-fortune">
+        <div class="m-fortune-k">✨ קינוח · הכדור הקסום של החדשות</div>
+        <div class="m-orb">🔮</div>
+        <div class="m-punch">"שאלתי את ה־AI אם הוא ישתלט על העולם. הוא ענה: 'רק אחרי שאסיים לטעון… 99%'."</div>
+      </div>
+      <div class="m-foot">שלחתי לך את זה כי ביקשת שאשמור לך על הדופק. משהו לא מדויק? <a href="#">בוא נכוונן יחד ←</a></div>
+    </div>
+  </div>
+
+  <!-- ============ BROADSHEET ============ -->
+  <div class="col">
+    <div class="col-label">כיוון 2 · מהדורה<small>בהיר · עיתונאי · דף ראשון</small></div>
+    <div class="email b">
+      <div class="b-head">
+        <div class="b-kicker">מהדורת בוקר</div>
+        <div class="b-title">חדשות הבוקר</div>
+        <div class="b-meta">יום ראשון, 20 ביולי 2026 · <b>5 דקות קריאה</b></div>
+      </div>
+      <div class="b-intro">בוקר טוב, נעם. הלילה עולם ה־AI לא נתן לאף אחד לנוח - ריכזתי לך את מה שבאמת זז.</div>
+      <div class="b-scan">
+        <div class="b-scan-h">- 30 שניות על קצה המזלג -</div>
+        <div class="b-scan-item"><span>OpenAI</span> חושפת מודל שמריץ סוכנים פי 10 מהר יותר</div>
+        <div class="b-scan-item"><span>ג'יימס וב</span> מזהה אטמוספירה על כוכב לכת רחוק</div>
+        <div class="b-scan-item"><span>מתקפת סייבר</span> משביתה רשת בתי חולים באירופה</div>
+      </div>
+      <div class="b-art">
+        <span class="b-tag" style="color:#15803d;border-color:#15803d;">בינה מלאכותית</span>
+        <div class="b-ah">OpenAI חושפת מודל שמריץ סוכנים פי 10 מהר יותר</div>
+        <ul class="b-b">
+          <li>המודל החדש <strong>מייעל את זמן ההסקה</strong> תוך שימוש בפחות משאבי חישוב.</li>
+          <li>מפתחים כבר מדווחים על <strong>סוכנים אוטונומיים</strong> שרצים בזמן אמת.</li>
+          <li>המחיר לטוקן <strong>צונח בכ־40%</strong> לעומת הדור הקודם.</li>
+        </ul>
+        <div class="b-src">TechCrunch · 2 דק׳ · <a href="#">למקור באנגלית ←</a></div>
+      </div>
+      <div class="b-art">
+        <span class="b-tag" style="color:#4338ca;border-color:#4338ca;">חלל</span>
+        <div class="b-ah">טלסקופ ג'יימס וב מזהה אטמוספירה על כוכב לכת רחוק</div>
+        <ul class="b-b">
+          <li>זוהו <strong>מולקולות מים</strong> באטמוספירה של כוכב במרחק 120 שנות אור.</li>
+          <li>הממצא <strong>מחזק את הסיכוי</strong> לתנאים תומכי־חיים.</li>
+        </ul>
+        <div class="b-src">NASA · 3 דק׳ · <a href="#">למקור באנגלית ←</a></div>
+      </div>
+      <div class="b-ticket">
+        <span class="b-perf-l"></span><span class="b-perf-r"></span>
+        <div class="b-ticket-inner">
+          <div class="b-ticket-k">🎟 קינוח · כרטיס המזל היומי</div>
+          <div class="b-ticket-sub">גירדת את החדשות - עכשיו גרד חיוך</div>
+          <div class="b-foil">◇ ◇ ◇ גורד ◇ ◇ ◇</div>
+          <div class="b-punch">"שאלתי את ה־AI אם הוא ישתלט על העולם. הוא ענה: 'רק אחרי שאסיים לטעון… 99%'."</div>
+        </div>
+      </div>
+      <div class="b-foot">שלחתי לך את זה כי ביקשת שאשמור לך על הדופק. משהו לא מדויק? <a href="#">בוא נכוונן יחד ←</a></div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

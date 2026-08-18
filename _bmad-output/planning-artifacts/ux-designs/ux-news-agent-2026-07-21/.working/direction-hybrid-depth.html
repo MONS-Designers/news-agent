@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>NewsAgent - Direction: Hybrid Depth</title>
+<style>
+/*
+  Hybrid direction: restraint of "Crisp Minimal SaaS" (#1) + the interactive
+  "game" quality of "RPG Class Select" (#2) - but the game feel comes from
+  scroll/mouse-driven depth (parallax background layers), not neon color or
+  playful copy. Tone: serious, mysterious, professional.
+
+  Palette:
+    --bg-void:      #0a0d16   (near-black base)
+    --bg-panel:     rgba(255,255,255,0.04)
+    --panel-border: rgba(255,255,255,0.09)
+    --panel-border-hover: rgba(255,255,255,0.18)
+    --ink:          #eef1f8
+    --ink-dim:      #8b93a7
+    --ink-faint:    #565f74
+    --accent:       #6d7bff   (restrained indigo-violet, not neon)
+    --accent-soft:  rgba(109,123,255,0.14)
+    --accent-glow:  rgba(109,123,255,0.35)
+    --orb-a:        #4b3fae
+    --orb-b:        #1f6f78
+    --orb-c:        #7a3b6e
+*/
+html, body { height: 100%; }
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Arial, sans-serif;
+  background: #0a0d16;
+  color: #eef1f8;
+  overflow-x: hidden;
+  min-height: 100vh;
+}
+
+/* fixed depth layer, sits behind everything, shifts with mouse + scroll */
+.depth-field {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(70px);
+  opacity: 0.35;
+  will-change: transform;
+  transition: transform 0.15s ease-out;
+}
+.orb-a { width: 460px; height: 460px; top: -120px; left: -80px; background: radial-gradient(circle, #4b3fae, transparent 70%); }
+.orb-b { width: 380px; height: 380px; top: 40%; right: -100px; background: radial-gradient(circle, #1f6f78, transparent 70%); }
+.orb-c { width: 340px; height: 340px; bottom: -140px; left: 30%; background: radial-gradient(circle, #7a3b6e, transparent 70%); }
+
+.grain {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0.35;
+  background-image: radial-gradient(rgba(255,255,255,0.045) 1px, transparent 1px);
+  background-size: 26px 26px;
+}
+
+.chrome {
+  position: relative;
+  z-index: 2;
+  max-width: 760px;
+  margin: 40px auto 120px;
+  padding: 0 24px;
+}
+.browserbar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 12px 16px; margin-bottom: 28px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 10px 10px 0 0;
+}
+.dot { width: 10px; height: 10px; border-radius: 50%; background: #3a3f52; }
+.urlbar { margin-left: 10px; font-size: 12px; color: #6b7288; }
+
+.reveal {
+  opacity: 0;
+  transform: translateY(22px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+.reveal.in { opacity: 1; transform: translateY(0); }
+
+.kicker {
+  font-size: 11px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase;
+  color: #6d7bff; margin: 0 0 10px;
+}
+h1 { font-size: 34px; font-weight: 650; letter-spacing: -0.5px; margin: 0 0 10px; color: #f4f6fb; }
+.sub { font-size: 15px; color: #8b93a7; line-height: 1.55; margin: 0 0 40px; max-width: 52ch; }
+
+.panel {
+  background: rgba(255,255,255,0.035);
+  border: 1px solid rgba(255,255,255,0.09);
+  border-radius: 16px;
+  padding: 26px;
+  margin-bottom: 22px;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  transition: border-color 0.25s ease, transform 0.25s ease;
+}
+.panel:hover { border-color: rgba(255,255,255,0.16); }
+
+.stephead { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+.stepnum {
+  width: 22px; height: 22px; border-radius: 6px;
+  background: rgba(109,123,255,0.16); color: #a9b1ff;
+  font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center;
+}
+.steplabel { font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: #6b7288; }
+
+.chiprow { display: flex; flex-wrap: wrap; gap: 10px; }
+.chip {
+  padding: 11px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.09);
+  background: rgba(255,255,255,0.02);
+  color: #c4cadb;
+  font-size: 13.5px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+.chip:hover { border-color: rgba(255,255,255,0.22); background: rgba(255,255,255,0.05); transform: translateY(-1px); }
+.chip.selected {
+  background: linear-gradient(180deg, rgba(109,123,255,0.22), rgba(109,123,255,0.10));
+  border-color: rgba(109,123,255,0.55);
+  color: #fff;
+  box-shadow: 0 0 0 1px rgba(109,123,255,0.25), 0 8px 24px -8px rgba(109,123,255,0.45);
+}
+.chip.other {
+  border-style: dashed;
+  color: #8b93a7;
+}
+.chip.other.selected { border-style: solid; }
+
+.otherinput {
+  margin-top: 12px;
+  width: 100%;
+  padding: 11px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(109,123,255,0.4);
+  background: rgba(109,123,255,0.06);
+  color: #eef1f8;
+  font-size: 13.5px;
+  outline: none;
+}
+.otherinput::placeholder { color: #565f74; }
+
+.segrow {
+  display: flex; gap: 2px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  padding: 3px;
+}
+.seg {
+  flex: 1; text-align: center; padding: 9px 0;
+  border-radius: 8px; font-size: 13px; color: #8b93a7; cursor: pointer;
+  transition: all 0.18s ease;
+}
+.seg.selected { background: rgba(109,123,255,0.18); color: #fff; }
+
+.prompts { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.prompt {
+  font-size: 12px; color: #8b93a7;
+  padding: 6px 12px; border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.02);
+  cursor: pointer;
+}
+.prompt:hover { color: #c4cadb; border-color: rgba(255,255,255,0.18); }
+textarea {
+  width: 100%; min-height: 76px; resize: vertical;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.09);
+  border-radius: 12px; padding: 14px;
+  color: #eef1f8; font-size: 13.5px; font-family: inherit; line-height: 1.5;
+  outline: none;
+}
+textarea:focus { border-color: rgba(109,123,255,0.5); }
+textarea::placeholder { color: #565f74; }
+
+.suggestbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.cap { font-size: 12px; color: #565f74; }
+.cap b { color: #a9b1ff; }
+
+.topicgrid { display: flex; flex-wrap: wrap; gap: 10px; }
+.topic {
+  padding: 10px 15px; border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.09);
+  background: rgba(255,255,255,0.02);
+  color: #8b93a7; font-size: 13px; cursor: pointer;
+  display: flex; align-items: center; gap: 7px;
+  transition: all 0.18s ease;
+}
+.topic:hover { border-color: rgba(255,255,255,0.2); }
+.topic.picked {
+  background: linear-gradient(180deg, rgba(109,123,255,0.22), rgba(109,123,255,0.09));
+  border-color: rgba(109,123,255,0.5);
+  color: #fff;
+}
+.topic .x { opacity: 0.6; font-size: 11px; }
+.topic.faint { opacity: 0.45; border-style: dashed; }
+
+.foot { text-align: center; margin-top: 44px; font-size: 12px; color: #454c60; }
+</style>
+</head>
+<body>
+
+<div class="depth-field">
+  <div class="orb orb-a" id="orb-a"></div>
+  <div class="orb orb-b" id="orb-b"></div>
+  <div class="orb orb-c" id="orb-c"></div>
+</div>
+<div class="grain"></div>
+
+<div class="chrome">
+  <div class="browserbar">
+    <div class="dot" style="background:#e5555f"></div>
+    <div class="dot" style="background:#e0a63e"></div>
+    <div class="dot" style="background:#4bb26b"></div>
+    <div class="urlbar">app.newsagent.io/preferences</div>
+  </div>
+
+  <div class="reveal in">
+    <p class="kicker">Preferences</p>
+    <h1>Set up your profile</h1>
+    <p class="sub">A few details help us suggest the right topics - nothing here is permanent, you can change it any time.</p>
+  </div>
+
+  <div class="panel reveal in">
+    <div class="stephead"><span class="stepnum">1</span><span class="steplabel">Field</span></div>
+    <div class="chiprow">
+      <div class="chip selected">Tech</div>
+      <div class="chip">Finance</div>
+      <div class="chip">Healthcare</div>
+      <div class="chip">Education</div>
+      <div class="chip">Design</div>
+      <div class="chip other">Other</div>
+    </div>
+  </div>
+
+  <div class="panel reveal in">
+    <div class="stephead"><span class="stepnum">2</span><span class="steplabel">Role</span></div>
+    <div class="chiprow">
+      <div class="chip">Software Engineer</div>
+      <div class="chip">Product Manager</div>
+      <div class="chip">Data Scientist</div>
+      <div class="chip">Founder / Exec</div>
+      <div class="chip other selected">Other</div>
+    </div>
+    <input class="otherinput" placeholder="e.g. Developer Relations" value="Developer Relations" />
+  </div>
+
+  <div class="panel reveal in">
+    <div class="stephead"><span class="stepnum">3</span><span class="steplabel">Experience</span></div>
+    <div class="segrow">
+      <div class="seg">0–2 yrs</div>
+      <div class="seg selected">3–5 yrs</div>
+      <div class="seg">6–10 yrs</div>
+      <div class="seg">10+ yrs</div>
+    </div>
+  </div>
+
+  <div class="panel reveal in">
+    <div class="stephead"><span class="stepnum">4</span><span class="steplabel">Interests (optional)</span></div>
+    <div class="prompts">
+      <div class="prompt">✦ What are you building right now?</div>
+      <div class="prompt">✦ What do you wish you understood better?</div>
+    </div>
+    <textarea placeholder="Type freely - we'll use this to sharpen your suggestions...">Trying to understand LLM infra costs at small scale, and how local models actually get deployed in production.</textarea>
+  </div>
+
+  <div class="panel reveal in">
+    <div class="suggestbar">
+      <div class="stephead" style="margin:0"><span class="stepnum">5</span><span class="steplabel">Suggested topics</span></div>
+      <div class="cap">Selected <b>4</b> / 4</div>
+    </div>
+    <div class="topicgrid">
+      <div class="topic picked">AI &amp; Machine Learning <span class="x">✕</span></div>
+      <div class="topic picked">Developer Tools <span class="x">✕</span></div>
+      <div class="topic picked">Startups <span class="x">✕</span></div>
+      <div class="topic picked">Open Source <span class="x">✕</span></div>
+      <div class="topic faint">Cloud &amp; Infra</div>
+      <div class="topic faint">Cybersecurity</div>
+      <div class="topic faint">Product Design</div>
+    </div>
+  </div>
+
+  <p class="foot">4 selected · tap a faint topic to swap it in</p>
+</div>
+
+<script>
+  // Mouse + scroll driven parallax on the background orbs.
+  // Both handlers recompute each orb's full transform from current state -
+  // never append to the existing transform string (that grows unbounded
+  // and freezes the tab under fast/repeated scroll events).
+  var orbs = [
+    { el: document.getElementById('orb-a'), depthX: 26, scrollFactor: 0.04 },
+    { el: document.getElementById('orb-b'), depthX: 40, scrollFactor: -0.06 },
+    { el: document.getElementById('orb-c'), depthX: 18, scrollFactor: 0.03 }
+  ];
+  var mouseX = 0, mouseY = 0, scrollY = 0;
+
+  function applyOrbTransforms() {
+    orbs.forEach(function (o) {
+      var x = mouseX * o.depthX;
+      var y = mouseY * o.depthX + scrollY * o.scrollFactor;
+      o.el.style.transform = 'translate(' + x + 'px, ' + y + 'px)';
+    });
+  }
+
+  window.addEventListener('mousemove', function (e) {
+    mouseX = (e.clientX / window.innerWidth) - 0.5;
+    mouseY = (e.clientY / window.innerHeight) - 0.5;
+    applyOrbTransforms();
+  });
+
+  window.addEventListener('scroll', function () {
+    scrollY = window.scrollY;
+    applyOrbTransforms();
+  }, { passive: true });
+
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (entry) {
+      if (entry.isIntersecting) entry.target.classList.add('in');
+    });
+  }, { threshold: 0.15 });
+  document.querySelectorAll('.reveal').forEach(function (el) { io.observe(el); });
+</script>
+</body>
+</html>

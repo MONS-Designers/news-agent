@@ -4,8 +4,23 @@ __pycache__/
 .venv/
 venv/
 .env
+*.db
+# NEWSAGENT_LOG_FILE output - at DEBUG these contain raw LLM responses and article text
+*.log
+logs/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
 dist/
 build/
+frontend/e2e/.tmp/
+frontend/test-results/
+frontend/playwright-report/
+.claude/settings.local.json
+.vscode/
+_bmad/*
+!_bmad/custom/
+_bmad/custom/*
+!_bmad/custom/*.toml
+_bmad/custom/*.user.toml
+.claude/

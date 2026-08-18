@@ -1,0 +1,32 @@
+@import "tailwindcss";
+
+/*
+  Hybrid Depth tokens, per DESIGN.md - the profile picker's dark visual
+  identity, deliberately scoped in usage to that component only (see
+  ProfilePickerShell.vue and friends), but expressed here as Tailwind theme
+  tokens per UX-DR4 so the picker uses the same utility-class convention as
+  the rest of the app instead of hand-rolled scoped CSS.
+*/
+@theme {
+  --color-hd-bg: #0a0d16;
+  --color-hd-fg: #eef1f8;
+  --color-hd-title: #f4f6fb;
+  --color-hd-subtitle: #8b93a7;
+  --color-hd-kicker: #6d7bff;
+  --color-hd-muted: #565f74;
+  --color-hd-label: #6b7288;
+  --color-hd-body: #c4cadb;
+  --color-hd-chip: #c4cadb;
+  --color-hd-accent: #a9b1ff;
+  --color-hd-accent-2: #6d7bff;
+
+  --animate-fade-up: fadeUp 0.5s ease forwards;
+  --font-hd: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Arial, sans-serif;
+}
+
+@keyframes fadeUp {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
