@@ -2,7 +2,10 @@
   <div class="min-h-screen bg-neutral-50 text-neutral-900 antialiased">
     <header class="sticky top-0 z-10 border-b border-neutral-200 bg-white/80 backdrop-blur">
       <div class="mx-auto flex max-w-4xl items-center gap-8 px-4 py-3 sm:px-6">
-        <span class="text-lg font-semibold tracking-tight">NewsAgent</span>
+        <span dir="ltr" class="flex items-center gap-2 text-lg font-semibold tracking-tight">
+          <img :src="logoMark" alt="" class="h-7 w-7 rounded-lg" />
+          <span>News<span class="text-amber-500">Agent</span></span>
+        </span>
         <nav class="flex gap-1">
           <router-link
             v-if="me?.is_admin"
@@ -75,6 +78,7 @@ import { onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { loginUrl } from "@/api/client";
 import { ensureMe, me, signOut as authSignOut } from "@/auth";
+import logoMark from "@/assets/logo-mark.svg";
 
 const router = useRouter();
 const errorBanner = ref("");

@@ -1,0 +1,8 @@
+<svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="NewsAgent">
+  <rect width="64" height="64" rx="16" fill="#0b1020"/>
+  <path d="M46,9 C46,13 42,17 38,17 C42,17 46,21 46,25 C46,21 50,17 54,17 C50,17 46,13 46,9 Z" fill="#f0b429"/>
+  <path d="M34,17.5 C34,19.25 32.25,21 30.5,21 C32.25,21 34,22.75 34,24.5 C34,22.75 35.75,21 37.5,21 C35.75,21 34,19.25 34,17.5 Z" fill="#f0b429" fill-opacity="0.85" transform="rotate(67 34 21)"/>
+  <rect x="14" y="27" width="30" height="7" rx="3.5" fill="#f0b429"/>
+  <rect x="14" y="38" width="30" height="7" rx="3.5" fill="#f0b429" fill-opacity="0.8"/>
+  <rect x="14" y="49" width="18" height="7" rx="3.5" fill="#f0b429" fill-opacity="0.6"/>
+</svg>
