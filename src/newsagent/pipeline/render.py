@@ -170,4 +170,5 @@ def render_digest_html(digest: Digest, db: Session) -> str:
         preferences_url=_click_url(preferences_link),
         unsubscribe_url=_click_url(unsubscribe_link),
         tracking_pixel_url=f"{settings.backend_base_url}/t/{digest.tracking_token}.gif",
+        logo_url=f"{settings.frontend_url}/logo-mark.png",
     )

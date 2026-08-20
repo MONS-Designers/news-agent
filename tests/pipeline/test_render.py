@@ -131,6 +131,12 @@ def test_tracking_pixel_present(db: Session):
     assert f"/t/{digest.tracking_token}.gif" in html
 
 
+def test_logo_present_in_masthead(db: Session):
+    digest = build_digest(db, [add_article(db, url_suffix="a")])
+    html = render_digest_html(digest, db)
+    assert "/logo-mark.png" in html
+
+
 def test_article_link_is_click_tracked_not_raw_url(db: Session):
     article = add_article(db, url_suffix="a")
     digest = build_digest(db, [article])
