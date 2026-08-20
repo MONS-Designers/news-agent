@@ -20,7 +20,7 @@
       <section class="hero">
         <p class="kicker">NewsAgent · דייג'סט AI</p>
         <template v-if="firstRun">
-          <h1 class="title">אתה בפנים.<br /> נגדיר את הדייג'סט שלך.</h1>
+          <h1 class="title">אתה בפנים.<br />אפשר לגדיר את הדייג'סט שלך.</h1>
           <p class="subtitle">
             עוד צעד אחד - ספר לנו על התחום ותחומי העניין שלך, ונתחיל לבנות את הדייג'סט השבועי
             הראשון שלך סביב מה שבאמת חשוב לך.

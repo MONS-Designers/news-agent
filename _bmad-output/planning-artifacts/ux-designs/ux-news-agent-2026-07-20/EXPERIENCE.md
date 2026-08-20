@@ -32,7 +32,7 @@ Article selection today is a **placeholder ordering**: round-robin across the us
 The product's voice is warm and personal - like a person curated this for you, not a generic content digest. Two pieces of copy are generated fresh per digest rather than templated:
 
 - **Personal intro line** and **dad joke (קינוח punchline)** both come from a new LLM contract method, `compose_digest_voice(headlines) -> DigestVoice(intro_he, dad_joke_he)`, composed from that day's actual article headlines - never static boilerplate.
-- **Footer microcopy** is warm and conversational by design, not administrative: "בוא נכוונן יחד" ("let's tune this together"), not a blunt "עדכון העדפות" ("update preferences").
+- **Footer microcopy** is warm and conversational by design, not administrative: "אפשר לכוונן יחד" ("let's tune this together"), not a blunt "עדכון העדפות" ("update preferences").
 - Mock/dev-provider content is visibly prefixed (`[דמה]` / `[תרגום דמה]`) so it's never mistaken for real provider output in lower environments; the real provider removes these markers entirely.
 
 ## Component Patterns
