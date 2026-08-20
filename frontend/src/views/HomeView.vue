@@ -20,7 +20,7 @@
       <section class="hero">
         <p class="kicker">NewsAgent · דייג'סט AI</p>
         <template v-if="firstRun">
-          <h1 class="title">אתה בפנים.<br />בוא נגדיר את הדייג'סט שלך.</h1>
+          <h1 class="title">אתה בפנים.<br /> נגדיר את הדייג'סט שלך.</h1>
           <p class="subtitle">
             עוד צעד אחד - ספר לנו על התחום ותחומי העניין שלך, ונתחיל לבנות את הדייג'סט השבועי
             הראשון שלך סביב מה שבאמת חשוב לך.
@@ -59,6 +59,7 @@
 
     <footer class="foot">
       <p class="foot-text">מגיע במייל. אין שום דבר אחר לבדוק.</p>
+      <p class="foot-text"><a class="foot-link" href="/privacy.html">מדיניות פרטיות</a></p>
     </footer>
   </div>
 </template>
@@ -420,6 +421,15 @@ onBeforeUnmount(() => {
   font-size: 12px;
   color: #565f74;
   margin: 0;
+}
+.foot-text + .foot-text {
+  margin-top: 8px;
+}
+.foot-link {
+  color: #8b93a7;
+}
+.foot-link:hover {
+  color: #a9b1ff;
 }
 
 @media (max-width: 760px) {
