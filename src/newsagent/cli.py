@@ -7,10 +7,11 @@ Usage:
 """
 
 import argparse
+import logging
 
 from newsagent.db import SessionLocal
 from newsagent.llm import get_llm_provider
-from newsagent.logging_setup import configure_logging
+from newsagent.logging_setup import attach_pipeline_run, configure_logging, track_pipeline_run_logs
 from newsagent.mail import get_email_sender
 from newsagent.models.pipeline_run import RUN_TYPE_FILTER, RUN_TYPE_SUMMARIZE
 from newsagent.pipeline import digest, extract, fetcher, relevance, send, summarize
@@ -80,45 +81,63 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"  {result.source_name}: {status}")
             print(f"Total new articles: {fetch_report.total_new}")
         elif args.command == "filter":
-            filter_report = relevance.filter_pending_articles(db, get_llm_provider())
-            print(
-                f"Scored {filter_report.scored}: {filter_report.relevant} relevant, "
-                f"{filter_report.irrelevant} irrelevant "
-                f"({filter_report.refused} refused, {filter_report.errors} errors, "
-                f"{filter_report.borderline} borderline)"
-            )
-            print(
-                f"Usage: {filter_report.usage_input_units} in / "
-                f"{filter_report.usage_output_units} out units"
-            )
-            pipeline_runs.record_run(
-                db,
-                run_type=RUN_TYPE_FILTER,
-                succeeded=filter_report.scored,
-                refused=filter_report.refused,
-                errors=filter_report.errors,
-                usage_input_units=filter_report.usage_input_units,
-                usage_output_units=filter_report.usage_output_units,
-            )
+            with track_pipeline_run_logs():
+                filter_report = relevance.filter_pending_articles(db, get_llm_provider())
+                print(
+                    f"Scored {filter_report.scored}: {filter_report.relevant} relevant, "
+                    f"{filter_report.irrelevant} irrelevant "
+                    f"({filter_report.refused} refused, {filter_report.errors} errors, "
+                    f"{filter_report.borderline} borderline)"
+                )
+                print(
+                    f"Usage: {filter_report.usage_input_units} in / "
+                    f"{filter_report.usage_output_units} out units"
+                )
+                run = pipeline_runs.record_run(
+                    db,
+                    run_type=RUN_TYPE_FILTER,
+                    succeeded=filter_report.scored,
+                    refused=filter_report.refused,
+                    errors=filter_report.errors,
+                    usage_input_units=filter_report.usage_input_units,
+                    usage_output_units=filter_report.usage_output_units,
+                )
+                try:
+                    attach_pipeline_run(db, run.id)
+                except Exception:
+                    logging.getLogger(__name__).warning(
+                        "Failed to attach pipeline_run_id=%s to its log entries",
+                        run.id,
+                        exc_info=True,
+                    )
         elif args.command == "summarize":
-            summary_report = summarize.summarize_relevant_articles(db, get_llm_provider())
-            print(
-                f"Summarized {summary_report.summarized} "
-                f"({summary_report.refused} refused, {summary_report.errors} errors)"
-            )
-            print(
-                f"Usage: {summary_report.usage_input_units} in / "
-                f"{summary_report.usage_output_units} out units"
-            )
-            pipeline_runs.record_run(
-                db,
-                run_type=RUN_TYPE_SUMMARIZE,
-                succeeded=summary_report.summarized,
-                refused=summary_report.refused,
-                errors=summary_report.errors,
-                usage_input_units=summary_report.usage_input_units,
-                usage_output_units=summary_report.usage_output_units,
-            )
+            with track_pipeline_run_logs():
+                summary_report = summarize.summarize_relevant_articles(db, get_llm_provider())
+                print(
+                    f"Summarized {summary_report.summarized} "
+                    f"({summary_report.refused} refused, {summary_report.errors} errors)"
+                )
+                print(
+                    f"Usage: {summary_report.usage_input_units} in / "
+                    f"{summary_report.usage_output_units} out units"
+                )
+                run = pipeline_runs.record_run(
+                    db,
+                    run_type=RUN_TYPE_SUMMARIZE,
+                    succeeded=summary_report.summarized,
+                    refused=summary_report.refused,
+                    errors=summary_report.errors,
+                    usage_input_units=summary_report.usage_input_units,
+                    usage_output_units=summary_report.usage_output_units,
+                )
+                try:
+                    attach_pipeline_run(db, run.id)
+                except Exception:
+                    logging.getLogger(__name__).warning(
+                        "Failed to attach pipeline_run_id=%s to its log entries",
+                        run.id,
+                        exc_info=True,
+                    )
         elif args.command == "extract":
             extract_report = extract.extract_relevant_articles(db)
             print(f"Extracted {extract_report.extracted}, failed {extract_report.failed}")

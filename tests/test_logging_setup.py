@@ -1,24 +1,26 @@
-"""Covers the destination/level selection in newsagent.logging_setup.
+"""Covers newsagent.logging_setup: the DB handler, level selection, the
+uvicorn/noisy-logger re-pointing, and pipeline-run correlation.
 
 Two global-state hazards shape this file:
 
 1. configure_logging() mutates the process-wide root logger, so every test runs
    under restore_root_logger. Without it a handler leaks into every sibling suite.
 2. These tests read the `settings` singleton, which loads the developer's local
-   .env ahead of code defaults - and README now tells developers to set exactly
-   these variables. Every test therefore pins the values it depends on, including
+   .env ahead of code defaults - and README tells developers to set exactly
+   this variable. Every test therefore pins the value it depends on, including
    the ones asserting "the default", so a local .env can never break them.
 """
 
 import logging
-import sys
-from pathlib import Path
 
 import pytest
+from sqlalchemy import create_engine, select
+from sqlalchemy.orm import Session, sessionmaker
 
 from newsagent.config import settings
-from newsagent.logging_setup import configure_logging
-
+from newsagent.logging_setup import attach_pipeline_run, configure_logging, track_pipeline_run_logs
+from newsagent.models import LogEntry
+from newsagent.models.base import Base
 
 _TOUCHED_LOGGERS = ("uvicorn", "uvicorn.error", "uvicorn.access", "httpx", "httpcore")
 
@@ -54,163 +56,115 @@ def restore_root_logger():
 
 @pytest.fixture
 def default_settings(monkeypatch: pytest.MonkeyPatch):
-    """Pin the code-level defaults so a local .env cannot influence the result."""
-    monkeypatch.setattr(settings, "log_destination", "stderr")
+    """Pin the code-level default so a local .env cannot influence the result."""
     monkeypatch.setattr(settings, "log_level", "WARNING")
-    monkeypatch.setattr(settings, "log_file", "")
 
 
 @pytest.fixture
-def log_to(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
-    """Point logging at a fresh file and hand back the path."""
-
-    def _configure(name: str = "newsagent.log", level: str = "WARNING") -> Path:
-        path = tmp_path / name
-        monkeypatch.setattr(settings, "log_destination", "file")
-        monkeypatch.setattr(settings, "log_file", str(path))
-        monkeypatch.setattr(settings, "log_level", level)
-        return path
-
-    return _configure
+def db_session(monkeypatch: pytest.MonkeyPatch) -> Session:
+    """Point the handler's DB writes at a fresh in-memory sqlite DB instead of
+    whatever NEWSAGENT_DATABASE_URL resolves to."""
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    TestSessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
+    monkeypatch.setattr("newsagent.logging_setup.SessionLocal", TestSessionLocal)
+    with Session(engine) as session:
+        yield session
 
 
-def test_default_is_a_single_stderr_handler_at_warning(default_settings):
+def test_default_is_a_single_db_handler_at_warning(default_settings, db_session):
     configure_logging()
 
     assert len(logging.root.handlers) == 1
-    handler = logging.root.handlers[0]
-    assert isinstance(handler, logging.StreamHandler)
-    assert handler.stream is sys.stderr
+    from newsagent.logging_setup import _DBHandler
+
+    assert isinstance(logging.root.handlers[0], _DBHandler)
     assert logging.root.level == logging.WARNING
 
 
-def test_stdout_destination_selects_stdout_stream(
-    default_settings, monkeypatch: pytest.MonkeyPatch
+def test_a_warning_record_is_persisted_with_level_logger_and_message(
+    default_settings, db_session
 ):
-    monkeypatch.setattr(settings, "log_destination", "stdout")
-
-    configure_logging()
-
-    assert len(logging.root.handlers) == 1
-    assert logging.root.handlers[0].stream is sys.stdout
-
-
-def test_file_destination_writes_records_to_the_file(log_to):
-    log_file = log_to()
-
     configure_logging()
     logging.getLogger("newsagent.pipeline.fetcher").warning("fetch failed")
 
-    assert len(logging.root.handlers) == 1
-    assert isinstance(logging.root.handlers[0], logging.FileHandler)
-    contents = log_file.read_text(encoding="utf-8")
-    assert "fetch failed" in contents
-    assert "newsagent.pipeline.fetcher" in contents
+    entry = db_session.scalar(select(LogEntry))
+    assert entry is not None
+    assert entry.level == "WARNING"
+    assert entry.logger_name == "newsagent.pipeline.fetcher"
+    assert "fetch failed" in entry.message
 
 
-def test_record_format_carries_a_timestamp(log_to):
-    """The spec's stated justification for owning the format is that a file log
-    without timestamps is not diagnosable - so pin it, or a format regression
-    would pass every other test in this file."""
-    log_file = log_to()
+def test_persisted_record_carries_the_app_version(default_settings, db_session):
+    from importlib.metadata import version as pkg_version
 
     configure_logging()
     logging.getLogger("newsagent.pipeline.fetcher").warning("boom")
 
-    line = log_file.read_text(encoding="utf-8").splitlines()[0]
-    assert line[:4].isdigit() and line[4] == "-", f"expected leading timestamp, got {line!r}"
-    assert "WARNING" in line
+    entry = db_session.scalar(select(LogEntry))
+    assert entry.version == pkg_version("newsagent")
 
 
-def test_file_destination_appends_rather_than_truncates(log_to):
-    log_file = log_to()
-
+def test_a_fresh_record_has_no_pipeline_run_id(default_settings, db_session):
     configure_logging()
-    logging.getLogger("newsagent.pipeline.fetcher").warning("first")
+    logging.getLogger("newsagent.pipeline.fetcher").warning("boom")
+
+    entry = db_session.scalar(select(LogEntry))
+    assert entry.pipeline_run_id is None
+
+
+def test_records_emitted_inside_a_tracked_run_are_attached_afterward(
+    default_settings, db_session
+):
     configure_logging()
-    logging.getLogger("newsagent.pipeline.fetcher").warning("second")
+    with track_pipeline_run_logs():
+        logging.getLogger("newsagent.pipeline.relevance").warning("scored one")
+        logging.getLogger("newsagent.pipeline.relevance").warning("scored two")
+        attach_pipeline_run(db_session, pipeline_run_id=42)
 
-    contents = log_file.read_text(encoding="utf-8")
-    assert "first" in contents and "second" in contents
+    entries = db_session.scalars(select(LogEntry)).all()
+    assert len(entries) == 2
+    assert all(entry.pipeline_run_id == 42 for entry in entries)
 
 
-def test_missing_parent_directory_is_created(log_to, tmp_path: Path):
-    log_file = log_to(name="nested/deeper/na.log")
-    assert not log_file.parent.exists()
-
+def test_records_outside_a_tracked_run_are_unaffected_by_attach(default_settings, db_session):
     configure_logging()
-    logging.getLogger("newsagent.pipeline.fetcher").warning("created")
+    logging.getLogger("newsagent.pipeline.fetcher").warning("outside any run")
+    with track_pipeline_run_logs():
+        attach_pipeline_run(db_session, pipeline_run_id=99)
 
-    assert log_file.read_text(encoding="utf-8").strip().endswith("created")
-
-
-def test_unopenable_log_file_raises_naming_the_setting(
-    default_settings, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-):
-    a_directory = tmp_path / "not-a-file"
-    a_directory.mkdir()
-    monkeypatch.setattr(settings, "log_destination", "file")
-    monkeypatch.setattr(settings, "log_file", str(a_directory))
-
-    with pytest.raises(ValueError, match="NEWSAGENT_LOG_FILE"):
-        configure_logging()
+    entry = db_session.scalar(select(LogEntry))
+    assert entry.pipeline_run_id is None
 
 
-def test_file_destination_without_path_raises(
-    default_settings, monkeypatch: pytest.MonkeyPatch
-):
-    monkeypatch.setattr(settings, "log_destination", "file")
-    monkeypatch.setattr(settings, "log_file", "   ")
-
-    with pytest.raises(ValueError, match="NEWSAGENT_LOG_FILE"):
-        configure_logging()
-
-
-def test_unknown_destination_names_the_known_values(
-    default_settings, monkeypatch: pytest.MonkeyPatch
-):
-    monkeypatch.setattr(settings, "log_destination", "kafka")
-
-    with pytest.raises(ValueError, match="kafka") as raised:
-        configure_logging()
-    for known in ("stderr", "stdout", "file"):
-        assert known in str(raised.value)
-
-
-@pytest.mark.parametrize("raw", [" STDERR ", "StdErr", "stderr "])
-def test_destination_is_case_and_whitespace_insensitive(
-    default_settings, monkeypatch: pytest.MonkeyPatch, raw: str
-):
-    monkeypatch.setattr(settings, "log_destination", raw)
-
+def test_a_db_write_failure_does_not_raise_and_does_not_crash(default_settings, db_session):
+    """No destination fallback is left, so a broken write must degrade to the
+    stdlib handleError() path (stderr) rather than propagating - see
+    _DBHandler.emit()'s docstring."""
     configure_logging()
+    assert len(logging.root.handlers) == 1  # sanity: exactly one handler installed
+    from unittest.mock import patch
 
-    assert logging.root.handlers[0].stream is sys.stderr
+    with patch("newsagent.services.log_entries.record_log", side_effect=RuntimeError("db down")):
+        logging.getLogger("newsagent.pipeline.fetcher").warning("should not crash")  # no raise
 
 
-def test_empty_destination_falls_back_to_the_default(
-    default_settings, monkeypatch: pytest.MonkeyPatch
+def test_debug_level_lets_debug_records_reach_the_destination(
+    db_session, monkeypatch: pytest.MonkeyPatch
 ):
-    monkeypatch.setattr(settings, "log_destination", "")
-
-    configure_logging()
-
-    assert logging.root.handlers[0].stream is sys.stderr
-
-
-def test_debug_level_lets_debug_records_reach_the_destination(log_to):
-    log_file = log_to(name="debug.log", level="DEBUG")
+    monkeypatch.setattr(settings, "log_level", "DEBUG")
 
     configure_logging()
     logging.getLogger("newsagent.pipeline.summarize").debug("raw model response")
 
     assert logging.root.level == logging.DEBUG
-    assert "raw model response" in log_file.read_text(encoding="utf-8")
+    entry = db_session.scalar(select(LogEntry))
+    assert "raw model response" in entry.message
 
 
 @pytest.mark.parametrize("raw,expected", [("20", logging.INFO), (" debug ", logging.DEBUG)])
 def test_level_accepts_numeric_and_padded_names(
-    default_settings, monkeypatch: pytest.MonkeyPatch, raw: str, expected: int
+    default_settings, db_session, monkeypatch: pytest.MonkeyPatch, raw: str, expected: int
 ):
     monkeypatch.setattr(settings, "log_level", raw)
 
@@ -219,9 +173,7 @@ def test_level_accepts_numeric_and_padded_names(
     assert logging.root.level == expected
 
 
-def test_unknown_level_names_the_known_values(
-    default_settings, monkeypatch: pytest.MonkeyPatch
-):
+def test_unknown_level_names_the_known_values(default_settings, db_session, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(settings, "log_level", "CHATTY")
 
     with pytest.raises(ValueError, match="CHATTY") as raised:
@@ -229,18 +181,38 @@ def test_unknown_level_names_the_known_values(
     assert "WARNING" in str(raised.value)
 
 
-def test_notset_level_is_rejected(default_settings, monkeypatch: pytest.MonkeyPatch):
+def test_notset_level_is_rejected(default_settings, db_session, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(settings, "log_level", "NOTSET")
 
     with pytest.raises(ValueError, match="NOTSET"):
         configure_logging()
 
 
-def test_explicit_access_log_opt_out_is_honored(log_to):
+@pytest.mark.parametrize("raw", ["0", " 0 ", "5", "999", "²"])
+def test_out_of_range_numeric_levels_are_rejected(
+    default_settings, db_session, monkeypatch: pytest.MonkeyPatch, raw: str
+):
+    """0 is NOTSET by another spelling (emits everything); 999 installs a
+    handler that can never emit. Both must fail loudly, not silently."""
+    monkeypatch.setattr(settings, "log_level", raw)
+
+    with pytest.raises(ValueError, match="NEWSAGENT_LOG_LEVEL|log level|Log level"):
+        configure_logging()
+
+
+def test_empty_level_falls_back_to_the_default(default_settings, db_session, monkeypatch: pytest.MonkeyPatch):
+    """A blank env var means "unset"."""
+    monkeypatch.setattr(settings, "log_level", "  ")
+
+    configure_logging()
+
+    assert logging.root.level == logging.WARNING
+
+
+def test_explicit_access_log_opt_out_is_honored(default_settings, db_session):
     """uvicorn's --no-access-log leaves the logger with no handlers and
     propagate=False. Re-pointing it would resurrect request lines that carry
     tracking-pixel URLs embedding user and article ids."""
-    log_to(name="optout.log", level="INFO")
     access = logging.getLogger("uvicorn.access")
     access.handlers.clear()
     access.propagate = False
@@ -250,10 +222,9 @@ def test_explicit_access_log_opt_out_is_honored(log_to):
     assert access.propagate is False
 
 
-def test_server_handlers_are_closed_when_cleared(log_to, tmp_path: Path):
+def test_server_handlers_are_closed_when_cleared(default_settings, db_session, tmp_path):
     """Clearing without closing leaks the fd - and on Windows keeps the old
     file locked for the life of the process."""
-    log_to(name="closed.log", level="INFO")
     stale_path = tmp_path / "stale-uvicorn.log"
     stale = logging.FileHandler(stale_path, encoding="utf-8")
     error_logger = logging.getLogger("uvicorn.error")
@@ -265,62 +236,28 @@ def test_server_handlers_are_closed_when_cleared(log_to, tmp_path: Path):
     assert stale.stream is None or stale.stream.closed, "handler dropped but never closed"
 
 
-def test_unencodable_characters_do_not_drop_the_record(
-    default_settings, monkeypatch: pytest.MonkeyPatch, capsys
-):
-    """Source articles are any language; a legacy console code page must not
-    make a record vanish inside emit()."""
-    monkeypatch.setattr(settings, "log_destination", "stdout")
-
-    configure_logging()
-    logging.getLogger("newsagent.pipeline.summarize").warning("title: 人工智能 / Прорыв")
-
-    assert logging.root.handlers[0].stream.errors in ("backslashreplace", "replace")
-
-
-@pytest.mark.parametrize("raw", ["0", " 0 ", "5", "999", "²"])
-def test_out_of_range_numeric_levels_are_rejected(
-    default_settings, monkeypatch: pytest.MonkeyPatch, raw: str
-):
-    """0 is NOTSET by another spelling (emits everything); 999 installs a
-    handler that can never emit. Both must fail loudly, not silently."""
-    monkeypatch.setattr(settings, "log_level", raw)
-
-    with pytest.raises(ValueError, match="NEWSAGENT_LOG_LEVEL|log level|Log level"):
-        configure_logging()
-
-
-def test_empty_level_falls_back_to_the_default(
-    default_settings, monkeypatch: pytest.MonkeyPatch
-):
-    """Mirrors the empty-destination rule - a blank env var means "unset"."""
-    monkeypatch.setattr(settings, "log_level", "  ")
-
-    configure_logging()
-
-    assert logging.root.level == logging.WARNING
-
-
-def test_server_logs_reach_the_configured_destination(log_to):
+def test_server_logs_reach_the_destination(default_settings, db_session, monkeypatch: pytest.MonkeyPatch):
     """uvicorn ships propagate=False with its own handlers, so a root-handler
-    swap alone would leave every startup/error/access line on the console."""
+    swap alone would leave every startup/error/access line uncaptured."""
     from logging.config import dictConfig
 
     from uvicorn.config import LOGGING_CONFIG
 
     dictConfig(LOGGING_CONFIG)  # what uvicorn does before importing the app
-    log_file = log_to(name="server.log", level="INFO")
+    monkeypatch.setattr(settings, "log_level", "INFO")
 
     configure_logging()
     logging.getLogger("uvicorn.error").info("Application startup complete")
     logging.getLogger("uvicorn.access").info("GET /health 200")
 
-    contents = log_file.read_text(encoding="utf-8")
-    assert "Application startup complete" in contents
-    assert "GET /health 200" in contents
+    messages = [entry.message for entry in db_session.scalars(select(LogEntry)).all()]
+    assert "Application startup complete" in messages
+    assert "GET /health 200" in messages
 
 
-def test_log_level_governs_server_and_third_party_loggers(log_to):
+def test_log_level_governs_server_and_third_party_loggers(
+    default_settings, db_session, monkeypatch: pytest.MonkeyPatch
+):
     """uvicorn pins itself to INFO and the noisy pair get a WARNING floor, so a
     stricter LOG_LEVEL must still win - otherwise ERROR silences the application
     while server and transport chatter keeps flowing, the exact inverse of intent."""
@@ -329,7 +266,7 @@ def test_log_level_governs_server_and_third_party_loggers(log_to):
     from uvicorn.config import LOGGING_CONFIG
 
     dictConfig(LOGGING_CONFIG)
-    log_file = log_to(name="strict.log", level="ERROR")
+    monkeypatch.setattr(settings, "log_level", "ERROR")
 
     configure_logging()
     logging.getLogger("uvicorn.access").info("GET /health 200")
@@ -337,28 +274,30 @@ def test_log_level_governs_server_and_third_party_loggers(log_to):
     logging.getLogger("httpx").warning("HTTP Request: POST ...")
     logging.getLogger("newsagent.pipeline.fetcher").error("real failure")
 
-    contents = log_file.read_text(encoding="utf-8")
-    assert "real failure" in contents
-    assert "GET /health 200" not in contents
-    assert "Application startup complete" not in contents
-    assert "HTTP Request" not in contents
+    messages = [entry.message for entry in db_session.scalars(select(LogEntry)).all()]
+    assert "real failure" in messages
+    assert "GET /health 200" not in messages
+    assert "Application startup complete" not in messages
+    assert not any("HTTP Request" in message for message in messages)
 
 
-def test_noisy_third_party_loggers_stay_at_warning(log_to):
-    log_file = log_to(name="quiet.log", level="DEBUG")
+def test_noisy_third_party_loggers_stay_at_warning(
+    default_settings, db_session, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setattr(settings, "log_level", "DEBUG")
 
     configure_logging()
     logging.getLogger("httpcore.connection").debug("connect_tcp.started")
     logging.getLogger("httpx").debug("HTTP Request: POST ...")
     logging.getLogger("newsagent.pipeline.summarize").debug("raw model response")
 
-    contents = log_file.read_text(encoding="utf-8")
-    assert "raw model response" in contents
-    assert "connect_tcp.started" not in contents
-    assert "HTTP Request" not in contents
+    messages = [entry.message for entry in db_session.scalars(select(LogEntry)).all()]
+    assert "raw model response" in messages
+    assert not any("connect_tcp.started" in message for message in messages)
+    assert not any("HTTP Request" in message for message in messages)
 
 
-def test_calling_twice_does_not_accumulate_handlers(default_settings):
+def test_calling_twice_does_not_accumulate_handlers(default_settings, db_session):
     configure_logging()
     configure_logging()
 

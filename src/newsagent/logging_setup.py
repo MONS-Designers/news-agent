@@ -1,67 +1,91 @@
-"""Log destination selection - pointing logs somewhere else is a one-line config
-change (NEWSAGENT_LOG_DESTINATION), no code edit at any call site.
+"""Every log record is written to the DB via a custom logging.Handler - there
+is no other destination. See newsagent.services.log_entries for the actual
+persistence (the single service every writer here goes through).
 
 Called once per process from every runnable entrypoint: cli.main(),
 api.main.create_app(), and llm.demo's __main__ block.
 """
 
 import logging
-import sys
-from pathlib import Path
+from contextlib import contextmanager
+from contextvars import ContextVar
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as _pkg_version
+from typing import Iterator
+
+from sqlalchemy.orm import Session
 
 from newsagent.config import settings
+from newsagent.db import SessionLocal
+from newsagent.services import log_entries
 
-_DESTINATIONS = ("stderr", "stdout", "file")
+try:
+    _VERSION = _pkg_version("newsagent")
+except PackageNotFoundError:
+    _VERSION = "unknown"
 
-_FORMAT = "%(asctime)s %(levelname)s %(name)s: %(message)s"
+# Only the message + any exception traceback - level/logger/timestamp are
+# already structured columns on log_entries, so duplicating them into the text
+# would be redundant now that the destination isn't a flat stream/file.
+_FORMAT = "%(message)s"
 
 # uvicorn installs its own handlers and sets propagate=False, so its startup,
-# error, and access records bypass the root logger entirely. Re-point them so a
-# file destination captures the whole deployment, not just newsagent.* records.
+# error, and access records bypass the root logger entirely. Re-point them so
+# the DB destination captures the whole deployment, not just newsagent.* records.
 _SERVER_LOGGERS = ("uvicorn", "uvicorn.error", "uvicorn.access")
 
 # Transport-level DEBUG (per-connection traces, per-request lines) drowns out the
 # application records LOG_LEVEL=DEBUG exists to surface.
 _NOISY_LOGGERS = ("httpx", "httpcore")
 
-
-def _build_handler() -> logging.Handler:
-    destination = settings.log_destination.strip().lower() or "stderr"
-    if destination in ("stderr", "stdout"):
-        stream = sys.stderr if destination == "stderr" else sys.stdout
-        # Windows consoles use a legacy code page (cp1255 on this project's dev
-        # machines). sys.stdout encodes strictly, so a Chinese or Russian source
-        # title raises inside emit() and the record is lost outright - sys.stderr
-        # already defaults to backslashreplace. Degrade to escapes rather than
-        # dropping the record. The file destination pins utf-8 and needs none of this.
-        if getattr(stream, "errors", None) not in ("backslashreplace", "replace") and hasattr(
-            stream, "reconfigure"
-        ):
-            stream.reconfigure(errors="backslashreplace")
-        return logging.StreamHandler(stream)
-    if destination == "file":
-        return _build_file_handler()
-    raise ValueError(
-        f"Unknown log destination {settings.log_destination!r} "
-        f"(known: {', '.join(_DESTINATIONS)})"
-    )
+# None outside a tracked pipeline run; a list of emitted LogEntry ids while one
+# is in progress - see track_pipeline_run_logs()/attach_pipeline_run() below.
+_tracked_ids: ContextVar[list[int] | None] = ContextVar("_tracked_ids", default=None)
 
 
-def _build_file_handler() -> logging.Handler:
-    path_value = settings.log_file.strip()
-    if not path_value:
-        raise ValueError("log_destination='file' requires NEWSAGENT_LOG_FILE to be set")
+class _DBHandler(logging.Handler):
+    """Writes each emitted record to the DB via services.log_entries. Never
+    lets a DB failure crash the process or raise into application code - with
+    no fallback destination left, that would mean silent total logging loss
+    *and* a crashing app, so a write failure instead goes through the stdlib
+    handleError() path (default: printed to stderr)."""
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            message = self.format(record)
+            with SessionLocal() as db:
+                entry = log_entries.record_log(
+                    db,
+                    level=record.levelname,
+                    logger_name=record.name,
+                    message=message,
+                    version=_VERSION,
+                )
+            run_ids = _tracked_ids.get()
+            if run_ids is not None:
+                run_ids.append(entry.id)
+        except Exception:
+            self.handleError(record)
+
+
+@contextmanager
+def track_pipeline_run_logs() -> Iterator[None]:
+    """Wrap a filter/summarize CLI run so every log record emitted inside
+    is remembered for attach_pipeline_run() to correlate afterward, once
+    that run's pipeline_runs row (and therefore its id) exists."""
+    token = _tracked_ids.set([])
     try:
-        # expanduser() is inside the guard: on a host with no resolvable home
-        # directory a "~/..." path raises RuntimeError, which would otherwise
-        # escape as a bare traceback from create_app() at import.
-        path = Path(path_value).expanduser()
-        path.parent.mkdir(parents=True, exist_ok=True)
-        # Opened eagerly (not delay=True) so a bad path fails here, with the
-        # setting named, instead of as a bare OSError on the first record.
-        return logging.FileHandler(path, encoding="utf-8")
-    except (OSError, RuntimeError) as error:
-        raise ValueError(f"NEWSAGENT_LOG_FILE {path_value!r} is unusable: {error}") from error
+        yield
+    finally:
+        _tracked_ids.reset(token)
+
+
+def attach_pipeline_run(db: Session, pipeline_run_id: int) -> None:
+    """Call after pipeline_runs.record_run() returns, from inside the same
+    track_pipeline_run_logs() block, to back-fill pipeline_run_id on every
+    record emitted during that run."""
+    ids = _tracked_ids.get()
+    log_entries.attach_pipeline_run(db, ids or [], pipeline_run_id)
 
 
 def _resolve_level() -> int:
@@ -94,7 +118,7 @@ def _resolve_level() -> int:
 
 
 def configure_logging() -> None:
-    """Install the configured handler on the root logger.
+    """Install the DB handler on the root logger.
 
     force=True closes and removes any handlers already on root, so calling this
     twice in one process leaves exactly one handler rather than duplicating
@@ -102,7 +126,7 @@ def configure_logging() -> None:
     caplog - so tests that capture logs around an entrypoint must reconfigure.
     """
     level = _resolve_level()
-    logging.basicConfig(handlers=[_build_handler()], level=level, format=_FORMAT, force=True)
+    logging.basicConfig(handlers=[_DBHandler()], level=level, format=_FORMAT, force=True)
     for name in _SERVER_LOGGERS:
         server_logger = logging.getLogger(name)
         # No handlers *and* propagate off is uvicorn's signature for an explicit

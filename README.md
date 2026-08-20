@@ -61,15 +61,15 @@ out of the box for local dev:
 | Variable                      | Default                    | Purpose                                            |
 | ----------------------------- | -------------------------- | -------------------------------------------------- |
 | `NEWSAGENT_DATABASE_URL`      | _(none - required)_        | SQLAlchemy database URL (Postgres, e.g. a Neon branch) |
-| `NEWSAGENT_LOG_DESTINATION`   | `stderr`                   | Where log records go: `stderr`, `stdout`, or `file` |
 | `NEWSAGENT_LOG_LEVEL`         | `WARNING`                  | Root log level (`DEBUG`, `INFO`, `WARNING`, ...)   |
-| `NEWSAGENT_LOG_FILE`          | _(unset)_                  | Log file path - required when destination is `file` |
 
-Logging is wired at every entrypoint - the CLI, the API process, and `newsagent.llm.demo` - so
-the same settings apply however you run it. With `file`, the parent directory is created if
-missing, and the API's own uvicorn startup/error/access lines are captured alongside
-`newsagent.*` records. `httpx`/`httpcore` stay at WARNING so `DEBUG` shows application records
-rather than transport traces.
+Every log record is written to the `log_entries` table in the same database - there is no
+stderr/stdout/file destination choice. Each row carries the app version (read from installed
+package metadata) and, for records emitted during a `filter`/`summarize` CLI run, the id of that
+run's `pipeline_runs` row. Logging is wired at every entrypoint - the CLI, the API process, and
+`newsagent.llm.demo` - so the same `NEWSAGENT_LOG_LEVEL` applies however you run it. The API's
+own uvicorn startup/error/access lines are captured alongside `newsagent.*` records. `httpx`/
+`httpcore` stay at WARNING so `DEBUG` shows application records rather than transport traces.
 
 `NEWSAGENT_LOG_LEVEL` is the single source of truth for verbosity and takes precedence over
 uvicorn's own `--log-level`. `--no-access-log` is still honored - it says "don't produce these
@@ -79,14 +79,18 @@ uvicorn's startup and request lines must set `NEWSAGENT_LOG_LEVEL=INFO`.
 To capture a pipeline run for debugging (PowerShell):
 
 ```powershell
-$env:NEWSAGENT_LOG_DESTINATION="file"; $env:NEWSAGENT_LOG_FILE="./logs/newsagent.log"; $env:NEWSAGENT_LOG_LEVEL="DEBUG"; python -m newsagent.cli summarize
+$env:NEWSAGENT_LOG_LEVEL="DEBUG"; python -m newsagent.cli summarize
 ```
 
 The equivalent in bash:
 
 ```bash
-NEWSAGENT_LOG_DESTINATION=file NEWSAGENT_LOG_FILE=./logs/newsagent.log NEWSAGENT_LOG_LEVEL=DEBUG python -m newsagent.cli summarize
+NEWSAGENT_LOG_LEVEL=DEBUG python -m newsagent.cli summarize
 ```
+
+A DB write failure inside the log handler itself does not crash the app or raise into
+application code - it falls back to `logging.Handler`'s default `handleError()` (prints to
+stderr), since there is no other destination left to fall back to.
 
 ## Running locally
 

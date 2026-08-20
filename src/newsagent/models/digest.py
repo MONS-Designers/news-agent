@@ -33,6 +33,9 @@ class Digest(Base):
     )
     sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     opened_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Device that made the first open-pixel hit (mobile/tablet/desktop/bot/unknown -
+    # see services.device_detection). Set once, alongside opened_at.
+    opened_device_type: Mapped[str | None] = mapped_column(String, nullable=True)
     # Digest-level editorial voice (LLM-composed from the week's headlines):
     # a warm personal opener and a light closing joke tied to the news.
     intro_he: Mapped[str | None] = mapped_column(Text, nullable=True)

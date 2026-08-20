@@ -7,7 +7,7 @@
       "runtimeArgs": ["run", "dev"],
       "cwd": "frontend",
       "port": 5173,
-      "autoPort": false
+      "autoPort": true
     },
     {
       "name": "backend",

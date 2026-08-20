@@ -38,6 +38,9 @@ class DigestLink(Base):
     target_url: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     clicked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Device that made the first click (mobile/tablet/desktop/bot/unknown - see
+    # services.device_detection). Set once, alongside clicked_at.
+    device_type: Mapped[str | None] = mapped_column(String, nullable=True)
 
     digest: Mapped["Digest"] = relationship(back_populates="links")
     article: Mapped["Article | None"] = relationship()

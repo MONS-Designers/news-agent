@@ -1,5 +1,20 @@
 # Deferred Work
 
+## Deferred from: GH #54 DB-backed logging (2026-08-20)
+
+- source_spec: none
+  summary: There is no real app version-bump process - `pyproject.toml`'s `version = "0.1.0"` is the only source of truth GH #54's `log_entries.version` column reads (via `importlib.metadata`), and it is not actively bumped on release. Every log row will read `0.1.0` indefinitely until a version-bump process exists.
+  evidence: Raised by the user during intent clarification for GH #54 as a known gap, explicitly scoped out of this issue ("כרגע אין. ציין שצריך לקבוע את זה" - there currently isn't one, note that this needs to be decided). Establishing a real process (manual bump per release, `setuptools-scm` off git tags, CI-driven bump, etc.) is a separate decision affecting release workflow, not a logging concern.
+- source_spec: none
+  summary: `log_entries` has no retention/pruning policy - unbounded growth, same class of risk as the file destination's deferred rotation entry it replaces (see the `spec-gh-39-swappable-log-destination` entries below).
+  evidence: Deliberately out of scope for GH #54, mirroring the same tradeoff already accepted for the `file` destination it replaces - immediate need is correctness (logs land in the DB, correlated to pipeline runs), not capacity planning at 2-dogfood-user scale.
+- source_spec: none
+  summary: Log writes are synchronous and unbatched (one DB round-trip per emitted record) - chosen deliberately for simplicity at current scale, but worth revisiting (e.g. `logging.handlers.MemoryHandler`-style buffering) if a `LOG_LEVEL=DEBUG` deployment or high article volume makes per-record DB writes a real latency/load concern.
+  evidence: User's explicit choice during intent clarification, delegated as "help me decide" - recorded here so the tradeoff is visible rather than silently assumed permanent.
+- source_spec: none
+  summary: Convert the project's existing logger mechanism to Python's built-in logging mechanism.
+  evidence: Flagged by the user on 2026-08-20, not yet scoped or designed - needs a decision on what "built-in mechanism" means here before implementation.
+
 ## Deferred from: frontend component test coverage expansion, GH #42 and beyond (2026-08-17)
 
 - source_spec: none

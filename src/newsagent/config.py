@@ -62,12 +62,9 @@ class Settings(BaseSettings):
     smtp_password: str = ""
     smtp_from_address: str = ""
     smtp_use_tls: bool = True
-    # Where log records go (see newsagent.logging_setup): stderr | stdout | file.
-    # The defaults reproduce Python's last-resort behavior - WARNING+ to stderr.
-    log_destination: str = "stderr"
+    # Verbosity for the DB-backed log handler (see newsagent.logging_setup).
+    # Every record is always written to the DB - there is no destination choice.
     log_level: str = "WARNING"
-    # Required when log_destination="file"; ignored otherwise.
-    log_file: str = ""
 
     # Self-registration hard cap (FR2) - total User rows, admin-seeded or
     # self-registered. Enforced atomically at the DB level (FR3), not by an

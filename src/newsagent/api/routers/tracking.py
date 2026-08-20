@@ -11,7 +11,7 @@ unguessable, matching FR12's "same shape as the existing pixel" design.
 
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -21,6 +21,7 @@ from newsagent.config import settings
 from newsagent.models import Digest, DigestLink
 from newsagent.models.digest_link import KIND_UNSUBSCRIBE
 from newsagent.services import subscription
+from newsagent.services.device_detection import classify_device
 
 router = APIRouter(tags=["tracking"])
 
@@ -31,16 +32,17 @@ _PIXEL = bytes.fromhex(
 
 
 @router.get("/t/{token}.gif")
-def track_open(token: str, db: Session = Depends(get_db)) -> Response:
+def track_open(token: str, request: Request, db: Session = Depends(get_db)) -> Response:
     digest = db.scalar(select(Digest).where(Digest.tracking_token == token))
     if digest is not None and digest.opened_at is None:
         digest.opened_at = datetime.now()
+        digest.opened_device_type = classify_device(request.headers.get("user-agent"))
         db.commit()
     return Response(content=_PIXEL, media_type="image/gif")
 
 
 @router.get("/c/{token}")
-def track_click(token: str, db: Session = Depends(get_db)) -> RedirectResponse:
+def track_click(token: str, request: Request, db: Session = Depends(get_db)) -> RedirectResponse:
     link = db.scalar(select(DigestLink).where(DigestLink.token == token))
     if link is None:
         # Unknown/stale token: nowhere real to send them, so fall back to the
@@ -48,10 +50,12 @@ def track_click(token: str, db: Session = Depends(get_db)) -> RedirectResponse:
         return RedirectResponse(url=settings.frontend_url)
     if link.clicked_at is None:
         link.clicked_at = datetime.now()
+        link.device_type = classify_device(request.headers.get("user-agent"))
     # A click proves the digest was opened even if the tracking pixel's image
     # never loaded (image-blocking is the common case, not the exception).
     if link.digest.opened_at is None:
         link.digest.opened_at = datetime.now()
+        link.digest.opened_device_type = classify_device(request.headers.get("user-agent"))
     db.commit()
     if link.kind == KIND_UNSUBSCRIBE:
         subscription.set_unsubscribed(db, link.digest.user, True)

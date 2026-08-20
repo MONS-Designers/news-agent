@@ -51,6 +51,25 @@ def test_valid_token_marks_opened_and_returns_pixel(
     assert digest.opened_at is not None
 
 
+def test_open_records_device_type_from_user_agent(
+    client: TestClient, db_session: Session, digest: Digest
+) -> None:
+    client.get(
+        f"/t/{digest.tracking_token}.gif",
+        headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0"},
+    )
+    db_session.refresh(digest)
+    assert digest.opened_device_type == "desktop"
+
+
+def test_open_without_user_agent_records_unknown_device_type(
+    client: TestClient, db_session: Session, digest: Digest
+) -> None:
+    client.get(f"/t/{digest.tracking_token}.gif")
+    db_session.refresh(digest)
+    assert digest.opened_device_type == "unknown"
+
+
 def test_second_hit_does_not_overwrite_first_open_time(
     client: TestClient, db_session: Session, digest: Digest
 ) -> None:
@@ -86,6 +105,23 @@ def test_click_redirects_to_real_destination_and_records_click(
     assert resp.headers["location"] == "https://example.com/story"
     db_session.refresh(article_link)
     assert article_link.clicked_at is not None
+
+
+def test_click_records_device_type_from_user_agent(
+    client: TestClient, db_session: Session, article_link: DigestLink
+) -> None:
+    client.get(
+        f"/c/{article_link.token}",
+        follow_redirects=False,
+        headers={
+            "User-Agent": (
+                "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) "
+                "Mobile/15E148 Safari/604.1"
+            )
+        },
+    )
+    db_session.refresh(article_link)
+    assert article_link.device_type == "mobile"
 
 
 def test_second_click_does_not_overwrite_first_click_time(
