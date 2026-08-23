@@ -3,17 +3,18 @@
 #
 # Two stages: `build` (Node 20) produces the production dist/; `serve`
 # (nginx, non-root via nginxinc/nginx-unprivileged) is the only stage that
-# ships. SPA fallback matches news-agent-infra's deploy/nginx.conf app.*
-# server block.
+# ships.
+#
+# No VITE_API_BASE build arg: client.ts already falls back to the relative
+# path "/api" when it's unset, matching frontend/vite.config.ts's own dev
+# proxy (which rewrites /api -> the backend, stripping the prefix). Baking an
+# absolute URL in here would freeze one environment's backend hostname into
+# the image, breaking the stage->prod promotion this image is built for.
+# nginx.frontend.conf.template does the same /api proxying at runtime
+# instead, via one BACKEND_HOST env var set per environment.
 
 # --- Stage 1: build ---
 FROM node:20-slim AS build
-
-ARG VITE_API_BASE
-RUN test -n "$VITE_API_BASE" || { \
-      echo "VITE_API_BASE build arg is required (no default) -- e.g. --build-arg VITE_API_BASE=https://api.newsagent-ai.com" >&2; \
-      exit 1; \
-    }
 
 WORKDIR /src/frontend
 COPY frontend/package.json frontend/package-lock.json ./
@@ -25,7 +26,10 @@ RUN npm run build
 FROM nginxinc/nginx-unprivileged:1.27-alpine AS serve
 
 COPY --from=build /src/frontend/dist /usr/share/nginx/html
-COPY nginx.frontend.conf /etc/nginx/conf.d/default.conf
+# nginx-unprivileged ships the same 20-envsubst-on-templates.sh entrypoint as
+# upstream nginx: any *.template file here is envsubst'd into conf.d on
+# container start, substituting $BACKEND_HOST from the environment.
+COPY nginx.frontend.conf.template /etc/nginx/templates/default.conf.template
 
 EXPOSE 8080
 
