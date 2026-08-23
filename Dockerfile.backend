@@ -1,0 +1,68 @@
+# Packages news-agent's FastAPI backend as a runnable API image. Lives at the
+# repo root of news-agent (not news-agent-infra) -- builds from local context,
+# no git clone needed. Adapted from news-agent-infra's deploy/Dockerfile,
+# which cloned this repo at build time; that stage is gone since the
+# Dockerfile is now IN the repo it builds.
+#
+# Two stages: `build` proves the frontend still builds and installs the
+# backend into a venv; `deploy` is the only stage that ships.
+
+# --- Stage 1: build ---
+FROM python:3.12-slim AS build
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+# No default: baking a placeholder here would silently ship a frontend that
+# can't reach the API. Fail loudly, before anything else runs.
+ARG VITE_API_BASE
+RUN test -n "$VITE_API_BASE" || { \
+      echo "VITE_API_BASE build arg is required (no default) -- e.g. --build-arg VITE_API_BASE=https://api.newsagent-ai.com" >&2; \
+      exit 1; \
+    }
+
+# Node 20 for the frontend build (Debian's apt-packaged Node is too old for
+# @tailwindcss/oxide).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl ca-certificates \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /src
+COPY . .
+
+# Frontend: proves it still builds. Output never reaches `deploy` -- this
+# image only ships the backend; the frontend ships as its own image
+# (Dockerfile.frontend).
+WORKDIR /src/frontend
+RUN npm ci && npm run build
+WORKDIR /src
+
+# Backend: install into a venv so `deploy` can copy it wholesale.
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+RUN pip install --no-cache-dir -r requirements.txt \
+    && pip install --no-cache-dir .
+
+# --- Stage 2: deploy -- only stage that ships ---
+FROM python:3.12-slim AS deploy
+
+RUN useradd --system --create-home --shell /usr/sbin/nologin newsagent
+
+WORKDIR /app
+
+# Only what's needed to run -- no node, npm cache, or build toolchain.
+COPY --from=build /opt/venv /opt/venv
+COPY --from=build /src/alembic ./alembic
+COPY --from=build /src/alembic.ini ./alembic.ini
+
+ENV PATH="/opt/venv/bin:$PATH"
+
+RUN chown -R newsagent:newsagent /app
+USER newsagent
+
+EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+
+CMD ["uvicorn", "newsagent.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
