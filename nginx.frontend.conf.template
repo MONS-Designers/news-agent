@@ -1,0 +1,37 @@
+# SPA fallback + /api reverse proxy for the containerized frontend. Runs
+# inside nginxinc/nginx-unprivileged (listens on 8080, non-root).
+#
+# envsubst'd at container start (nginx's built-in
+# 20-envsubst-on-templates.sh) -- the BACKEND_HOST env var becomes a literal
+# hostname below before nginx ever parses this file, so it's set once per
+# environment, not baked into the image. envsubst rewrites every ${VARNAME}
+# below matching a set env var (only BACKEND_HOST qualifies); the bare
+# $-prefixed nginx runtime variables (uri, scheme, host,
+# proxy_add_x_forwarded_for) don't match any container env var and are left
+# untouched.
+server {
+    listen 8080;
+    server_name _;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # client.ts calls /api/<path>; strip the prefix before forwarding, same
+    # as frontend/vite.config.ts's dev-server proxy rewrite. The trailing
+    # slash on proxy_pass does the stripping.
+    #
+    # Host must be overridden to the backend's own hostname -- Azure App
+    # Service routes on the Host header (not just TLS SNI), so forwarding
+    # the frontend's own Host here would hit the wrong app or a 404.
+    location /api/ {
+        proxy_pass https://${BACKEND_HOST}/;
+        proxy_set_header Host ${BACKEND_HOST};
+        proxy_ssl_server_name on;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}

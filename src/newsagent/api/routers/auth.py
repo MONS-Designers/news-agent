@@ -29,7 +29,13 @@ async def login(request: Request) -> RedirectResponse:
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Google OAuth is not configured (NEWSAGENT_GOOGLE_CLIENT_ID missing)",
         )
-    redirect_uri = str(request.url_for("callback"))
+    # Not request.url_for("callback"): behind a reverse proxy that overrides
+    # Host to the backend's own hostname (needed for Azure App Service
+    # routing), that would resolve to the backend origin instead of the
+    # frontend's -- sending Google's redirect straight past the proxy and
+    # setting the session cookie on the wrong origin. frontend_url is the
+    # one the browser is actually talking to.
+    redirect_uri = f"{settings.frontend_url}/api/auth/callback"
     response: RedirectResponse = await oauth.google.authorize_redirect(request, redirect_uri)
     return response
 
