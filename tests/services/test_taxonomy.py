@@ -151,9 +151,9 @@ def test_seed_default_roles_creates_roles_under_their_fields(db: Session):
     report = seed_default_roles(db)
 
     assert report.roles_created == sum(len(roles) for roles in DEFAULT_ROLES.values())
-    tech = find_field_by_name(db, "Tech")
+    tech = find_field_by_name(db, "טכנולוגיה")
     assert tech is not None
-    assert [r.name for r in list_roles(db, tech.id)] == sorted(DEFAULT_ROLES["Tech"])
+    assert [r.name for r in list_roles(db, tech.id)] == sorted(DEFAULT_ROLES["טכנולוגיה"])
 
 
 def test_seed_default_roles_is_idempotent(db: Session):

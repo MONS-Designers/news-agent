@@ -32,16 +32,20 @@ ROLE_NAME_MAX_LENGTH = 100
 
 # Generic starter Field content (PRD: PM authors initial seed, no real
 # dogfood-user data available yet) - mirrors DEFAULT_SOURCES's role in sources.py.
-DEFAULT_FIELDS: list[str] = ["Tech", "Finance", "Healthcare", "Education", "Design"]
+# Hebrew is the stored name, not a display label over an English key: these
+# strings are rendered verbatim in the profile picker and copied into
+# users.field_name/role_name. Migration d7f3a4b91e28 renamed the pre-existing
+# English rows to match.
+DEFAULT_FIELDS: list[str] = ["טכנולוגיה", "פיננסים", "בריאות ורפואה", "חינוך", "עיצוב"]
 
 # Starter Role content per Field, from the approved UX mockup. Admin curates
 # from here on (Epic 2 promotes "Other" submissions into this table).
 DEFAULT_ROLES: dict[str, list[str]] = {
-    "Tech": ["Software Engineer", "Product Manager", "Data Scientist", "Founder / Exec"],
-    "Finance": ["Analyst", "Portfolio Manager", "Accountant", "Founder / Exec"],
-    "Healthcare": ["Physician", "Nurse", "Researcher", "Administrator"],
-    "Education": ["Teacher", "Researcher", "Administrator", "Student"],
-    "Design": ["Product Designer", "Researcher", "Art Director", "Student"],
+    "טכנולוגיה": ["מהנדס/ת תוכנה", "מנהל/ת מוצר", "מדען/ית נתונים", "יזם/ית או מנהל/ת בכיר/ה"],
+    "פיננסים": ["אנליסט/ית", "מנהל/ת תיקי השקעות", "רואה/ת חשבון", "יזם/ית או מנהל/ת בכיר/ה"],
+    "בריאות ורפואה": ["רופא/ה", "אח/ות", "חוקר/ת", "מנהל/ת"],
+    "חינוך": ["מורה", "חוקר/ת", "מנהל/ת", "סטודנט/ית"],
+    "עיצוב": ["מעצב/ת מוצר", "חוקר/ת", "מנהל/ת אמנותי/ת", "סטודנט/ית"],
 }
 
 

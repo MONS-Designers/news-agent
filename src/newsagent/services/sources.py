@@ -12,18 +12,21 @@ from newsagent.models.source import STATUS_APPROVED, STATUS_PENDING
 from newsagent.models.topic import STATUS_APPROVED as TOPIC_STATUS_APPROVED
 
 # Curated starter feeds per topic - all seeded as approved (admin-curated).
+# Topic names are Hebrew - they surface verbatim in the picker and as the
+# digest's category tag (migration d7f3a4b91e28 renamed the English rows).
+# Source names stay in their own language: they're publication brands.
 DEFAULT_SOURCES: dict[str, list[tuple[str, str]]] = {
-    "AI": [
+    "בינה מלאכותית": [
         ("TechCrunch AI", "https://techcrunch.com/category/artificial-intelligence/feed/"),
         ("The Verge AI", "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml"),
         ("MIT Technology Review AI", "https://www.technologyreview.com/topic/artificial-intelligence/feed"),
     ],
-    "Cybersecurity": [
+    "סייבר": [
         ("SecurityWeek", "https://www.securityweek.com/feed/"),
         ("BleepingComputer", "https://www.bleepingcomputer.com/feed/"),
         ("Krebs on Security", "https://krebsonsecurity.com/feed/"),
     ],
-    "Space": [
+    "חלל": [
         ("NASA Breaking News", "https://www.nasa.gov/rss/dyn/breaking_news.rss"),
         ("SpaceNews", "https://spacenews.com/feed/"),
     ],
