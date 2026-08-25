@@ -56,7 +56,7 @@ afterEach(() => {
 describe("App - happy path", () => {
   it("shows a Google login link and no admin nav for an anonymous visitor", async () => {
     const { wrapper } = await mountApp();
-    expect(wrapper.text()).toContain("התחברות עם Google");
+    expect(wrapper.find('a[aria-label="התחברות עם Google"]').exists()).toBe(true);
     expect(wrapper.text()).not.toContain("ניהול");
     expect(wrapper.text()).not.toContain("התנתקות");
   });
@@ -66,7 +66,7 @@ describe("App - happy path", () => {
     const { wrapper } = await mountApp();
     expect(wrapper.text()).toContain("user@example.com");
     expect(wrapper.text()).toContain("התנתקות");
-    expect(wrapper.text()).not.toContain("התחברות עם Google");
+    expect(wrapper.find('a[aria-label="התחברות עם Google"]').exists()).toBe(false);
   });
 
   it("shows admin nav links only for an admin", async () => {
