@@ -2,9 +2,9 @@
   <div class="space-y-6">
     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <h1 class="text-2xl font-semibold tracking-tight">מעורבות בדייג'סט</h1>
+        <h1 class="text-2xl font-semibold tracking-tight">מעורבות בשליחות</h1>
         <p class="mt-1 text-sm text-neutral-500">
-          פתיחות וקליקים על לינקים בדייג'סטים שנשלחו.
+          פתיחות וקליקים על לינקים במיילים שנשלחו.
         </p>
       </div>
       <button
@@ -64,7 +64,7 @@
       v-else
       class="rounded-xl border border-dashed border-neutral-300 bg-white p-8 text-center text-sm text-neutral-500"
     >
-      עדיין לא נשלחו דייג'סטים.
+      עדיין לא נשלחו מיילים.
     </div>
   </div>
 </template>
@@ -84,7 +84,7 @@ async function loadEngagement() {
     rows.value = await listDigestEngagement();
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) {
-      errorMessage.value = "התחבר עם Google כדי לצפות במעורבות בדייג'סט.";
+      errorMessage.value = "התחבר עם Google כדי לצפות במעורבות בשליחות.";
     } else if (error instanceof ApiError && error.status === 403) {
       errorMessage.value = "לחשבון שלך אין הרשאת מנהל.";
     } else {

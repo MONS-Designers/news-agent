@@ -3,7 +3,7 @@ newspaper email. Renders the digest's already-selected articles in order;
 every field rendered here was persisted by #11/#12/#25, so nothing is
 recomputed or re-selected.
 
-Keyword emphasis is applied safely: bullet text is HTML-escaped first, then
+Keyword emphasis is applied safely: paragraph text is HTML-escaped first, then
 ``**markdown**`` markers become ``<strong>`` - provider output can never inject
 markup.
 """
@@ -11,6 +11,7 @@ markup.
 import html
 import re
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
@@ -18,9 +19,17 @@ from markupsafe import Markup
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from newsagent.branding import DIGEST_NOUN_WEEKLY
 from newsagent.config import settings
-from newsagent.models import Article, Digest
-from newsagent.models.digest_link import KIND_ARTICLE, KIND_PREFERENCES, KIND_UNSUBSCRIBE, DigestLink
+from newsagent.models import Article, Digest, User
+from newsagent.models.digest_link import (
+    KIND_ARTICLE,
+    KIND_FEEDBACK_DOWN,
+    KIND_FEEDBACK_UP,
+    KIND_PREFERENCES,
+    KIND_UNSUBSCRIBE,
+    DigestLink,
+)
 
 _TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 _env = Environment(
@@ -33,11 +42,12 @@ _HEBREW_MONTHS = [
     "יולי", "אוגוסט", "ספטמבר", "אוקטובר", "נובמבר", "דצמבר",
 ]
 
-# Per-topic category tag: Hebrew label + accent color. Unknown topics fall back.
+# Per-topic accent color for the category tag; unknown topics fall back. The
+# tag's text is Topic.name itself - Hebrew since migration d7f3a4b91e28 - so
+# there is no separate label map to keep in sync.
 # Colors chosen (and verified) to clear WCAG AA 4.5:1 against the #0b1020 email
 # background - see DESIGN.md.Colors in the ux-news-agent-2026-07-20 spine.
-_TOPIC_LABELS = {"AI": "בינה מלאכותית", "Cybersecurity": "סייבר", "Space": "חלל"}
-_TOPIC_COLORS = {"AI": "#4ade80", "Cybersecurity": "#f87171", "Space": "#818cf8"}
+_TOPIC_COLORS = {"בינה מלאכותית": "#4ade80", "סייבר": "#f87171", "חלל": "#818cf8"}
 _DEFAULT_TOPIC_COLOR = "#94a3b8"
 
 # Punchline legibility cap (DESIGN.md: Gveret Levin is a connected handwriting
@@ -87,7 +97,7 @@ def _truncate_punchline(text: str) -> str:
 @dataclass
 class ArticleView:
     title_he: Markup
-    bullets: list[Markup]
+    paragraphs: list[Markup]
     reading_time_minutes: int
     url: str
     source_name: str
@@ -98,6 +108,8 @@ class ArticleView:
     # blocked sees instead of the picture (issue #24). Kept separate from
     # title_he, which carries <bdi>/<strong> markup that can't live in an attr.
     alt_text: str
+    feedback_up_url: str
+    feedback_down_url: str
 
 
 def _get_or_create_link(
@@ -128,19 +140,103 @@ def _click_url(link: DigestLink) -> str:
 
 def _to_view(db: Session, digest: Digest, article: Article) -> ArticleView:
     topic_name = article.source.topic.name
-    bullets = article.bullets_he or ([article.summary_he] if article.summary_he else [])
+    paragraphs = article.paragraphs_he or ([article.summary_he] if article.summary_he else [])
     title = article.title_he or article.title
     link = _get_or_create_link(db, digest, KIND_ARTICLE, article.url, article=article)
+    thanks_url = f"{settings.frontend_url}/?feedback=thanks"
     return ArticleView(
         title_he=_emphasize(title),
-        bullets=[_emphasize(b) for b in bullets],
+        paragraphs=[_emphasize(p) for p in paragraphs],
         reading_time_minutes=article.reading_time_minutes or 1,
         url=_click_url(link),
         source_name=article.source.name,
-        topic_label=_TOPIC_LABELS.get(topic_name, topic_name),
+        topic_label=topic_name,
         topic_color=_TOPIC_COLORS.get(topic_name, _DEFAULT_TOPIC_COLOR),
         image_url=article.image_url,
         alt_text=title,
+        feedback_up_url=_click_url(
+            _get_or_create_link(db, digest, KIND_FEEDBACK_UP, thanks_url, article=article)
+        ),
+        feedback_down_url=_click_url(
+            _get_or_create_link(db, digest, KIND_FEEDBACK_DOWN, thanks_url, article=article)
+        ),
+    )
+
+
+@dataclass
+class WelcomeView:
+    """The one-time beta welcome block. Composed here rather than in the
+    template because which sentences apply depends on whether we know the
+    reader's name and Field, and whether there is any content to show."""
+
+    greeting: Markup | None
+    lines: list[Markup]
+
+
+def _welcome_view(user: User, *, has_articles: bool) -> WelcomeView:
+    # Deliberately no fallback address: a bare "שלום," or "שלום, משתמש" reads
+    # worse than opening straight into the message.
+    #
+    # The name is whatever Google gave us, verbatim - never transliterated.
+    # Most Israeli accounts carry a Latin name, so "שלום Nomi," is a mixed-
+    # direction line: without the <bdi> that _emphasize adds, bidi resolution
+    # can drag the comma to the wrong side of the name. Same treatment the
+    # article text already gets, applied here too rather than assumed unneeded.
+    greeting = (
+        _emphasize(f"שלום {user.name.split()[0]},")
+        if user.name and user.name.strip()
+        else None
+    )
+
+    # Every sentence stays free of second-person present tense, which Hebrew
+    # cannot write without picking a gender. Past tense ("הצטרפת", "סיפרת",
+    # "בחרת") and "אליך" are spelled identically for both, so the warm,
+    # personal voice costs nobody a wrong assumption.
+    lines = [
+        "שמח שהצטרפת.",
+        "ההזמנה הזו לא נשלחה לרשימת תפוצה. היא יצאה לקבוצה קטנה של אנשים "
+        "שנבחרו בשם, וההזמנה הגיעה אליך.",
+    ]
+    chose = f"הרגע סיפרת לי שבחרת ב{user.field_name}, ומה מעניין אותך שם." if user.field_name else "הרגע סיפרת לי מה מעניין אותך."
+    if has_articles:
+        lines.append(f"{chose} הלכתי לקרוא, וזה מה שמצאתי. זו הריצה הראשונה שלי - מכאן אני מגיע פעם בשבוע.")
+        lines.append(
+            "אם משהו כאן פספס, כדאי לי לדעת. אני עוד לומד, ומה שיגיע ממך עכשיו "
+            "יעצב את מה שיישלח בשבוע הבא."
+        )
+    else:
+        lines.append(
+            f"{chose} חלק מהנושאים שבחרת חדשים לגמרי אצלי, ואני עוד מחפש להם "
+            "מקורות טובים - עדיף לי לחכות יום מאשר לשלוח רעש."
+        )
+        lines.append("הדייג'סט הראשון יגיע בימים הקרובים. משם, פעם בשבוע.")
+    # Field names reach these lines from the database too, and can be Latin
+    # ("DevOps"), so every line gets the same bidi treatment as the greeting.
+    return WelcomeView(greeting=greeting, lines=[_emphasize(line) for line in lines])
+
+
+def render_welcome_html(user: User) -> str:
+    """The beta-only welcome, for a reader whose topics produced no articles
+    yet (so `build_digests` created no Digest for them at all).
+
+    Renders the same template with an empty article list. Every tracked link
+    is absent by necessity - DigestLink and the open pixel both hang off a
+    Digest row, and there is none here - so the links point straight at the
+    app instead of through /c/.
+    """
+    template = _env.get_template("digest.html.j2")
+    return template.render(
+        digest_noun_weekly=DIGEST_NOUN_WEEKLY,
+        digest_date=_hebrew_date(date.today()),
+        welcome=_welcome_view(user, has_articles=False),
+        articles=[],
+        total_reading_time=0,
+        preferences_url=f"{settings.frontend_url}/preferences",
+        unsubscribe_url=f"{settings.frontend_url}/preferences",
+        feedback_note_url=f"{settings.frontend_url}/?feedback=open",
+        tracking_pixel_url=None,
+        logo_url=f"{settings.frontend_url}/logo-mark.png",
+        home_url=settings.frontend_url,
     )
 
 
@@ -159,9 +255,22 @@ def render_digest_html(digest: Digest, db: Session) -> str:
     unsubscribe_link = _get_or_create_link(
         db, digest, KIND_UNSUBSCRIBE, f"{settings.frontend_url}/preferences"
     )
+    # Digest-level pair (article_id null): "how was this week's edition?", as
+    # opposed to the per-article thumbs above.
+    thanks_url = f"{settings.frontend_url}/?feedback=thanks"
+    digest_up_link = _get_or_create_link(db, digest, KIND_FEEDBACK_UP, thanks_url)
+    digest_down_link = _get_or_create_link(db, digest, KIND_FEEDBACK_DOWN, thanks_url)
 
     return template.render(
+        digest_noun_weekly=DIGEST_NOUN_WEEKLY,
         digest_date=_hebrew_date(digest.date),
+        # Only until the welcome has actually been delivered - send.py stamps
+        # welcomed_at on success, so a failed send re-renders it next run.
+        welcome=(
+            _welcome_view(digest.user, has_articles=bool(articles))
+            if digest.user.welcomed_at is None
+            else None
+        ),
         intro_he=digest.intro_he,
         dad_joke_he=dad_joke_he,
         joke_corner_title="קינוח",
@@ -169,6 +278,10 @@ def render_digest_html(digest: Digest, db: Session) -> str:
         total_reading_time=total_reading_time,
         preferences_url=_click_url(preferences_link),
         unsubscribe_url=_click_url(unsubscribe_link),
+        digest_feedback_up_url=_click_url(digest_up_link),
+        digest_feedback_down_url=_click_url(digest_down_link),
+        feedback_note_url=f"{settings.frontend_url}/?feedback=open",
         tracking_pixel_url=f"{settings.backend_base_url}/t/{digest.tracking_token}.gif",
         logo_url=f"{settings.frontend_url}/logo-mark.png",
+        home_url=settings.frontend_url,
     )

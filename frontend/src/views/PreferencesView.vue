@@ -3,7 +3,7 @@
     <div>
       <h1 class="text-2xl font-semibold tracking-tight">העדפות הנושאים שלי</h1>
       <p class="mt-1 text-sm text-neutral-500">
-        בחירת הנושאים שיופיעו בדייג'סט השבועי שלך.
+        בחירת הנושאים שיופיעו ב{{ DIGEST_NOUN_WEEKLY }} שלך.
       </p>
     </div>
 
@@ -16,7 +16,26 @@
       {{ errorMessage }}
     </div>
 
-    <div v-else-if="showSummary" class="space-y-5 rounded-xl border border-neutral-200 p-5">
+    <div v-else-if="showSummary" class="space-y-5">
+      <div
+        v-if="topicsStale"
+        class="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900"
+      >
+        <p class="font-medium">שינית את הפרופיל, אבל הנושאים נשארו כפי שהיו.</p>
+        <p class="mt-1 text-amber-800">
+          הנושאים שלמטה נבחרו לפי התשובות הקודמות שלך, ולכן {{ DIGEST_NOUN_WEEKLY }} עדיין נבנה
+          סביבן. אפשר לרענן אותם בהתאם לפרופיל החדש.
+        </p>
+        <button
+          type="button"
+          class="mt-3 rounded-lg bg-amber-900 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-800"
+          @click="editing = true"
+        >
+          עדכון הנושאים שלי
+        </button>
+      </div>
+
+      <div class="space-y-5 rounded-xl border border-neutral-200 p-5">
       <dl class="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
         <div>
           <dt class="text-neutral-500">תחום</dt>
@@ -57,6 +76,7 @@
       >
         עריכת פרופיל
       </button>
+      </div>
     </div>
 
     <div
@@ -66,7 +86,7 @@
       <div>
         <p class="text-sm font-medium">מיילים שבועיים</p>
         <p class="text-xs text-neutral-500">
-          {{ subscription?.unsubscribed ? "מושהה - לא תקבל את הדייג'סט." : "פעיל" }}
+          {{ subscription?.unsubscribed ? `מושהה - ${DIGEST_NOUN_WEEKLY} לא יישלח.` : "פעיל" }}
         </p>
       </div>
       <button
@@ -96,6 +116,7 @@ import {
   type TopicPreference,
 } from "@/api/client";
 import ProfilePickerShell from "@/components/profile-picker/ProfilePickerShell.vue";
+import { DIGEST_NOUN_WEEKLY } from "@/branding";
 
 const preferences = ref<TopicPreference[]>([]);
 const profile = ref<Profile | null>(null);
@@ -109,6 +130,7 @@ const errorMessage = ref("");
 // trigger) only happens when they explicitly choose to.
 const editing = ref(false);
 const showSummary = computed(() => !editing.value && !!profile.value?.field_name);
+const topicsStale = computed(() => !!profile.value?.topics_stale_at);
 
 // Mirrors AboutYouStep.vue's EXPERIENCE_BUCKETS display labels.
 const EXPERIENCE_LABELS: Record<string, string> = {

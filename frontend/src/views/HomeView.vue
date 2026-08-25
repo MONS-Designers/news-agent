@@ -8,7 +8,7 @@
     <div class="grain" aria-hidden="true"></div>
 
     <section v-if="capacityFull" class="hero">
-      <p class="kicker">NewsAgent · דייג'סט AI</p>
+      <p class="kicker">NewsAgent · גרסת בטא</p>
       <h1 class="title">אנחנו במלוא התפוסה כרגע.</h1>
       <p class="subtitle">
         NewsAgent פתוח כרגע לקבוצה קטנה של משתמשים מוקדמים בזמן שאנחנו מכווננים את המערכת. שמרנו
@@ -18,23 +18,23 @@
 
     <template v-else>
       <section class="hero">
-        <p class="kicker">NewsAgent · דייג'סט AI</p>
+        <p class="kicker">NewsAgent · גרסת בטא</p>
         <template v-if="firstRun">
-          <h1 class="title">אתה בפנים.<br />אפשר לגדיר את הדייג'סט שלך.</h1>
+          <h1 class="title">אתה בפנים.<br />נשאר רק להגדיר מי אתה.</h1>
           <p class="subtitle">
-            עוד צעד אחד - ספר לנו על התחום ותחומי העניין שלך, ונתחיל לבנות את הדייג'סט השבועי
-            הראשון שלך סביב מה שבאמת חשוב לך.
+            שתי דקות, פעם אחת - התחום שלך, התפקיד שלך, מה מעניין אותך. משם אנחנו בונים את
+            {{ DIGEST_NOUN_WEEKLY }} הראשון שלך סביב מה שבאמת חשוב לך.
           </p>
         </template>
         <template v-else>
           <h1 class="title">דייג'סט אחד.<br />כל מה שחשוב לך.</h1>
           <p class="subtitle">
-            בינה מלאכותית שקוראת את החדשות בשבילך - מזוקקת לדייג'סט אחד וממוקד, שמגיע כל שבוע,
-            בנוי סביב מה שבאמת מעניין אותך.
+            בינה מלאכותית שקוראת את החדשות בשבילך - מזוקקת לדייג'סט אחד וממוקד בעברית, שמגיע כל
+            שבוע, בנוי סביב מה שבאמת מעניין אותך.
           </p>
         </template>
         <button type="button" class="cta" @click="goToPreferences">
-          אני רוצה להגדיר את את הדייג'סט שלי
+          {{ firstRun ? "בוא נכיר, זה לוקח 2 דקות" : "אני רוצה להגדיר את הדייג'סט שלי" }}
           <span class="cta-arrow" aria-hidden="true">←</span>
         </button>
       </section>
@@ -69,6 +69,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { getMyProfile } from "@/api/client";
 import { ensureMe } from "@/auth";
+import { DIGEST_NOUN_WEEKLY } from "@/branding";
 
 const router = useRouter();
 const route = useRoute();

@@ -72,7 +72,7 @@ describe("EngagementView - happy path", () => {
     listDigestEngagement.mockResolvedValue([]);
     const wrapper = mount(EngagementView);
     await flushPromises();
-    expect(wrapper.text()).toContain("עדיין לא נשלחו דייג'סטים");
+    expect(wrapper.text()).toContain("עדיין לא נשלחו מיילים");
   });
 
   it("reloads on the refresh button", async () => {

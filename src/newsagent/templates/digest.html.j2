@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>הדייג'סט השבועי שלך</title>
+<title>{{ digest_noun_weekly }} שלך</title>
 <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800;900&family=Gveret+Levin&display=swap" rel="stylesheet">
 </head>
 <body style="margin:0; padding:0; background-color:#1c2333; direction:rtl;">
@@ -15,16 +15,35 @@
 <tr><td style="padding:32px 32px 24px; border-bottom:1px solid rgba(240,180,41,.22); direction:rtl; text-align:right;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
     <tr><td align="center" dir="ltr" style="text-align:center; direction:ltr; padding-bottom:22px;">
-      <img src="{{ logo_url }}" width="32" height="32" alt="" style="display:inline-block; vertical-align:middle; border-radius:8px;">
-      <span style="display:inline-block; vertical-align:middle; margin-inline-start:9px; font-family:'Segoe UI',Arial,sans-serif; font-size:18px; font-weight:800; color:#ffffff; letter-spacing:-0.2px;">News<span style="color:#f0b429;">Agent</span></span>
+      <a href="{{ home_url }}" style="text-decoration:none;">
+        <img src="{{ logo_url }}" width="32" height="32" alt="NewsAgent" style="display:inline-block; vertical-align:middle; border-radius:8px;">
+        <span style="display:inline-block; vertical-align:middle; margin-inline-start:9px; font-family:'Segoe UI',Arial,sans-serif; font-size:18px; font-weight:800; color:#ffffff; letter-spacing:-0.2px;">News<span style="color:#f0b429;">Agent</span></span>
+      </a>
     </td></tr>
   </table>
-  <div style="font-family:'Segoe UI',Arial,sans-serif; font-size:11px; font-weight:700; letter-spacing:5px; text-transform:uppercase; color:#f0b429;">תדרוך שבועי</div>
+  <div style="font-family:'Segoe UI',Arial,sans-serif; font-size:11px; font-weight:700; letter-spacing:5px; text-transform:uppercase; color:#f0b429;">גרסת בטא · מהדורה שבועית</div>
   <!-- div, not h1: Gmail/Outlook apply default heading styles that can
        partially override inline font-family on <h1>-<h6> specifically. -->
-  <div style="font-family:'Segoe UI',Arial,sans-serif; font-size:36px; font-weight:900; color:#ffffff; margin:10px 0 6px; letter-spacing:-0.5px; line-height:1.1;">חדשות הבוקר</div>
-  <div style="font-family:'Segoe UI',Arial,sans-serif; font-size:12.5px; color:#a3adc4; letter-spacing:.3px;"><bdi>{{ digest_date }}</bdi> &nbsp;·&nbsp; <bdi>{{ total_reading_time }} דקות קריאה</bdi></div>
+  <div style="font-family:'Segoe UI',Arial,sans-serif; font-size:36px; font-weight:900; color:#ffffff; margin:10px 0 6px; letter-spacing:-0.5px; line-height:1.1;">{{ digest_noun_weekly }}</div>
+  <div style="font-family:'Segoe UI',Arial,sans-serif; font-size:12.5px; color:#a3adc4; letter-spacing:.3px;"><bdi>{{ digest_date }}</bdi>{% if articles %} &nbsp;·&nbsp; <bdi>{{ total_reading_time }} דקות קריאה</bdi>{% endif %}</div>
 </td></tr>
+
+{% if welcome %}
+<!-- One-time beta welcome. Sits above the content on purpose: it frames what
+     follows as early work the reader helps shape, before they judge it. -->
+<tr><td style="padding:24px 32px 4px; direction:rtl; text-align:right;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid rgba(240,180,41,.3); border-radius:14px; background-color:rgba(240,180,41,.06);">
+    <tr><td style="padding:22px 24px; direction:rtl; text-align:right;">
+      {% if welcome.greeting %}
+      <div style="font-family:'Segoe UI',Arial,sans-serif; font-size:17px; font-weight:700; color:#ffffff; margin-bottom:10px;">{{ welcome.greeting }}</div>
+      {% endif %}
+      {% for line in welcome.lines %}
+      <p style="font-family:'Segoe UI',Arial,sans-serif; font-size:15px; color:#d7deef; line-height:1.75; margin:0 0 10px; direction:rtl; text-align:right;">{{ line }}</p>
+      {% endfor %}
+    </td></tr>
+  </table>
+</td></tr>
+{% endif %}
 
 {% if intro_he %}
 <tr><td style="padding:24px 32px 0; direction:rtl; text-align:right;">
@@ -32,6 +51,7 @@
 </td></tr>
 {% endif %}
 
+{% if articles %}
 <!-- 30-second scan -->
 <tr><td style="padding:20px 32px 4px; direction:rtl; text-align:right;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:rgba(240,180,41,.055); border:1px solid rgba(240,180,41,.28); border-radius:12px;">
@@ -67,19 +87,18 @@
   </table>
   {% endif %}
   <div style="font-family:'Segoe UI',Arial,sans-serif; font-size:24px; font-weight:800; color:#ffffff; line-height:1.35; margin:14px 0 12px; letter-spacing:-.2px;">{{ article.title_he }}</div>
-  <ul style="list-style:none; margin:0; padding:0; font-family:'Segoe UI',Arial,sans-serif;">
-    {% for bullet in article.bullets %}
-    <li style="font-size:15px; color:#cfd7e8; line-height:1.7; padding:4px 0; direction:rtl; text-align:right;">
-      <span style="color:#f0b429; margin-left:8px;">-</span>{{ bullet }}
-    </li>
-    {% endfor %}
-  </ul>
-  <div style="font-family:'Segoe UI',Arial,sans-serif; font-size:12px; color:#7a85a0; margin-top:14px; padding-top:11px; border-top:1px solid rgba(255,255,255,.07); direction:rtl; text-align:right;">
-    <bdi>{{ article.source_name }}</bdi> &nbsp;·&nbsp; <bdi>{{ article.reading_time_minutes }} דק׳ קריאה</bdi> &nbsp;·&nbsp;
-    <a href="{{ article.url }}" style="color:#f0b429; text-decoration:none;">למקור באנגלית ←</a>
+  {% for paragraph in article.paragraphs %}
+  <p style="font-family:'Segoe UI',Arial,sans-serif; font-size:15.5px; color:#cfd7e8; line-height:1.75; margin:0 0 12px; direction:rtl; text-align:right;">{{ paragraph }}</p>
+  {% endfor %}
+  <div dir="ltr" style="font-family:'Segoe UI',Arial,sans-serif; font-size:12px; color:#7a85a0; margin-top:14px; padding-top:11px; border-top:1px solid rgba(255,255,255,.07); direction:ltr; text-align:right;">
+    <a href="{{ article.feedback_down_url }}" style="text-decoration:none; font-size:15px;" title="פחות">👎</a>
+    <a href="{{ article.feedback_up_url }}" style="text-decoration:none; font-size:15px; margin-inline-start:4px;" title="מעניין">👍</a>
+    &nbsp;·&nbsp;
+    <a href="{{ article.url }}" style="color:#f0b429; text-decoration:none;">למקור באנגלית ←</a> &nbsp;·&nbsp; <bdi>{{ article.reading_time_minutes }} דק׳ קריאה</bdi> &nbsp;·&nbsp; <bdi>{{ article.source_name }}</bdi>
   </div>
 </td></tr>
 {% endfor %}
+{% endif %}
 
 {% if dad_joke_he %}
 <!-- קינוח: magic-8-ball fortune -->
@@ -94,10 +113,29 @@
 </td></tr>
 {% endif %}
 
+<!-- Beta feedback: one tap, no form, no sign-in -->
+<tr><td style="padding:6px 32px 24px; direction:rtl; text-align:right;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid rgba(240,180,41,.28); border-radius:14px; background-color:rgba(240,180,41,.05);">
+    <tr><td style="padding:20px 22px; text-align:center; direction:rtl;">
+      <div style="font-family:'Segoe UI',Arial,sans-serif; font-size:14.5px; font-weight:600; color:#f4f6fb; margin-bottom:4px;">{% if welcome and not articles %}משהו על הדעת כבר עכשיו?{% elif welcome %}איך יצא הראשון?{% else %}איך היה השבוע?{% endif %}</div>
+      <div style="font-family:'Segoe UI',Arial,sans-serif; font-size:12.5px; color:#a3adc4; margin-bottom:14px;">{% if welcome and not articles %}אם יש נושא שחשוב לך שאכסה, זה הרגע להגיד.{% elif welcome %}אני עוד לומד אותך. לחיצה אחת עכשיו משנה את מה שיגיע בשבוע הבא.{% else %}הקבוצה שרואה את זה עדיין קטנה, אז כל לחיצה כאן נשמעת.{% endif %}</div>
+      {# No thumbs without articles: there is nothing to rate yet, and the
+         links are Digest-scoped tokens that do not exist in that render. #}
+      {% if articles %}
+      <a href="{{ digest_feedback_up_url }}" style="display:inline-block; text-decoration:none; font-size:22px; padding:8px 18px; margin:0 4px; border-radius:12px; background-color:rgba(74,222,128,.12); border:1px solid rgba(74,222,128,.35);">👍</a>
+      <a href="{{ digest_feedback_down_url }}" style="display:inline-block; text-decoration:none; font-size:22px; padding:8px 18px; margin:0 4px; border-radius:12px; background-color:rgba(248,113,113,.12); border:1px solid rgba(248,113,113,.35);">👎</a>
+      {% endif %}
+      <div style="font-family:'Segoe UI',Arial,sans-serif; font-size:12px; margin-top:14px;">
+        <a href="{{ feedback_note_url }}" style="color:#f0b429; text-decoration:none;">{{ "רוצה להגיד לי משהו במילים? ←" if welcome else "רוצה להגיד משהו במילים? ←" }}</a>
+      </div>
+    </td></tr>
+  </table>
+</td></tr>
+
 <!-- Footer -->
 <tr><td style="padding:22px 32px; border-top:1px solid rgba(255,255,255,.07); direction:rtl; text-align:right;">
   <div style="font-family:'Segoe UI',Arial,sans-serif; font-size:12px; color:#a3adc4; line-height:1.6;">
-    שלחתי לך את זה כי ביקשת שאשמור לך על הדופק. משהו לא מדויק?
+    {{ "שלחתי לך את זה כי ביקשת שאשמור לך על הדופק." if articles else "אני שומר לך על הדופק מהרגע שהצטרפת." }} משהו לא מדויק?
     <a href="{{ preferences_url }}" style="color:#a3adc4;">אפשר לכוונן יחד ←</a>
   </div>
   <div style="font-family:'Segoe UI',Arial,sans-serif; font-size:12px; color:#a3adc4; line-height:1.6; margin-top:8px;">
@@ -106,7 +144,7 @@
 </td></tr>
 
 </table>
-<img src="{{ tracking_pixel_url }}" width="1" height="1" alt="" style="display:block;">
+{% if tracking_pixel_url %}<img src="{{ tracking_pixel_url }}" width="1" height="1" alt="" style="display:block;">{% endif %}
 </td></tr>
 </table>
 </body>
