@@ -13,8 +13,9 @@ summarized candidates competes for `digest_max_articles` slots here.
 """
 
 import logging
+from collections.abc import Collection
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -28,6 +29,12 @@ from newsagent.pipeline.ranking import select_top
 from newsagent.pipeline.summarize import SUMMARY_DONE
 
 logger = logging.getLogger(__name__)
+
+# How far back to look for an already-composed editorial voice covering the
+# same articles. Bounded rather than unlimited because the voice is written
+# about a moment in the news - borrowing one from last month would open a
+# digest with a stale framing of stories that have since moved on.
+VOICE_REUSE_DAYS = 3
 
 
 @dataclass
@@ -57,6 +64,43 @@ def _undelivered_articles(db: Session, user: User) -> list[Article]:
     )
 
 
+def _reuse_recent_voice(db: Session, digest: Digest) -> bool:
+    """Copy the editorial voice from a recent digest built on the exact same
+    articles, instead of paying another LLM call to describe the same news.
+    Returns whether a match was found.
+
+    Matched on the article set, not on topics: the voice is generated *from*
+    the headlines, so borrowing it across different article sets would open a
+    reader's digest by referring to stories that are not in it.
+
+    This is aimed squarely at new signups. `topic_affinity` gives a reader with
+    no sent-and-opened history a neutral score for every topic, so two people
+    who just picked the same topics get ranked identically and land on the same
+    top-N - which is exactly when the LLM would be asked to write the same
+    intro twice.
+    """
+    article_ids = {entry.article_id for entry in digest.articles}
+    if not article_ids:
+        return False
+
+    cutoff = digest.date - timedelta(days=VOICE_REUSE_DAYS)
+    recent = db.scalars(
+        select(Digest).where(
+            Digest.id != digest.id,
+            Digest.date >= cutoff,
+            Digest.date <= digest.date,
+            Digest.intro_he.is_not(None),
+        )
+    )
+    for candidate in recent:
+        if {entry.article_id for entry in candidate.articles} == article_ids:
+            digest.intro_he = candidate.intro_he
+            digest.dad_joke_he = candidate.dad_joke_he
+            logger.info("Digest %s reused the voice from digest %s", digest.id, candidate.id)
+            return True
+    return False
+
+
 def _compose_voice(provider: LLMProvider, digest: Digest) -> None:
     """Fill the digest's editorial voice from its article headlines. Best-effort:
     a refusal or provider error leaves the voice empty (template renders without
@@ -76,15 +120,35 @@ def _compose_voice(provider: LLMProvider, digest: Digest) -> None:
 
 
 def build_digests(
-    db: Session, provider: LLMProvider, for_date: date | None = None
+    db: Session,
+    provider: LLMProvider,
+    for_date: date | None = None,
+    *,
+    user_ids: Collection[int] | None = None,
 ) -> DigestReport:
+    """Build digests for every eligible user, or only for `user_ids`.
+
+    The caller decides *who* - this stage has no opinion about cadence or
+    onboarding. That split is what makes the scheduler's short tick affordable:
+    building a digest costs an LLM call for the editorial voice, so the loop
+    passes the handful of users who are actually due (see services/cadence.py)
+    and this does no LLM work at all on the ticks where nobody is. An empty
+    collection means nobody, which is different from `None` (everybody).
+    """
     if for_date is None:
         for_date = date.today()
     report = DigestReport()
 
+    if user_ids is not None and not user_ids:
+        return report
+
     # Unsubscribed users (GH #46) are skipped entirely - no digest is even
     # built for them, not just held back at send time.
-    for user in db.scalars(select(User).where(User.unsubscribed_at.is_(None))):
+    candidates = select(User).where(User.unsubscribed_at.is_(None))
+    if user_ids is not None:
+        candidates = candidates.where(User.id.in_(user_ids))
+
+    for user in db.scalars(candidates):
         report.users_processed += 1
         articles = _undelivered_articles(db, user)
         if not articles:
@@ -128,8 +192,11 @@ def build_digests(
             db.add(DigestArticle(digest_id=digest.id, article_id=article.id))
         report.articles_added += len(selected)
         db.flush()
-        # Refresh the voice against the digest's now-final article set.
-        _compose_voice(provider, digest)
+        # Refresh the voice against the digest's now-final article set, unless
+        # a recent digest already covers exactly these articles - then the LLM
+        # would only be rewriting a description of the same news.
+        if not _reuse_recent_voice(db, digest):
+            _compose_voice(provider, digest)
         db.commit()
         logger.info("Digest for %s (%s): +%d articles", user.email, for_date, len(selected))
 

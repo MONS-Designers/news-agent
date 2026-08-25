@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 import pytest
 from sqlalchemy import create_engine, select
@@ -8,7 +8,7 @@ from newsagent.config import settings
 from newsagent.llm.mock import MockLLMProvider
 from newsagent.models import Article, Digest, DigestArticle, Source, Topic, User, UserTopicPreference
 from newsagent.models.base import Base
-from newsagent.pipeline.digest import build_digests
+from newsagent.pipeline.digest import VOICE_REUSE_DAYS, build_digests
 
 TODAY = date(2026, 7, 20)
 
@@ -168,3 +168,74 @@ def test_cap_selects_top_n_and_leaves_rest_undelivered(db: Session):
     # Leftover candidates weren't dropped - they're still eligible next run.
     report2 = build_digests(db, MockLLMProvider(), for_date=date(2026, 7, 21))
     assert report2.articles_added == len(leftover_ids)
+
+
+# --- Editorial voice reuse -------------------------------------------------
+
+
+class CountingProvider(MockLLMProvider):
+    """Counts voice compositions, which are the only LLM call a build makes."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.voice_calls = 0
+
+    def compose_digest_voice(self, headlines):
+        self.voice_calls += 1
+        return super().compose_digest_voice(headlines)
+
+
+def _newcomer(db: Session, user_id: int) -> None:
+    db.add(User(id=user_id, email=f"u{user_id}@example.com"))
+    db.flush()
+    db.add(UserTopicPreference(user_id=user_id, topic_id=1))
+    db.commit()
+
+
+def test_a_new_signup_reuses_a_recent_voice_instead_of_paying_for_one(db: Session):
+    """The case this exists for: someone joins, picks the same topics as an
+    existing reader, and lands on an identical top-N because a brand-new user
+    has neutral topic affinity. Writing that intro again is pure waste."""
+    add_article(db, source_id=1, url_suffix="a")
+    provider = CountingProvider()
+    build_digests(db, provider, TODAY)
+    assert provider.voice_calls == 1
+
+    _newcomer(db, 2)
+    build_digests(db, provider, TODAY)
+
+    assert provider.voice_calls == 1  # no second call
+    first, second = db.scalars(select(Digest).order_by(Digest.id)).all()
+    assert second.intro_he == first.intro_he
+    assert second.dad_joke_he == first.dad_joke_he
+
+
+def test_a_different_article_set_still_composes_its_own_voice(db: Session):
+    """The voice is written from the headlines, so borrowing it across
+    different articles would open a digest by naming stories it doesn't have."""
+    add_article(db, source_id=1, url_suffix="a")
+    provider = CountingProvider()
+    build_digests(db, provider, TODAY)
+
+    # Newcomer subscribes to Space instead, so their articles differ.
+    db.add(User(id=2, email="u2@example.com"))
+    db.flush()
+    db.add(UserTopicPreference(user_id=2, topic_id=2))
+    add_article(db, source_id=2, url_suffix="b")
+    db.commit()
+    build_digests(db, provider, TODAY)
+
+    assert provider.voice_calls == 2
+
+
+def test_a_voice_older_than_the_window_is_not_reused(db: Session):
+    """A voice describes a moment in the news - past the window it would frame
+    a digest around stories that have since moved on."""
+    add_article(db, source_id=1, url_suffix="a")
+    provider = CountingProvider()
+    build_digests(db, provider, TODAY)
+
+    _newcomer(db, 2)
+    build_digests(db, provider, TODAY + timedelta(days=VOICE_REUSE_DAYS + 1))
+
+    assert provider.voice_calls == 2
