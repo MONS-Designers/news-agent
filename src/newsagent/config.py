@@ -50,6 +50,13 @@ class Settings(BaseSettings):
     # Top-N articles selected per user's digest per run; the rest stay undelivered.
     digest_max_articles: int = 7
 
+    # LOCAL DEVELOPMENT ONLY. When set to an email address, the API exposes
+    # GET /auth/dev-login, which signs that identity in without Google. Empty
+    # (the default) means the route is never registered at all - not a
+    # disabled route that 404s on a flag, but no route, so a stray value in a
+    # production environment cannot re-enable it by accident.
+    dev_auth_email: str = ""
+
     # Which email sender adapter the pipeline uses (see newsagent.mail.factory)
     email_sender: str = "console"
     # When set, the console sender also writes each email's HTML here

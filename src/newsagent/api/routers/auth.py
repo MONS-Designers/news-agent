@@ -1,3 +1,5 @@
+import logging
+
 from authlib.integrations.starlette_client import OAuth, OAuthError
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
@@ -9,6 +11,8 @@ from newsagent.api.schemas import IdentityOut
 from newsagent.config import settings
 from newsagent.models import User
 from newsagent.services.waitlist import capture_to_waitlist
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -75,6 +79,43 @@ async def callback(request: Request, db: Session = Depends(get_db)) -> RedirectR
     auth.save_identity(request, identity)
     destination = _redirect_destination(db, identity)
     return RedirectResponse(f"{settings.frontend_url}{destination}")
+
+
+if settings.dev_auth_email:
+    # Registered only when NEWSAGENT_DEV_AUTH_EMAIL is set, so in every other
+    # environment this path simply does not exist.
+    #
+    # Deliberately a real sign-in rather than a bypass inside require_identity:
+    # it produces the same session the Google callback produces, so nothing
+    # downstream behaves differently under it, and there is no code on the
+    # authenticated request path that could ever skip a check.
+    @router.get("/dev-login")
+    def dev_login(
+        request: Request, email: str | None = None, db: Session = Depends(get_db)
+    ) -> RedirectResponse:
+        """Sign in as `email` (default: NEWSAGENT_DEV_AUTH_EMAIL) without Google.
+
+        The `email` parameter exists so one dev environment can move between
+        several seeded accounts - an admin, a fresh reader, a returning one -
+        without editing config between them.
+        """
+        target = (email or settings.dev_auth_email).strip().lower()
+        # name=None, never the address: an email address is not a name, and
+        # storing one makes the digest open with "שלום dev@example.com,".
+        # Google supplies a real name on the OAuth path; here we honestly have
+        # none, and every greeting is written to be omitted when that is so.
+        identity = auth.resolve_identity(db, target, name=None, cap=settings.max_users)
+        if identity is None:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=(
+                    f"{target} has no account and the {settings.max_users}-user cap is full. "
+                    "Seed one with: python -m newsagent.cli add-user <email>"
+                ),
+            )
+        auth.save_identity(request, identity)
+        logger.warning("Dev login used for %s - this must never happen in production", target)
+        return RedirectResponse(f"{settings.frontend_url}{_redirect_destination(db, identity)}")
 
 
 @router.get("/me", response_model=IdentityOut)

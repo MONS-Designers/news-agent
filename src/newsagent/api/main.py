@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
@@ -7,8 +9,19 @@ from newsagent.config import settings
 from newsagent.logging_setup import configure_logging
 
 
+logger = logging.getLogger(__name__)
+
+
 def create_app() -> FastAPI:
     configure_logging()
+    if settings.dev_auth_email:
+        # Loud on every boot, not just on use: the failure mode is nobody
+        # noticing it is on, so it has to announce itself before it is reached.
+        logger.warning(
+            "DEV LOGIN IS ENABLED: GET /auth/dev-login signs in as %s with no "
+            "Google verification. Unset NEWSAGENT_DEV_AUTH_EMAIL outside local development.",
+            settings.dev_auth_email,
+        )
     app = FastAPI(title="NewsAgent API")
     app.add_middleware(
         SessionMiddleware,
