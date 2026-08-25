@@ -66,3 +66,14 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
 
 CMD ["uvicorn", "newsagent.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+# This image also carries the delivery scheduler, which owns the send schedule
+# in code rather than in an external cron. Run it as a SECOND container from
+# this same image, overriding the command:
+#
+#     python -m newsagent.scheduler
+#
+# It needs the database URL and the mail settings (NEWSAGENT_EMAIL_SENDER and
+# the SMTP_* values); the API container does not. Extra replicas are safe --
+# a lease row lets only one deliver at a time -- but they do no useful work,
+# so one is enough.
