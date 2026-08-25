@@ -155,6 +155,7 @@ def test_get_profile_before_any_save_is_all_none(as_user_with_db: TestClient):
         "role_name": None,
         "experience_bucket": None,
         "interest_free_text": None,
+        "topics_stale_at": None,
     }
 
 
@@ -182,6 +183,7 @@ def test_put_profile_curated_field_saves_field_name(as_user_with_db: TestClient,
         "role_name": None,
         "experience_bucket": None,
         "interest_free_text": None,
+        "topics_stale_at": None,
     }
     assert seeded_db.query(PendingTaxonomySuggestion).count() == 0
 
@@ -198,6 +200,7 @@ def test_put_profile_other_field_creates_pending_suggestion(
         "role_name": None,
         "experience_bucket": None,
         "interest_free_text": None,
+        "topics_stale_at": None,
     }
 
     suggestion = seeded_db.scalar(select(PendingTaxonomySuggestion))
@@ -295,6 +298,7 @@ def test_put_profile_curated_role_saves_role_name(as_user_with_db: TestClient, s
         "role_name": "Software Engineer",
         "experience_bucket": None,
         "interest_free_text": None,
+        "topics_stale_at": None,
     }
     assert seeded_db.query(PendingTaxonomySuggestion).count() == 0
 
@@ -321,6 +325,7 @@ def test_put_profile_other_role_creates_field_scoped_suggestion(
         "role_name": "Developer Relations",
         "experience_bucket": None,
         "interest_free_text": None,
+        "topics_stale_at": None,
     }
 
     suggestion = seeded_db.scalar(select(PendingTaxonomySuggestion))
@@ -384,6 +389,7 @@ def test_put_profile_valid_experience_bucket_saves(as_user_with_db: TestClient, 
         "role_name": None,
         "experience_bucket": "6-10",
         "interest_free_text": None,
+        "topics_stale_at": None,
     }
 
 
@@ -416,6 +422,7 @@ def test_put_profile_interest_free_text_alone_saves(
         "role_name": None,
         "experience_bucket": None,
         "interest_free_text": "curious about ML",
+        "topics_stale_at": None,
     }
 
 

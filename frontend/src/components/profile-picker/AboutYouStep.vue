@@ -53,7 +53,7 @@
       </div>
     </fieldset>
 
-    <p v-if="loadError" class="mt-3 text-xs text-hd-subtitle">טעינת האפשרויות נכשלה. נסה לרענן את הדף.</p>
+    <p v-if="loadError" class="mt-3 text-xs text-hd-subtitle">טעינת האפשרויות נכשלה. אפשר לרענן את הדף.</p>
 
     <div class="mt-7 flex items-center justify-end gap-3.5">
       <p v-if="saveError" class="text-xs text-hd-subtitle">{{ saveError }}</p>
@@ -240,7 +240,7 @@ async function onContinue() {
     captureSnapshot();
     emit("continue");
   } catch {
-    saveError.value = "השמירה נכשלה. בדוק את החיבור ונסה שוב.";
+    saveError.value = "השמירה נכשלה. ניתן לבדוק את החיבור ולנסות שוב.";
   } finally {
     saving.value = false;
   }

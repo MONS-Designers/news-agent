@@ -112,7 +112,7 @@ async function advance() {
     initialText = text;
     emit("continue");
   } catch {
-    saveError.value = "השמירה נכשלה. בדוק את החיבור ונסה שוב.";
+    saveError.value = "השמירה נכשלה. ניתן לבדוק את החיבור ולנסות שוב.";
   } finally {
     saving.value = false;
   }

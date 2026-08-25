@@ -16,7 +16,7 @@
     <p v-if="loading" class="text-[13px] text-hd-muted" role="status" aria-live="polite">
       {{ extendedWait ? "עדיין מנסים - זה לוקח יותר זמן מהרגיל…" : "מוצא הצעות בשבילך…" }}
     </p>
-    <p v-else-if="loadError" class="text-xs text-hd-subtitle">טעינת הנושאים נכשלה. נסה לרענן את הדף.</p>
+    <p v-else-if="loadError" class="text-xs text-hd-subtitle">טעינת הנושאים נכשלה. אפשר לרענן את הדף.</p>
 
     <template v-else>
       <div class="flex flex-wrap gap-2.5" role="group" aria-label="נושאים מוצעים">
@@ -40,7 +40,7 @@
       <div class="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:gap-3.5">
         <p v-if="saveMessage" class="text-xs text-hd-subtitle">{{ saveMessage }}</p>
         <button type="button" :class="BTN_PRIMARY" :disabled="saving || loading || loadError" @click="onSave">
-          {{ saving ? "שומר…" : "אני רוצה לקבל את הדייג'סט" }}
+          {{ saving ? "שומר…" : "אני רוצה לקבל את זה" }}
         </button>
       </div>
     </div>
@@ -217,7 +217,13 @@ async function load() {
 
     if (suggestionResult.suggestion_status === "ready" && readyChips.length > 0) {
       allChips.value = readyChips;
-      pickedChips.value = allChips.value.slice(0, MAX_TOPICS).map(toPick);
+      // Only pre-select real, admin-curated topics - never an LLM-invented
+      // name. An invented topic is created with status='pending' and no RSS
+      // sources behind it, so auto-subscribing someone to one silently fills
+      // a slot (of only MAX_TOPICS) with a topic that produces zero articles.
+      // Invented names stay on screen as unselected chips the user can opt
+      // into deliberately.
+      pickedChips.value = existingChips.slice(0, MAX_TOPICS).map(toPick);
     } else {
       // Failed, or ready-but-empty (shouldn't happen given the popularity
       // fallback ranks every topic, but never risk a dead end - FR-9).

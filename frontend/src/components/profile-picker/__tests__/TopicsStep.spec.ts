@@ -41,7 +41,7 @@ afterEach(() => {
 });
 
 describe("TopicsStep - happy path", () => {
-  it("renders ready suggestions and pre-picks up to MAX_TOPICS", async () => {
+  it("renders every suggestion but pre-picks only the real topics", async () => {
     getTopicSuggestions.mockResolvedValue({
       suggestion_status: "ready",
       suggested_topic_ids: [1, 2, 3],
@@ -52,8 +52,30 @@ describe("TopicsStep - happy path", () => {
 
     const buttons = wrapper.findAll('[role="group"] button');
     expect(buttons).toHaveLength(4);
-    expect(wrapper.text()).toContain("נבחרו");
-    expect(wrapper.text()).toContain("4");
+    const pressed = buttons.filter((b) => b.attributes("aria-pressed") === "true");
+    expect(pressed).toHaveLength(3);
+    expect(buttons[3].text()).toContain("Robotics");
+    expect(buttons[3].attributes("aria-pressed")).toBe("false");
+  });
+
+  it("never auto-picks an invented topic, even when real ones don't fill the cap", async () => {
+    // An invented name is created as a pending Topic with no RSS sources
+    // behind it, so auto-subscribing burns one of only MAX_TOPICS slots on a
+    // topic that yields zero articles - reported by a beta reader who was
+    // silently signed up to two topics they never chose.
+    getTopicSuggestions.mockResolvedValue({
+      suggestion_status: "ready",
+      suggested_topic_ids: [1],
+      suggested_new_topic_names: ["Autism research", "Autism education"],
+    });
+    const wrapper = mountStep();
+    await flushPromises();
+
+    const buttons = wrapper.findAll('[role="group"] button');
+    expect(buttons).toHaveLength(3);
+    const pressed = buttons.filter((b) => b.attributes("aria-pressed") === "true");
+    expect(pressed).toHaveLength(1);
+    expect(pressed[0].text()).toContain("AI");
   });
 
   it("filters out a suggested topic id that doesn't resolve locally (stale id)", async () => {
@@ -97,11 +119,12 @@ describe("TopicsStep - happy path", () => {
     const wrapper = mountStep();
     await flushPromises();
 
-    const saveButton = wrapper.findAll("button").find((b) => b.text().includes("דייג'סט"))!;
+    // Robotics is on screen but unpicked, so it must not reach the save.
+    const saveButton = wrapper.findAll("button").find((b) => b.text().includes("אני רוצה לקבל"))!;
     await saveButton.trigger("click");
     await flushPromises();
 
-    expect(updateMyPreferences).toHaveBeenCalledWith([1, 2], ["Robotics"]);
+    expect(updateMyPreferences).toHaveBeenCalledWith([1, 2], []);
     expect(wrapper.emitted("saved")).toBeTruthy();
     expect(push).toHaveBeenCalledWith("/");
   });
@@ -215,7 +238,7 @@ describe("TopicsStep - unhappy path / edge cases", () => {
     const wrapper = mountStep();
     await flushPromises();
 
-    const saveButton = wrapper.findAll("button").find((b) => b.text().includes("דייג'סט"))!;
+    const saveButton = wrapper.findAll("button").find((b) => b.text().includes("אני רוצה לקבל"))!;
     await saveButton.trigger("click");
     await flushPromises();
 
@@ -275,7 +298,7 @@ describe("TopicsStep - unhappy path / edge cases", () => {
     const wrapper = mountStep();
     await flushPromises();
 
-    const saveButton = wrapper.findAll("button").find((b) => b.text().includes("דייג'סט"))!;
+    const saveButton = wrapper.findAll("button").find((b) => b.text().includes("אני רוצה לקבל"))!;
     await saveButton.trigger("click");
     await saveButton.trigger("click");
     resolveSave(PREFS);

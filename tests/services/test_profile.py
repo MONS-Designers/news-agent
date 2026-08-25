@@ -2,7 +2,7 @@ import pytest
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
-from newsagent.models import PendingTaxonomySuggestion, User
+from newsagent.models import PendingTaxonomySuggestion, Topic, User, UserTopicPreference
 from newsagent.models.base import Base
 from newsagent.models.user import SUGGESTION_STATUS_NONE, SUGGESTION_STATUS_PENDING
 from newsagent.services import profile as profile_module
@@ -14,6 +14,8 @@ from newsagent.services.profile import (
     save_profile,
     suggest_prompts_for_user,
 )
+from newsagent.services.preferences import set_preferences
+from newsagent.services.sources import add_topic
 from newsagent.services.taxonomy import add_field, add_role, normalize_taxonomy_text
 from newsagent.suggestions.errors import SuggestionError
 from newsagent.suggestions.types import PromptText
@@ -524,3 +526,75 @@ def test_suggest_prompts_for_user_skips_blank_prompts(db: Session, monkeypatch: 
     monkeypatch.setattr(profile_module, "get_suggestion_source", lambda: source)
 
     assert suggest_prompts_for_user(user) == ["What excites you about AI?"]
+
+
+# --- Topic staleness on profile edit --------------------------------------
+
+
+def _subscribe(db: Session, user: User) -> None:
+    topic, _ = add_topic(db, "בינה מלאכותית")
+    db.add(UserTopicPreference(user_id=user.id, topic_id=topic.id))
+    db.commit()
+    db.refresh(user)
+
+
+def test_first_run_profile_save_does_not_flag_topics_stale(db: Session):
+    """A brand-new user has no subscriptions to diverge from - flagging here
+    would greet them with an "out of date" banner before they picked any."""
+    user = _user(db)
+    add_field(db, "Tech")
+
+    _save(db, user)
+
+    assert user.topics_stale_at is None
+
+
+def test_changing_field_flags_saved_topics_as_stale(db: Session):
+    user = _user(db)
+    add_field(db, "Tech")
+    add_field(db, "Design")
+    _save(db, user)
+    _subscribe(db, user)
+
+    _save(db, user, field_name="Design")
+
+    assert user.topics_stale_at is not None
+
+
+def test_changing_interest_text_flags_saved_topics_as_stale(db: Session):
+    """Interests feed suggest_topics just as much as Field/Role do."""
+    user = _user(db)
+    add_field(db, "Tech")
+    _save(db, user)
+    _subscribe(db, user)
+
+    _save(db, user, interest_free_text="כלי פיתוח ובדיקות אוטומטיות")
+
+    assert user.topics_stale_at is not None
+
+
+def test_resaving_the_same_profile_does_not_flag_topics_stale(db: Session):
+    """The flag tracks a real divergence, not the act of pressing save."""
+    user = _user(db)
+    add_field(db, "Tech")
+    _save(db, user)
+    _subscribe(db, user)
+
+    _save(db, user, field_name="Tech")
+
+    assert user.topics_stale_at is None
+
+
+def test_saving_topics_clears_the_stale_flag(db: Session):
+    user = _user(db)
+    add_field(db, "Tech")
+    add_field(db, "Design")
+    _save(db, user)
+    _subscribe(db, user)
+    _save(db, user, field_name="Design")
+    assert user.topics_stale_at is not None
+
+    topic = db.scalar(select(Topic).where(Topic.name == "בינה מלאכותית"))
+    set_preferences(db, user, [topic.id])
+
+    assert user.topics_stale_at is None

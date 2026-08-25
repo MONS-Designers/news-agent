@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, ConfigDict
 
 
@@ -17,6 +19,9 @@ class ProfileOut(BaseModel):
     role_name: str | None
     experience_bucket: str | None
     interest_free_text: str | None
+    # Non-null once a profile edit has diverged from the saved topics; cleared
+    # when the user next saves their topics. The UI treats it as a boolean.
+    topics_stale_at: datetime | None
 
 
 class TopicSuggestionsOut(BaseModel):

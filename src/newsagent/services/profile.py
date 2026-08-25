@@ -6,6 +6,7 @@ that imports from newsagent.suggestions (AD-3's profile -> suggestions
 dependency direction)."""
 
 from concurrent.futures import FIRST_EXCEPTION, Future, ThreadPoolExecutor, wait
+from datetime import datetime
 from typing import Any
 
 from sqlalchemy import func, select
@@ -159,6 +160,11 @@ def _apply(
     if role_name is not None and field_name is None:
         raise ValueError(INVALID_PROFILE)
 
+    # Captured before any write below, so the comparison at the end of this
+    # function sees the pre-edit values.
+    previous_suggestion_inputs = (user.field_name, user.role_name, user.interest_free_text)
+    had_topics = bool(user.topic_preferences)
+
     if field_name is not None:
         field = taxonomy.find_field_by_name(db, field_name)
         if not field_is_other and field is None:
@@ -215,6 +221,17 @@ def _apply(
     # step" called this.
     user.suggestion_status = SUGGESTION_STATUS_PENDING
     user.suggestion_request_seq = (user.suggestion_request_seq or 0) + 1
+
+    # The saved topics were chosen against the *old* answers; once one of the
+    # three inputs suggest_topics reads has actually changed, they no longer
+    # follow from the profile. Only meaningful for a user who already has
+    # subscriptions - during first-run setup there is nothing to diverge from,
+    # and flagging it would greet a brand-new user with a "your topics are out
+    # of date" banner before they ever picked any.
+    if had_topics and (user.field_name, user.role_name, user.interest_free_text) != (
+        previous_suggestion_inputs
+    ):
+        user.topics_stale_at = datetime.now()
 
     db.commit()
     db.refresh(user)

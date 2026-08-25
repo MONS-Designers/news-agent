@@ -59,6 +59,9 @@ export interface Profile {
   role_name: string | null;
   experience_bucket: string | null;
   interest_free_text: string | null;
+  // Non-null once a profile edit diverged from the saved topics; cleared when
+  // the user next saves their topics.
+  topics_stale_at: string | null;
 }
 
 export interface ProfileUpdate {
@@ -198,6 +201,17 @@ export async function getTopicSuggestions(): Promise<TopicSuggestions> {
 
 export async function getMyProfile(): Promise<Profile> {
   return request("/me/profile");
+}
+
+export async function submitFeedback(
+  sentiment: "up" | "down" | null,
+  text: string,
+): Promise<void> {
+  await request("/me/feedback", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sentiment, text: text || null }),
+  });
 }
 
 export async function updateMyProfile(update: ProfileUpdate): Promise<Profile> {

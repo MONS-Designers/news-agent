@@ -108,6 +108,9 @@ def set_preferences(
         db.add(UserTopicPreference(user_id=user.id, topic_id=topic_id))
     for topic_id in current.keys() - desired:
         db.delete(current[topic_id])
+    # This save is what re-aligns the topics with the profile, whatever the
+    # user picked - so it clears the divergence flag services/profile.py set.
+    user.topics_stale_at = None
     db.commit()
     db.refresh(user)
     return list_topic_choices(db, user)
