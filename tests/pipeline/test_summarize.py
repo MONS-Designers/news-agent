@@ -227,3 +227,47 @@ def test_articles_with_no_subscribed_topic_are_skipped(db: Session):
 
     assert report.summarized == 0
     assert article.summary_status == SUMMARY_PENDING
+
+
+# --- Cost: article writing is paid once, globally --------------------------
+
+
+class CountingSummarizer(MockLLMProvider):
+    def __init__(self) -> None:
+        super().__init__()
+        self.calls = 0
+
+    def summarize(self, article: ArticleInput):
+        self.calls += 1
+        return super().summarize(article)
+
+
+def test_an_article_is_never_summarized_twice(db: Session):
+    """Hebrew text is stored on the Article row, so the paid call happens once
+    for the article - not once per reader who receives it."""
+    add_article(db)
+    provider = CountingSummarizer()
+
+    summarize_relevant_articles(db, provider)
+    assert provider.calls == 1
+
+    summarize_relevant_articles(db, provider)
+    assert provider.calls == 1
+
+
+def test_extra_readers_on_the_same_topic_cost_nothing_extra(db: Session):
+    """The case worth protecting: ten beta readers on one topic must not mean
+    ten translations of the same story."""
+    add_article(db)
+    provider = CountingSummarizer()
+    summarize_relevant_articles(db, provider)
+
+    for user_id in range(2, 12):
+        db.add(User(id=user_id, email=f"u{user_id}@example.com"))
+        db.flush()
+        db.add(UserTopicPreference(user_id=user_id, topic_id=1))
+    db.commit()
+
+    summarize_relevant_articles(db, provider)
+
+    assert provider.calls == 1
