@@ -43,8 +43,9 @@ class Article(Base):
     # summarize.py already prefers full_text when this reaches "done".
     extraction_status: Mapped[str] = mapped_column(String, default="pending", server_default="pending")
     extraction_attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
-    # Key points for the email body; each may carry **markdown** keyword emphasis.
-    bullets_he: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    # Body copy for the email: short flowing Hebrew paragraphs, in order. Each
+    # may carry **markdown** keyword emphasis.
+    paragraphs_he: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
     # General "worth-reading" signal (0-1), distinct from relevance; feeds ranking.
     interestingness: Mapped[float | None] = mapped_column(Float, nullable=True)
     summary_status: Mapped[str] = mapped_column(String, default="pending", server_default="pending")

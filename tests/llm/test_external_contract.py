@@ -24,7 +24,7 @@ _SUMMARY = json.dumps(
         "title_he": "כותרת בעברית",
         "source_language": "en",
         "reading_time_minutes": 2,
-        "bullets_he": ["נקודה ראשונה", "נקודה שנייה"],
+        "paragraphs_he": ["נקודה ראשונה", "נקודה שנייה"],
         "interestingness": 0.6,
     }
 )

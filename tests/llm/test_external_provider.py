@@ -95,7 +95,7 @@ def test_out_of_range_score_maps_to_provider_error():
         provider.score_relevance(ON_TOPIC_ARTICLE, TOPIC)
 
 
-def test_non_list_bullets_he_maps_to_provider_error():
+def test_non_list_paragraphs_he_maps_to_provider_error():
     def handler(request: httpx.Request) -> httpx.Response:
         content = json.dumps(
             {
@@ -103,7 +103,7 @@ def test_non_list_bullets_he_maps_to_provider_error():
                 "title_he": "x",
                 "source_language": "en",
                 "reading_time_minutes": 1,
-                "bullets_he": "not a list",
+                "paragraphs_he": "not a list",
                 "interestingness": 0.5,
             }
         )
@@ -122,7 +122,7 @@ def test_zero_reading_time_maps_to_provider_error():
                 "title_he": "x",
                 "source_language": "en",
                 "reading_time_minutes": 0,
-                "bullets_he": ["a"],
+                "paragraphs_he": ["a"],
                 "interestingness": 0.5,
             }
         )
@@ -181,7 +181,7 @@ def test_fenced_json_now_parses_successfully(caplog):
                 "title_he": "t",
                 "source_language": "en",
                 "reading_time_minutes": 2,
-                "bullets_he": ["a"],
+                "paragraphs_he": ["a"],
                 "interestingness": 0.5,
             }
         )
@@ -221,7 +221,7 @@ def test_truncated_json_logs_the_json_stage_and_the_length(caplog):
 
 
 def test_schema_failure_logs_the_schema_stage_not_the_json_stage(caplog):
-    """Valid JSON, empty bullets_he - a different bug from a parse failure, and
+    """Valid JSON, empty paragraphs_he - a different bug from a parse failure, and
     the log has to say so or the 33 failures stay indistinguishable."""
     provider = _summarize_returning(
         json.dumps(
@@ -230,7 +230,7 @@ def test_schema_failure_logs_the_schema_stage_not_the_json_stage(caplog):
                 "title_he": "t",
                 "source_language": "en",
                 "reading_time_minutes": 2,
-                "bullets_he": [],
+                "paragraphs_he": [],
                 "interestingness": 0.5,
             }
         )
@@ -242,7 +242,7 @@ def test_schema_failure_logs_the_schema_stage_not_the_json_stage(caplog):
 
     assert "stage=schema" in caplog.text
     assert "stage=json" not in caplog.text
-    assert "bullets_he" in caplog.text
+    assert "paragraphs_he" in caplog.text
 
 
 def test_bad_envelope_logs_the_envelope_stage(caplog):
@@ -281,7 +281,7 @@ def test_successful_summarize_logs_nothing(caplog):
                 "title_he": "t",
                 "source_language": "en",
                 "reading_time_minutes": 2,
-                "bullets_he": ["a"],
+                "paragraphs_he": ["a"],
                 "interestingness": 0.5,
             }
         )

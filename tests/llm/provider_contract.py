@@ -64,11 +64,11 @@ class ProviderContractSuite(ABC):
         assert result.source_language
         assert result.reading_time_minutes >= 1
 
-    def test_summarize_returns_bullets_and_interestingness(self):
+    def test_summarize_returns_paragraphs_and_interestingness(self):
         result = self.make_provider().summarize(ON_TOPIC_ARTICLE)
         assert isinstance(result, SummaryResult)
-        assert len(result.bullets_he) >= 1
-        assert all(b for b in result.bullets_he)
+        assert len(result.paragraphs_he) >= 1
+        assert all(b for b in result.paragraphs_he)
         assert 0.0 <= result.interestingness <= 1.0
 
     def test_compose_digest_voice_returns_intro_and_joke(self):

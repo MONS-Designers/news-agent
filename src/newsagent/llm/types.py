@@ -39,7 +39,8 @@ class RelevanceScore:
 class SummaryResult:
     """A Hebrew summary of an article.
 
-    `bullets_he` are the key points for the email body - 3 short Hebrew lines.
+    `paragraphs_he` is the email body copy - 1-2 short flowing Hebrew
+    paragraphs that read as prose, not as a list of extracted facts.
     Keyword emphasis is marked with ``**markdown**`` (never raw HTML): the
     renderer HTML-escapes the text and only then converts the markers to
     ``<strong>``, so provider output can never inject markup.
@@ -52,7 +53,7 @@ class SummaryResult:
     title_he: str
     source_language: str
     reading_time_minutes: int
-    bullets_he: tuple[str, ...] = field(default_factory=tuple)
+    paragraphs_he: tuple[str, ...] = field(default_factory=tuple)
     interestingness: float = 0.5
     usage: Usage | None = None
 

@@ -109,13 +109,17 @@ class MockLLMProvider(LLMProvider):
         summary_he = f"[תרגום דמה] {snippet}"
         source_language = "he" if _HEBREW_CHARS.search(article.text) else "en"
 
-        # Deterministic bullets: first 3 sentences (or word-chunks as fallback),
-        # each with its longest word emphasized via **markdown** markers.
+        # Deterministic paragraphs: the first 4 sentences (or word-chunks as
+        # fallback) joined into two paragraphs, each with its longest word
+        # emphasized via **markdown** markers.
         sentences = _split_sentences(article.text)
-        if len(sentences) < 3:
+        if len(sentences) < 4:
             sentences = [" ".join(words[i : i + 8]) for i in range(0, len(words), 8)]
-        bullets_he = tuple(
-            f"[תרגום דמה] {_emphasize_longest(sentence)}" for sentence in sentences[:3]
+        emphasized = [_emphasize_longest(sentence) for sentence in sentences[:4]]
+        paragraphs_he = tuple(
+            f"[תרגום דמה] {' '.join(chunk)}"
+            for chunk in (emphasized[:2], emphasized[2:4])
+            if chunk
         )
 
         # Deterministic interestingness in [0, 1] from a stable hash of the title.
@@ -128,7 +132,7 @@ class MockLLMProvider(LLMProvider):
             title_he=f"[תרגום דמה] {article.title}",
             source_language=source_language,
             reading_time_minutes=max(1, round(len(words) / _WORDS_PER_MINUTE)),
-            bullets_he=bullets_he,
+            paragraphs_he=paragraphs_he,
             interestingness=interestingness,
             usage=usage,
         )
