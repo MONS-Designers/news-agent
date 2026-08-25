@@ -1,4 +1,5 @@
 from newsagent.api.schemas.engagement import DigestEngagementOut
+from newsagent.api.schemas.feedback import FeedbackIn
 from newsagent.api.schemas.identity import IdentityOut
 from newsagent.api.schemas.preference import PreferenceUpdateIn, TopicPreferenceOut
 from newsagent.api.schemas.profile import ProfileOut, ProfileUpdateIn, TopicSuggestionsOut
@@ -13,6 +14,7 @@ from newsagent.api.schemas.taxonomy import (
 
 __all__ = [
     "DigestEngagementOut",
+    "FeedbackIn",
     "FieldOut",
     "IdentityOut",
     "PendingTaxonomySuggestionOut",

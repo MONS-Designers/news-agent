@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from newsagent.api.auth import require_user
 from newsagent.api.deps import get_db
 from newsagent.api.schemas import (
+    FeedbackIn,
     FieldOut,
     PreferenceUpdateIn,
     ProfileOut,
@@ -15,7 +16,8 @@ from newsagent.api.schemas import (
     TopicSuggestionsOut,
 )
 from newsagent.models import Field, User
-from newsagent.services import preferences, profile, subscription, taxonomy
+from newsagent.models.feedback import SENTIMENT_DOWN, SENTIMENT_UP, SOURCE_APP
+from newsagent.services import feedback, preferences, profile, subscription, taxonomy
 
 router = APIRouter(prefix="/me", tags=["me"])
 
@@ -54,6 +56,22 @@ def update_my_subscription(
 ) -> SubscriptionOut:
     updated = subscription.set_unsubscribed(db, user, body.unsubscribed)
     return SubscriptionOut(unsubscribed=updated.unsubscribed_at is not None)
+
+
+@router.post("/feedback")
+def submit_my_feedback(
+    body: FeedbackIn,
+    user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
+    if body.sentiment is not None and body.sentiment not in (SENTIMENT_UP, SENTIMENT_DOWN):
+        raise HTTPException(status_code=400, detail="Invalid sentiment")
+    if body.sentiment is None and not (body.text or "").strip():
+        raise HTTPException(status_code=400, detail="Feedback must carry a sentiment or text")
+    feedback.record(
+        db, source=SOURCE_APP, user_id=user.id, sentiment=body.sentiment, text=body.text
+    )
+    return {"status": "recorded"}
 
 
 @router.get("/fields", response_model=list[FieldOut])

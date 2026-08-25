@@ -14,6 +14,13 @@ if TYPE_CHECKING:
 KIND_ARTICLE = "article"
 KIND_PREFERENCES = "preferences"
 KIND_UNSUBSCRIBE = "unsubscribe"
+# One-tap feedback from inside the email. Carries article_id for a per-article
+# thumb, or null for the digest-level pair in the footer - the same
+# (digest, kind, article) uniqueness that keeps article links stable.
+KIND_FEEDBACK_UP = "feedback_up"
+KIND_FEEDBACK_DOWN = "feedback_down"
+
+FEEDBACK_KINDS = {KIND_FEEDBACK_UP: "up", KIND_FEEDBACK_DOWN: "down"}
 
 
 def _generate_link_token() -> str:

@@ -19,8 +19,9 @@ from sqlalchemy.orm import Session
 from newsagent.api.deps import get_db
 from newsagent.config import settings
 from newsagent.models import Digest, DigestLink
-from newsagent.models.digest_link import KIND_UNSUBSCRIBE
-from newsagent.services import subscription
+from newsagent.models.digest_link import FEEDBACK_KINDS, KIND_UNSUBSCRIBE
+from newsagent.models.feedback import SOURCE_ARTICLE, SOURCE_DIGEST
+from newsagent.services import feedback, subscription
 from newsagent.services.device_detection import classify_device
 
 router = APIRouter(tags=["tracking"])
@@ -59,4 +60,15 @@ def track_click(token: str, request: Request, db: Session = Depends(get_db)) -> 
     db.commit()
     if link.kind == KIND_UNSUBSCRIBE:
         subscription.set_unsubscribed(db, link.digest.user, True)
+    elif link.kind in FEEDBACK_KINDS:
+        # Recorded per click, not once per link: a reader who taps 👍 today and
+        # 👎 next week on the same article has told us two different things.
+        feedback.record(
+            db,
+            source=SOURCE_ARTICLE if link.article_id is not None else SOURCE_DIGEST,
+            user_id=link.digest.user_id,
+            digest_id=link.digest_id,
+            article_id=link.article_id,
+            sentiment=FEEDBACK_KINDS[link.kind],
+        )
     return RedirectResponse(url=link.target_url)
