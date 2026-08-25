@@ -173,8 +173,15 @@ def main(argv: list[str] | None = None) -> int:
                 f"articles added: {digest_report.articles_added}"
             )
         elif args.command == "send-digests":
-            send_report = send.send_pending_digests(db, get_email_sender())
+            sender = get_email_sender()
+            send_report = send.send_pending_digests(db, sender)
+            # Readers whose topics produced nothing still get their one-time
+            # welcome, so finishing setup is never met with silence.
+            welcome_report = send.send_pending_welcomes(db, sender)
             print(f"Sent {send_report.sent}, failed {send_report.failed}")
+            print(
+                f"Welcome-only: sent {welcome_report.sent}, failed {welcome_report.failed}"
+            )
     return 0
 
 

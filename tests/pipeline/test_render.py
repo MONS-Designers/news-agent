@@ -14,7 +14,7 @@ def db() -> Session:
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
     with Session(engine) as session:
-        topic = Topic(name="AI")
+        topic = Topic(name="בינה מלאכותית")
         session.add(topic)
         session.flush()
         session.add(Source(id=1, topic_id=topic.id, name="TechCrunch", url="feed://ok", status="approved"))
@@ -27,7 +27,7 @@ def add_article(
     db: Session,
     *,
     url_suffix: str,
-    bullets: list[str] | None = None,
+    paragraphs: list[str] | None = None,
     minutes: int = 3,
     image_url: str | None = None,
 ) -> Article:
@@ -37,7 +37,7 @@ def add_article(
         url=f"https://example.com/{url_suffix}",
         title_he="כותרת בעברית",
         summary_he="תקציר בעברית",
-        bullets_he=bullets if bullets is not None else ["נקודה **חשובה** ראשונה", "נקודה שנייה"],
+        paragraphs_he=paragraphs if paragraphs is not None else ["נקודה **חשובה** ראשונה", "נקודה שנייה"],
         reading_time_minutes=minutes,
         interestingness=0.5,
         summary_status="summarized",
@@ -68,14 +68,14 @@ def test_render_includes_hebrew_rtl_and_date(db: Session):
     assert "20 ביולי 2026" in html
 
 
-def test_bullets_render_with_safe_strong_emphasis(db: Session):
-    digest = build_digest(db, [add_article(db, url_suffix="a", bullets=["נקודה **חשובה** כאן"])])
+def test_paragraphs_render_with_safe_strong_emphasis(db: Session):
+    digest = build_digest(db, [add_article(db, url_suffix="a", paragraphs=["נקודה **חשובה** כאן"])])
     html = render_digest_html(digest, db)
     assert "<strong>חשובה</strong>" in html
 
 
 def test_keyword_emphasis_escapes_injected_html(db: Session):
-    digest = build_digest(db, [add_article(db, url_suffix="a", bullets=["<script>alert(1)</script> **מפתח**"])])
+    digest = build_digest(db, [add_article(db, url_suffix="a", paragraphs=["<script>alert(1)</script> **מפתח**"])])
     html = render_digest_html(digest, db)
     assert "<script>alert(1)</script>" not in html
     assert "&lt;" in html and "&gt;" in html
@@ -83,15 +83,15 @@ def test_keyword_emphasis_escapes_injected_html(db: Session):
 
 
 def test_embedded_latin_brand_name_wrapped_for_bidi_safety(db: Session):
-    digest = build_digest(db, [add_article(db, url_suffix="a", bullets=["OpenAI חושפת מודל חדש"])])
+    digest = build_digest(db, [add_article(db, url_suffix="a", paragraphs=["OpenAI חושפת מודל חדש"])])
     html = render_digest_html(digest, db)
     assert "<bdi>OpenAI</bdi>" in html
 
 
-def test_category_tag_uses_hebrew_label_and_color(db: Session):
+def test_category_tag_uses_topic_name_and_color(db: Session):
     digest = build_digest(db, [add_article(db, url_suffix="a")])
     html = render_digest_html(digest, db)
-    assert "בינה מלאכותית" in html  # Hebrew label for "AI"
+    assert "בינה מלאכותית" in html  # Topic.name itself, rendered verbatim
     assert "#4ade80" in html  # AI green (WCAG AA against #0b1020)
 
 
@@ -114,15 +114,15 @@ def test_render_does_not_recap_or_drop_articles(db: Session):
 def test_reading_time_grouped_with_its_hebrew_unit_in_one_bidi_isolate(db: Session):
     """A bare digit isolated on its own (<bdi>1</bdi> דק' קריאה) could drift
     away from its Hebrew unit during bidi resolution and end up positioned
-    next to the wrong neighbor - reported live as "1 · TechCrunch דק' קריאה"
-    instead of "TechCrunch · 1 דק' קריאה". Grouping the digit and its unit
-    into a single isolate keeps them atomic."""
+    next to the wrong neighbor. Grouping the digit and its unit into a single
+    isolate keeps them atomic. The HTML order is reversed to account for RTL
+    rendering in mail clients."""
     digest = build_digest(db, [add_article(db, url_suffix="a", minutes=1)])
     html = render_digest_html(digest, db)
     assert "<bdi>1 דק׳ קריאה</bdi>" in html
-    source_pos = html.index("<bdi>TechCrunch</bdi>")
     reading_time_pos = html.index("<bdi>1 דק׳ קריאה</bdi>")
-    assert source_pos < reading_time_pos
+    source_pos = html.index("<bdi>TechCrunch</bdi>")
+    assert reading_time_pos < source_pos
 
 
 def test_tracking_pixel_present(db: Session):
@@ -218,3 +218,31 @@ def test_no_image_element_when_absent(db: Session):
     # The lead image carries the title as its alt; the tracking pixel uses alt="".
     # No title-alt image → the article degraded to a text-only card.
     assert 'alt="כותרת בעברית"' not in html
+
+
+def test_latin_name_in_the_greeting_is_bidi_isolated(db: Session):
+    """Most Israeli Google accounts carry a Latin name, so the greeting is a
+    mixed-direction line - without isolation the comma can end up on the wrong
+    side of the name."""
+    user = db.get(User, 1)
+    user.name = "Nomi Magnus"
+    db.commit()
+    digest = build_digest(db, [add_article(db, url_suffix="a")])
+
+    html = render_digest_html(digest, db)
+
+    # The trailing comma falls inside the isolate: _LATIN_RUN treats it as part
+    # of the Latin run, which keeps "Nomi," together instead of letting the
+    # comma resolve against the surrounding Hebrew.
+    assert "שלום <bdi>Nomi,</bdi>" in html
+
+
+def test_latin_field_name_in_the_welcome_is_bidi_isolated(db: Session):
+    user = db.get(User, 1)
+    user.field_name = "DevOps"
+    db.commit()
+    digest = build_digest(db, [add_article(db, url_suffix="a")])
+
+    html = render_digest_html(digest, db)
+
+    assert "שבחרת ב<bdi>DevOps,</bdi>" in html
