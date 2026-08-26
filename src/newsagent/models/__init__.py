@@ -28,6 +28,7 @@ __all__ = [
     "Digest",
     "DigestArticle",
     "DigestLink",
+    "Feedback",
     "Field",
     "Role",
     "PendingTaxonomySuggestion",
