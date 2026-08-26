@@ -1,11 +1,14 @@
 import logging
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
 from newsagent.api.routers import admin, admin_engagement, admin_taxonomy, auth, me, tracking
 from newsagent.config import settings
+from newsagent.db import SessionLocal
 from newsagent.logging_setup import configure_logging
 
 
@@ -48,6 +51,17 @@ def create_app() -> FastAPI:
 
     @app.get("/health")
     def health() -> dict[str, str]:
+        return {"status": "ok"}
+
+    @app.get("/health/db")
+    def health_db(response: Response) -> dict[str, str]:
+        try:
+            with SessionLocal() as session:
+                session.execute(text("SELECT 1"))
+        except SQLAlchemyError:
+            logger.warning("DB health check failed", exc_info=True)
+            response.status_code = 503
+            return {"status": "error"}
         return {"status": "ok"}
 
     return app

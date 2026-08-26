@@ -1,6 +1,9 @@
 import pytest
 from fastapi import Request
 from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import sessionmaker
 
 from newsagent.api.main import app, create_app
 from newsagent.config import settings
@@ -12,6 +15,35 @@ def test_health_returns_200():
     response = client.get("/health")
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
+
+
+def test_health_db_returns_200_when_db_reachable(monkeypatch: pytest.MonkeyPatch):
+    engine = create_engine("sqlite:///:memory:")
+    monkeypatch.setattr("newsagent.api.main.SessionLocal", sessionmaker(bind=engine))
+
+    response = client.get("/health/db")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+
+
+def test_health_db_returns_503_when_db_unreachable(monkeypatch: pytest.MonkeyPatch):
+    class _FailingSession:
+        def __enter__(self) -> "_FailingSession":
+            return self
+
+        def __exit__(self, *exc_info: object) -> bool:
+            return False
+
+        def execute(self, *args: object, **kwargs: object) -> None:
+            raise SQLAlchemyError("connection refused")
+
+    monkeypatch.setattr("newsagent.api.main.SessionLocal", lambda: _FailingSession())
+
+    response = client.get("/health/db")
+
+    assert response.status_code == 503
+    assert response.json() == {"status": "error"}
 
 
 def test_cors_allows_configured_frontend_origin(monkeypatch: pytest.MonkeyPatch):
