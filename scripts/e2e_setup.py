@@ -50,7 +50,7 @@ def main() -> None:
         profiled_user = User(
             email="e2e-profiled-user@example.com",
             name="E2E Profiled User",
-            field_name="Tech",
+            field_name="טכנולוגיה",
             role_name="Software Engineer",
             experience_bucket="3-5",
         )
@@ -59,7 +59,7 @@ def main() -> None:
 
         # A couple of pending "Other" suggestions for the admin taxonomy flow.
         taxonomy.record_pending_suggestion(db, kind="field", field_id=None, text="Robotics")
-        tech = next(f for f in taxonomy.list_fields(db) if f.name == "Tech")
+        tech = next(f for f in taxonomy.list_fields(db) if f.name == "טכנולוגיה")
         taxonomy.record_pending_suggestion(db, kind="role", field_id=tech.id, text="DevRel Engineer")
         db.commit()
 

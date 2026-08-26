@@ -10,9 +10,9 @@ test.describe("profile picker onboarding", () => {
 
     // Step 1: About You - pick a curated Field, wait for its Roles to load,
     // pick a curated Role, pick an experience bucket.
-    await page.getByRole("group", { name: "תחום" }).getByRole("button", { name: "Tech", exact: true }).click();
+    await page.getByRole("group", { name: "תחום" }).getByRole("button", { name: "טכנולוגיה", exact: true }).click();
     const roleGroup = page.getByRole("group", { name: "תפקיד" });
-    await roleGroup.getByRole("button", { name: "Software Engineer", exact: true }).click();
+    await roleGroup.getByRole("button", { name: "מהנדס/ת תוכנה", exact: true }).click();
     // The radio input itself is visually hidden (sr-only); its wrapping
     // <label> is the actual click target.
     await page.locator("label", { hasText: "3–5 שנים" }).click();
@@ -37,7 +37,7 @@ test.describe("profile picker onboarding", () => {
     // read-only summary, not the wizard, with the values just chosen.
     await page.goto("/preferences");
     await expect(page.getByRole("heading", { name: "העדפות הנושאים שלי" })).toBeVisible();
-    await expect(page.getByText("Software Engineer", { exact: true })).toBeVisible();
+    await expect(page.getByText("מהנדס/ת תוכנה", { exact: true })).toBeVisible();
     await expect(page.getByText("3–5 שנים", { exact: true })).toBeVisible();
   });
 });
