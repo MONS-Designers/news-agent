@@ -28,7 +28,7 @@ test.describe("profile picker onboarding", () => {
     // fallback (no LLM call), so chips appear without waiting on any provider.
     const topicsGroup = page.getByRole("group", { name: "נושאים מוצעים" });
     await expect(topicsGroup.getByRole("button").first()).toBeVisible({ timeout: 15_000 });
-    await page.getByRole("button", { name: "אני רוצה לקבל את הדייג'סט" }).click();
+    await page.getByRole("button", { name: "אני רוצה לקבל את זה" }).click();
 
     // Saving redirects to the home page.
     await expect(page).toHaveURL(`${new URL(page.url()).origin}/`);
