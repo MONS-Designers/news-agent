@@ -38,8 +38,8 @@ _SERVER_LOGGERS = ("uvicorn", "uvicorn.error", "uvicorn.access")
 # application records LOG_LEVEL=DEBUG exists to surface.
 _NOISY_LOGGERS = ("httpx", "httpcore")
 
-# None outside a tracked pipeline run; a list of emitted LogEntry ids while one
-# is in progress - see track_pipeline_run_logs()/attach_pipeline_run() below.
+# None outside a tracked outbound run; a list of emitted LogEntry ids while
+# one is in progress - see track_outbound_run_logs()/attach_outbound_run() below.
 _tracked_ids: ContextVar[list[int] | None] = ContextVar("_tracked_ids", default=None)
 
 
@@ -69,10 +69,10 @@ class _DBHandler(logging.Handler):
 
 
 @contextmanager
-def track_pipeline_run_logs() -> Iterator[None]:
+def track_outbound_run_logs() -> Iterator[None]:
     """Wrap a filter/summarize CLI run so every log record emitted inside
-    is remembered for attach_pipeline_run() to correlate afterward, once
-    that run's pipeline_runs row (and therefore its id) exists."""
+    is remembered for attach_outbound_run() to correlate afterward, once
+    that run's outbound_runs row (and therefore its id) exists."""
     token = _tracked_ids.set([])
     try:
         yield
@@ -80,12 +80,12 @@ def track_pipeline_run_logs() -> Iterator[None]:
         _tracked_ids.reset(token)
 
 
-def attach_pipeline_run(db: Session, pipeline_run_id: int) -> None:
-    """Call after pipeline_runs.record_run() returns, from inside the same
-    track_pipeline_run_logs() block, to back-fill pipeline_run_id on every
+def attach_outbound_run(db: Session, outbound_run_id: int) -> None:
+    """Call once an outbound_runs row exists, from inside the same
+    track_outbound_run_logs() block, to back-fill outbound_run_id on every
     record emitted during that run."""
     ids = _tracked_ids.get()
-    log_entries.attach_pipeline_run(db, ids or [], pipeline_run_id)
+    log_entries.attach_outbound_run(db, ids or [], outbound_run_id)
 
 
 def _resolve_level() -> int:

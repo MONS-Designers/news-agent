@@ -66,7 +66,7 @@ out of the box for local dev:
 Every log record is written to the `log_entries` table in the same database - there is no
 stderr/stdout/file destination choice. Each row carries the app version (read from installed
 package metadata) and, for records emitted during a `filter`/`summarize` CLI run, the id of that
-run's `pipeline_runs` row. Logging is wired at every entrypoint - the CLI, the API process, and
+run's `outbound_runs` row (`log_entries.outbound_run_id`). Logging is wired at every entrypoint - the CLI, the API process, and
 `newsagent.llm.demo` - so the same `NEWSAGENT_LOG_LEVEL` applies however you run it. The API's
 own uvicorn startup/error/access lines are captured alongside `newsagent.*` records. `httpx`/
 `httpcore` stay at WARNING so `DEBUG` shows application records rather than transport traces.

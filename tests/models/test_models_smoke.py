@@ -12,8 +12,9 @@ from newsagent.models import (
     DigestArticle,
     Field,
     LogEntry,
+    OutboundCall,
+    OutboundRun,
     PendingTaxonomySuggestion,
-    PipelineRun,
     Role,
     Source,
     Topic,
@@ -44,7 +45,10 @@ def test_create_and_query_one_row_per_table(session: Session):
     pending_taxonomy_suggestion = PendingTaxonomySuggestion(
         kind="field", field_id=None, normalized_text="tech writer", status="pending"
     )
-    pipeline_run = PipelineRun(run_type="filter")
+    outbound_run = OutboundRun(kind="filter")
+    session.add(outbound_run)
+    session.flush()
+    outbound_call = OutboundCall(run_id=outbound_run.id, purpose="FILTERING", status="ok")
     log_entry = LogEntry(
         level="WARNING", logger_name="newsagent.pipeline.fetcher", message="boom", version="0.1.0"
     )
@@ -62,7 +66,7 @@ def test_create_and_query_one_row_per_table(session: Session):
             field,
             role,
             pending_taxonomy_suggestion,
-            pipeline_run,
+            outbound_call,
             log_entry,
         ]
     )
@@ -79,5 +83,6 @@ def test_create_and_query_one_row_per_table(session: Session):
     assert session.query(Field).count() == 1
     assert session.query(Role).count() == 1
     assert session.query(PendingTaxonomySuggestion).count() == 1
-    assert session.query(PipelineRun).count() == 1
+    assert session.query(OutboundRun).count() == 1
+    assert session.query(OutboundCall).count() == 1
     assert session.query(LogEntry).count() == 1

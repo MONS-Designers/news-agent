@@ -21,8 +21,8 @@ from newsagent.llm.types import (
     Refusal,
     RelevanceScore,
     SummaryResult,
-    Usage,
 )
+from newsagent.telemetry.context import attempt_scope, increment_attempt
 
 T = TypeVar("T")
 
@@ -38,7 +38,6 @@ class LLMProvider(ABC):
         self._max_attempts = max_attempts
         self._backoff_seconds = backoff_seconds
         self._sleep = sleep
-        self._usage_log: list[Usage] = []
 
     # -- public contract -----------------------------------------------------
 
@@ -70,23 +69,6 @@ class LLMProvider(ABC):
             for article in articles
         ]
 
-    # -- usage accounting ------------------------------------------------------
-
-    def _record_usage(self, usage: Usage | None) -> None:
-        """Called by an adapter for every billed attempt - including ones that
-        go on to fail - so cost is never invisible just because a call didn't
-        return a result. GH #19."""
-        if usage is not None:
-            self._usage_log.append(usage)
-
-    def drain_usage(self) -> list[Usage]:
-        """Every Usage recorded since the last drain, across every attempt for
-        the call just made - success or failure, including retries. Callers
-        (the pipeline stages) drain once per article so failures still get
-        counted instead of silently reading as zero."""
-        usage_log, self._usage_log = self._usage_log, []
-        return usage_log
-
     # -- adapter surface -----------------------------------------------------
 
     @abstractmethod
@@ -108,10 +90,21 @@ class LLMProvider(ABC):
     def _run(self, operation: Callable[[], T]) -> T:
         attempt = 1
         while True:
-            try:
-                return operation()
-            except LLMError as error:
-                if not error.transient or attempt >= self._max_attempts:
-                    raise
-                self._sleep(self._backoff_seconds * 2 ** (attempt - 1))
-                attempt += 1
+            # The only place that knows a network call is about to be (re)
+            # tried (AD-15) - the transport reports what it measured, this
+            # counter is what turns that into "attempt 1" vs "attempt 2".
+            increment_attempt()
+            # attempt_scope() is what actually writes the telemetry row for
+            # this attempt, once - on the way out of this `with`, whether
+            # `operation()` returned or raised. Not at the transport's report:
+            # only `operation()` (via llm/external.py) can discover a billed
+            # call's body was unusable and mark it `malformed` before this
+            # closes (AD-15's amendment).
+            with attempt_scope():
+                try:
+                    return operation()
+                except LLMError as error:
+                    if not error.transient or attempt >= self._max_attempts:
+                        raise
+                    self._sleep(self._backoff_seconds * 2 ** (attempt - 1))
+                    attempt += 1

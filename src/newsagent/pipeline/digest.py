@@ -13,6 +13,7 @@ summarized candidates competes for `digest_max_articles` slots here.
 """
 
 import logging
+import time
 from collections.abc import Collection
 from dataclasses import dataclass
 from datetime import date, timedelta
@@ -20,6 +21,7 @@ from datetime import date, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from newsagent import telemetry
 from newsagent.config import settings
 from newsagent.llm.base import LLMProvider
 from newsagent.llm.errors import LLMError
@@ -101,22 +103,29 @@ def _reuse_recent_voice(db: Session, digest: Digest) -> bool:
     return False
 
 
-def _compose_voice(provider: LLMProvider, digest: Digest) -> None:
+def _compose_voice(provider: LLMProvider, digest: Digest) -> str | None:
     """Fill the digest's editorial voice from its article headlines. Best-effort:
     a refusal or provider error leaves the voice empty (template renders without
-    it) rather than failing the build."""
+    it) rather than failing the build.
+
+    Returns `'succeeded'` / `'refused'` / `'error'` reflecting the provider's
+    actual outcome, for the caller to pass on as this run's real
+    `outbound_runs` counts (AD-13 - never a hardcoded placeholder) - or
+    `None` if there were no headlines to compose from at all, i.e. nothing
+    was attempted."""
     headlines = [entry.article.title_he or entry.article.title for entry in digest.articles]
     if not headlines:
-        return
+        return None
     try:
         voice = provider.compose_digest_voice(headlines)
     except LLMError as error:
         logger.warning("Voice composition failed for digest %s: %s", digest.id, error)
-        return
+        return "error"
     if isinstance(voice, Refusal):
-        return
+        return "refused"
     digest.intro_he = voice.intro_he
     digest.dad_joke_he = voice.dad_joke_he
+    return "succeeded"
 
 
 def build_digests(
@@ -194,9 +203,46 @@ def build_digests(
         db.flush()
         # Refresh the voice against the digest's now-final article set, unless
         # a recent digest already covers exactly these articles - then the LLM
-        # would only be rewriting a description of the same news.
-        if not _reuse_recent_voice(db, digest):
-            _compose_voice(provider, digest)
+        # would only be rewriting a description of the same news. One run per
+        # user (AD-11/AD-14: digest_build is per-user, unlike filter/summarize).
+        with telemetry.open_run(
+            telemetry.KIND_DIGEST_BUILD,
+            user_id=user.id,
+            intent_summary=f"digest voice · {for_date}",
+        ) as run:
+            outcome: str | None = None
+            try:
+                with telemetry.attribute_call(telemetry.PURPOSE_DIGEST_VOICE):
+                    voice_check_start = time.monotonic()
+                    reused = _reuse_recent_voice(db, digest)
+                    if reused:
+                        # AD-15: the transport never ran, so the caller reports
+                        # the cache lookup itself - real duration, zero cost. A
+                        # reused voice is as usable as a freshly composed one.
+                        telemetry.report_avoided(
+                            duration_ms=int((time.monotonic() - voice_check_start) * 1000)
+                        )
+                        outcome = "succeeded"
+                    else:
+                        outcome = _compose_voice(provider, digest)
+            except BaseException:
+                # Only LLMError ever reaches _compose_voice's own try - an
+                # unmapped exception must still count as an error here, or
+                # run.close() below never runs at all and the run silently
+                # closes as 0/0/0, indistinguishable from a no-op (round 2
+                # review finding).
+                outcome = "error"
+                raise
+            finally:
+                # Real outcome, not a placeholder (AD-13): "no headlines"
+                # (outcome is None) means nothing was attempted, so it counts
+                # toward none of the three - same as an article a filter run
+                # never scored.
+                run.close(
+                    succeeded=1 if outcome == "succeeded" else 0,
+                    refused=1 if outcome == "refused" else 0,
+                    errors=1 if outcome == "error" else 0,
+                )
         db.commit()
         logger.info("Digest for %s (%s): +%d articles", user.email, for_date, len(selected))
 

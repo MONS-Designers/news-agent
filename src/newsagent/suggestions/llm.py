@@ -20,6 +20,7 @@ from newsagent.suggestions.types import (
     TopicPopularity,
     TopicSuggestion,
 )
+from newsagent.telemetry import mark_malformed
 
 T = TypeVar("T")
 
@@ -56,10 +57,20 @@ class LLMSuggestionSource(SuggestionSource):
     # -- shared request/parse/error-mapping ----------------------------------
 
     def _request(self, system: str, user: str, build: Callable[[dict], T]) -> T:
-        """Call the model and hand the parsed JSON body to `build`. `build`
-        runs inside the same try as the network call so a malformed/missing
-        field while constructing the typed result maps to
-        SuggestionProviderError too, not just a raw json.loads failure."""
+        """Call the model and hand the parsed JSON body to `build`.
+
+        Two separate `try` blocks, not one: the first wraps only
+        `send_chat_completion` itself, whose failure modes split into "the
+        body was never valid JSON" (raised before usage is ever parsed -
+        nothing was billed) and "content extraction failed" (raised after
+        usage was already parsed - it may have been billed). The second wraps
+        `json.loads`/`build`, which only run once `send_chat_completion` has
+        already returned successfully, so usage (if the backend reported
+        any) is always already known there - unconditionally "billed but
+        unusable" if it fails (Review Finding, 2026-08-27: a single merged
+        `except` here previously let a body-wasn't-JSON-at-all response,
+        which billed zero tokens, get mis-tagged `malformed` too).
+        """
         messages = [
             {"role": "system", "content": system},
             {"role": "user", "content": user},
@@ -72,8 +83,6 @@ class LLMSuggestionSource(SuggestionSource):
                 messages=messages,
                 client=self._client,
             )
-            data = json.loads(strip_code_fence(completion.content))
-            return build(data)
         except httpx.HTTPStatusError as error:
             status = error.response.status_code
             if status in (401, 403):
@@ -87,7 +96,26 @@ class LLMSuggestionSource(SuggestionSource):
             raise SuggestionProviderError(f"local LLM error ({status})") from error
         except (httpx.TimeoutException, httpx.TransportError) as error:
             raise SuggestionTransportError("local LLM request failed") from error
+        except ValueError as error:
+            # response.json() itself failed inside send_chat_completion (a
+            # non-JSON body) - before usage is ever parsed, so nothing was
+            # billed. Stays the transport's own default 'error'.
+            raise SuggestionProviderError("local LLM returned malformed output") from error
+        except (KeyError, IndexError, TypeError) as error:
+            # Content-extraction failure inside send_chat_completion, which
+            # only runs after usage was already parsed - usage may
+            # genuinely have been billed here.
+            mark_malformed()
+            raise SuggestionProviderError("local LLM returned malformed output") from error
+
+        try:
+            data = json.loads(strip_code_fence(completion.content))
+            return build(data)
         except (json.JSONDecodeError, KeyError, IndexError, TypeError, ValueError) as error:
+            # send_chat_completion already returned successfully by this
+            # point, so usage (if the backend reported any) was already
+            # parsed - always a genuine "billed but unusable" case.
+            mark_malformed()
             raise SuggestionProviderError("local LLM returned malformed output") from error
 
     # -- adapter surface ------------------------------------------------------

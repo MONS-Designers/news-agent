@@ -17,22 +17,11 @@ class ArticleInput:
 
 
 @dataclass(frozen=True)
-class Usage:
-    """Optional work report in neutral units - token counts are an LLM
-    assumption and are deliberately not part of the contract."""
-
-    input_units: int
-    output_units: int
-    unit: str = "words"
-
-
-@dataclass(frozen=True)
 class RelevanceScore:
     """Calibrated 0.0–1.0 score. Contract anchors: >= 0.7 clearly on-topic,
     <= 0.3 clearly off-topic. Filtering thresholds live in pipeline config."""
 
     score: float
-    usage: Usage | None = None
 
 
 @dataclass(frozen=True)
@@ -55,7 +44,6 @@ class SummaryResult:
     reading_time_minutes: int
     paragraphs_he: tuple[str, ...] = field(default_factory=tuple)
     interestingness: float = 0.5
-    usage: Usage | None = None
 
 
 @dataclass(frozen=True)
@@ -66,7 +54,6 @@ class DigestVoice:
 
     intro_he: str
     dad_joke_he: str
-    usage: Usage | None = None
 
 
 @dataclass(frozen=True)

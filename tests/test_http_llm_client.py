@@ -186,68 +186,12 @@ def test_successful_call_logs_nothing(caplog):
     assert caplog.text == ""
 
 
-def test_on_usage_fires_even_when_choices_extraction_fails(caplog):
-    """GH #19: OpenRouter can return HTTP 200 with a usage block but no
-    choices (upstream provider failure). The caller must still learn what was
-    billed, even though the function goes on to raise."""
-    calls: list[tuple[int | None, int | None]] = []
 
-    def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(
-            200,
-            json={"error": {"message": "upstream is down"}, "usage": {"prompt_tokens": 50}},
-        )
-
-    client = httpx.Client(transport=httpx.MockTransport(handler))
-    with pytest.raises(KeyError):
-        send_chat_completion(
-            base_url="http://local-model.test",
-            auth_token="t",
-            model="m",
-            messages=[{"role": "user", "content": "hi"}],
-            on_usage=lambda p, c: calls.append((p, c)),
-            client=client,
-        )
-
-    assert calls == [(50, None)]
-
-
-def test_on_usage_does_not_fire_when_no_json_body_was_parsed():
-    """A non-JSON response (e.g. an HTML error page from a proxy) never
-    reaches the usage-extraction step - there is nothing to report."""
-    calls = []
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, content=b"<html>not json</html>")
-
-    client = httpx.Client(transport=httpx.MockTransport(handler))
-    with pytest.raises(ValueError):
-        send_chat_completion(
-            base_url="http://local-model.test",
-            auth_token="t",
-            model="m",
-            messages=[{"role": "user", "content": "hi"}],
-            on_usage=lambda p, c: calls.append((p, c)),
-            client=client,
-        )
-
-    assert calls == []
-
-
-def test_on_usage_not_called_when_usage_block_is_absent():
-    calls = []
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, json={"choices": [{"message": {"content": "ok"}}]})
-
-    client = httpx.Client(transport=httpx.MockTransport(handler))
-    send_chat_completion(
-        base_url="http://local-model.test",
-        auth_token="t",
-        model="m",
-        messages=[{"role": "user", "content": "hi"}],
-        on_usage=lambda p, c: calls.append((p, c)),
-        client=client,
-    )
-
-    assert calls == []
+# GH #19's guarantee - that a call which billed tokens but then failed to
+# yield usable content still gets its tokens counted - used to be tested here
+# through the now-removed `on_usage` parameter. `on_usage` had no real caller
+# left once newsagent.telemetry took over reporting (llm/external.py and
+# suggestions/llm.py both stopped passing it), so it was deleted along with
+# these three tests; the same guarantee is now covered end-to-end through the
+# telemetry path in tests/telemetry/test_call_recording.py (billed-tokens
+# preserved on a transport-level failure, and on a `malformed` one).

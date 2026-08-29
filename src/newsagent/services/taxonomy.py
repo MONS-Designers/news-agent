@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from newsagent import telemetry
 from newsagent.models import Field, PendingTaxonomySuggestion, Role
 from newsagent.models.pending_taxonomy_suggestion import (
     KIND_FIELD,
@@ -151,21 +152,59 @@ def suggest_roles_for_field(db: Session, field: Field) -> list[RoleSuggestionVie
     for it to contribute. If the LLM call fails, the curated list is still
     returned in full (up to the cap) - a suggestion failure never blocks Role
     selection, it just means no new names this time.
+
+    One of the two real, API-reachable LLM call sites missed by the first
+    telemetry pass (the other is services/profile.py's suggest_prompts_for_user)
+    - both ran with no open_run() at all and so recorded permanently as
+    UNATTRIBUTED. `user_id=None`: this isn't a per-user request - it's keyed
+    on a Field, and any user picking a Role for it hits the same call.
     """
     curated = list_roles(db, field.id)
     views = [
         RoleSuggestionView(name=role.name, is_curated=True)
         for role in curated[:ROLE_SUGGESTION_CAP]
     ]
-    if len(curated) >= ROLE_SUGGESTION_CAP:
-        return views
 
-    try:
-        suggested = get_suggestion_source().suggest_roles(
-            field.name, existing_roles=[role.name for role in curated]
-        )
-    except SuggestionError:
-        suggested = []
+    status: str | None = None
+    suggested = []
+    with telemetry.open_run(
+        telemetry.KIND_TAXONOMY_SUGGESTION,
+        user_id=None,
+        intent_summary=f"role suggestions · field={field.name}",
+    ) as run:
+        if len(curated) >= ROLE_SUGGESTION_CAP:
+            # Curated Roles alone already fill the cap - nothing for the LLM
+            # to contribute, so no call is made and nothing is attributed.
+            # A run row is still opened and closed rather than skipped
+            # (AD-13's own worked example: "a run row is always created,
+            # even for role suggestions"), so this path stays visible to the
+            # same telemetry queries as every other invocation (Review
+            # Finding, 2026-08-27 - previously this returned before
+            # open_run() was ever reached, writing zero rows).
+            run.close(succeeded=1)
+        else:
+            try:
+                with telemetry.attribute_call(telemetry.PURPOSE_SUGGEST_ROLES):
+                    try:
+                        suggested = get_suggestion_source().suggest_roles(
+                            field.name, existing_roles=[role.name for role in curated]
+                        )
+                        status = "succeeded"
+                    except SuggestionError:
+                        suggested = []
+                        status = "error"
+            except BaseException:
+                # An unmapped exception (not SuggestionError) must still
+                # count as an error, or run.close() below never runs and the
+                # run silently closes as 0/0/0 - indistinguishable from a
+                # no-op (round 2 review finding).
+                status = "error"
+                raise
+            finally:
+                run.close(
+                    succeeded=1 if status == "succeeded" else 0,
+                    errors=1 if status == "error" else 0,
+                )
 
     seen = {normalize_taxonomy_text(role.name) for role in curated}
     for option in suggested:

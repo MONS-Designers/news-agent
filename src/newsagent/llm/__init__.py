@@ -8,7 +8,6 @@ from newsagent.llm.types import (
     Refusal,
     RelevanceScore,
     SummaryResult,
-    Usage,
 )
 
 __all__ = [
@@ -23,6 +22,5 @@ __all__ = [
     "Refusal",
     "RelevanceScore",
     "SummaryResult",
-    "Usage",
     "get_llm_provider",
 ]

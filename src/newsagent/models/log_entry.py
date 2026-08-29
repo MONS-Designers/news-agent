@@ -9,9 +9,9 @@ from newsagent.models.base import Base
 class LogEntry(Base):
     """One row per emitted log record (see newsagent.logging_setup and
     newsagent.services.log_entries) - the only log destination; there is no
-    file/stream fallback. pipeline_run_id starts NULL and is patched in after
-    the fact once a pipeline_runs row exists (that row is only created at the
-    end of a run - see services.log_entries.attach_pipeline_run)."""
+    file/stream fallback. outbound_run_id starts NULL and is patched in after
+    the fact once an outbound_runs row exists (that row is only created at
+    the end of a run - see services.log_entries.attach_outbound_run)."""
 
     __tablename__ = "log_entries"
 
@@ -21,6 +21,6 @@ class LogEntry(Base):
     logger_name: Mapped[str] = mapped_column(String)
     message: Mapped[str] = mapped_column(Text)
     version: Mapped[str] = mapped_column(String)
-    pipeline_run_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("pipeline_runs.id"), nullable=True, index=True
+    outbound_run_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("outbound_runs.id"), nullable=True, index=True
     )

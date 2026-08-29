@@ -5,7 +5,6 @@ kept fully separate from `local_llm_*` (used by `suggestions/llm.py`, AD-3):
 neither adapter shares a client or a base_url with the other.
 """
 
-import dataclasses
 import json
 import logging
 from collections.abc import Callable, Sequence
@@ -23,9 +22,9 @@ from newsagent.llm.types import (
     Refusal,
     RelevanceScore,
     SummaryResult,
-    Usage,
 )
 from newsagent.llm_json import strip_code_fence
+from newsagent.telemetry import mark_malformed
 
 logger = logging.getLogger(__name__)
 
@@ -87,25 +86,12 @@ class ExternalLLMProvider(LLMProvider):
             {"role": "system", "content": system},
             {"role": "user", "content": user},
         ]
-        def _on_usage(prompt_tokens: int | None, completion_tokens: int | None) -> None:
-            # Fires inside send_chat_completion the moment a usage block is
-            # seen - before content is even extracted - so a call that billed
-            # tokens but then failed at any of the three stages below still
-            # gets counted. This is the ONLY place usage is recorded for this
-            # attempt; the success path's `dataclasses.replace(... usage=...)`
-            # below is a separate, per-result attachment, not a second count.
-            self._record_usage(
-                Usage(input_units=prompt_tokens or 0, output_units=completion_tokens or 0,
-                      unit="tokens")
-            )
-
         try:
             completion = send_chat_completion(
                 base_url=self._base_url,
                 auth_token=self._auth_token,
                 model=self._model,
                 messages=messages,
-                on_usage=_on_usage,
                 client=self._client,
             )
         except httpx.HTTPStatusError as error:
@@ -119,15 +105,39 @@ class ExternalLLMProvider(LLMProvider):
             raise LLMProviderError(f"external LLM error ({status})") from error
         except (httpx.TimeoutException, httpx.TransportError) as error:
             raise LLMTransportError("external LLM request failed") from error
-        except (json.JSONDecodeError, KeyError, IndexError, TypeError, ValueError) as error:
-            # The body itself was already logged by http_llm_client, which is
-            # the only layer that still had it.
+        except ValueError as error:
+            # response.json() itself failed inside send_chat_completion (a
+            # non-JSON body - an HTML error page from a proxy, most
+            # commonly - raises json.JSONDecodeError, a ValueError). This
+            # happens BEFORE http_llm_client ever reaches its usage-parsing
+            # step, so tokens_in/tokens_out are guaranteed None - nothing
+            # was billed. Do NOT mark_malformed() here: that would record a
+            # call that billed zero tokens as 'malformed', contradicting
+            # AD-15's "malformed implies real tokens were billed" (Review
+            # Finding, 2026-08-27). Stays the transport's own default
+            # 'error'. The body itself was already logged by
+            # http_llm_client, which is the only layer that still had it.
             logger.warning(
                 "malformed output (stage=envelope, model=%s): %s: %s",
                 self._model,
                 type(error).__name__,
                 error,
             )
+            raise LLMProviderError("external LLM returned malformed output") from error
+        except (KeyError, IndexError, TypeError) as error:
+            # Unlike the ValueError case above, this is raised by
+            # http_llm_client's content-extraction step, which only runs
+            # AFTER usage was already parsed (successfully or not) - e.g.
+            # OpenRouter's HTTP-200-with-no-"choices" upstream failure. Usage
+            # may genuinely have been billed here, so this - and only this -
+            # is the real "billed but unusable" case (AD-15).
+            logger.warning(
+                "malformed output (stage=envelope, model=%s): %s: %s",
+                self._model,
+                type(error).__name__,
+                error,
+            )
+            mark_malformed()
             raise LLMProviderError("external LLM returned malformed output") from error
 
         content = completion.content
@@ -151,6 +161,7 @@ class ExternalLLMProvider(LLMProvider):
                 position,
                 _clip(content),
             )
+            mark_malformed()
             raise LLMProviderError("external LLM returned malformed output") from error
 
         try:
@@ -164,25 +175,10 @@ class ExternalLLMProvider(LLMProvider):
                 error,
                 _clip(content),
             )
+            mark_malformed()
             raise LLMProviderError("external LLM returned malformed output") from error
 
-        # Attached here rather than inside each `build`: usage comes from the
-        # response envelope, not from the model's JSON, so the builders stay
-        # concerned only with the content contract. unit="tokens" because the
-        # neutral Usage type deliberately does not assume an LLM is behind it.
-        if completion.prompt_tokens is None and completion.completion_tokens is None:
-            return result
-        # Every T here (RelevanceScore, SummaryResult, DigestVoice) is a frozen
-        # dataclass carrying `usage`, but they share no base class for the
-        # TypeVar to be bound to - hence the ignore below.
-        return dataclasses.replace(  # type: ignore[type-var]
-            result,
-            usage=Usage(
-                input_units=completion.prompt_tokens or 0,
-                output_units=completion.completion_tokens or 0,
-                unit="tokens",
-            ),
-        )
+        return result
 
     # -- junk/empty pre-checks, no network call ------------------------------
 

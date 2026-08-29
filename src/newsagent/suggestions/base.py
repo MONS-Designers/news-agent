@@ -19,6 +19,7 @@ from newsagent.suggestions.types import (
     TopicPopularity,
     TopicSuggestion,
 )
+from newsagent.telemetry.context import attempt_scope, increment_attempt
 
 T = TypeVar("T")
 
@@ -132,10 +133,16 @@ class SuggestionSource(ABC):
     def _run(self, operation: Callable[[], T]) -> T:
         attempt = 1
         while True:
-            try:
-                return operation()
-            except SuggestionError as error:
-                if not error.transient or attempt >= self._max_attempts:
-                    raise
-                self._sleep(self._backoff_seconds * 2 ** (attempt - 1))
-                attempt += 1
+            # Sibling to llm/base.py's _run (AD-3: no cross-import, so this
+            # is its own copy, not a shared call) - same telemetry contract:
+            # increment the attempt counter, then close the attempt scope
+            # (writes the row once, on the way out) around exactly one try.
+            increment_attempt()
+            with attempt_scope():
+                try:
+                    return operation()
+                except SuggestionError as error:
+                    if not error.transient or attempt >= self._max_attempts:
+                        raise
+                    self._sleep(self._backoff_seconds * 2 ** (attempt - 1))
+                    attempt += 1

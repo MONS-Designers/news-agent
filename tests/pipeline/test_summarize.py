@@ -3,9 +3,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from newsagent.config import settings
-from newsagent.llm.errors import LLMProviderError
 from newsagent.llm.mock import MockLLMProvider
-from newsagent.llm.types import ArticleInput, Refusal, SummaryResult, Usage
+from newsagent.llm.types import ArticleInput, Refusal, SummaryResult
 from newsagent.models import Article, Source, Topic, User, UserTopicPreference
 from newsagent.models.base import Base
 from newsagent.pipeline.summarize import (
@@ -126,30 +125,10 @@ def test_empty_summary_without_refusal_is_an_error(db: Session):
     assert article.summary_he is None
 
 
-def test_usage_is_aggregated(db: Session):
-    add_article(db, url_suffix="a")
-    add_article(db, url_suffix="b")
-    report = summarize_relevant_articles(db, MockLLMProvider())
-    assert report.usage_input_units > 0
-
-
-class BillsThenFailsProvider(MockLLMProvider):
-    """Simulates GH #19's actual gap: the provider billed real tokens for this
-    call (a valid HTTP 200 with a usage block) but the call still ends in
-    LLMProviderError - e.g. GH #38's malformed-output cases. Before this fix
-    such a call reported 0 usage, hiding exactly the failures most likely to
-    be expensive (see #41's 67k-char runaway)."""
-
-    def _summarize(self, article: ArticleInput) -> SummaryResult | Refusal:
-        self._record_usage(Usage(input_units=1200, output_units=340, unit="tokens"))
-        raise LLMProviderError("external LLM returned malformed output")
-
-
-def test_a_billed_but_failed_call_still_counts_toward_usage(db: Session):
+def test_run_id_is_populated_on_the_report(db: Session):
     add_article(db)
-    report = summarize_relevant_articles(db, BillsThenFailsProvider())
-    assert report.errors == 1
-    assert (report.usage_input_units, report.usage_output_units) == (1200, 340)
+    report = summarize_relevant_articles(db, MockLLMProvider())
+    assert report.run_id is not None
 
 
 def test_failure_increments_attempts_and_stays_error_below_max(
@@ -183,7 +162,6 @@ def test_failed_articles_are_never_reselected_or_billed(db: Session):
     report = summarize_relevant_articles(db, MockLLMProvider(fail_permanent=True))
     assert report.summarized == 0
     assert report.errors == 0
-    assert report.usage_input_units == 0
 
 
 def test_success_after_prior_failures_still_reaches_done(

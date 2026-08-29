@@ -9,13 +9,16 @@ Usage:
 import argparse
 import logging
 
+from sqlalchemy import case, func, select
+
 from newsagent.db import SessionLocal
 from newsagent.llm import get_llm_provider
-from newsagent.logging_setup import attach_pipeline_run, configure_logging, track_pipeline_run_logs
+from newsagent.logging_setup import attach_outbound_run, configure_logging, track_outbound_run_logs
 from newsagent.mail import get_email_sender
-from newsagent.models.pipeline_run import RUN_TYPE_FILTER, RUN_TYPE_SUMMARIZE
+from newsagent.models import OutboundCall
 from newsagent.pipeline import digest, extract, fetcher, relevance, send, summarize
-from newsagent.services import identity, pipeline_runs, preferences, sources, taxonomy
+from newsagent.services import identity, preferences, sources, taxonomy
+from newsagent.telemetry import STATUS_AVOIDED, STATUS_MALFORMED
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -45,7 +48,7 @@ def main(argv: list[str] | None = None) -> int:
     subscribe_cmd.add_argument("topic")
 
     subparsers.add_parser(
-        "usage-report", help="Print LLM token usage totals per stage and per day"
+        "usage-report", help="Print LLM token usage, latency, and waste totals per purpose"
     )
 
     subparsers.add_parser("build-digests", help="Build today's digests for all users")
@@ -81,7 +84,7 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"  {result.source_name}: {status}")
             print(f"Total new articles: {fetch_report.total_new}")
         elif args.command == "filter":
-            with track_pipeline_run_logs():
+            with track_outbound_run_logs():
                 filter_report = relevance.filter_pending_articles(db, get_llm_provider())
                 print(
                     f"Scored {filter_report.scored}: {filter_report.relevant} relevant, "
@@ -89,75 +92,80 @@ def main(argv: list[str] | None = None) -> int:
                     f"({filter_report.refused} refused, {filter_report.errors} errors, "
                     f"{filter_report.borderline} borderline)"
                 )
-                print(
-                    f"Usage: {filter_report.usage_input_units} in / "
-                    f"{filter_report.usage_output_units} out units"
-                )
-                run = pipeline_runs.record_run(
-                    db,
-                    run_type=RUN_TYPE_FILTER,
-                    succeeded=filter_report.scored,
-                    refused=filter_report.refused,
-                    errors=filter_report.errors,
-                    usage_input_units=filter_report.usage_input_units,
-                    usage_output_units=filter_report.usage_output_units,
-                )
-                try:
-                    attach_pipeline_run(db, run.id)
-                except Exception:
-                    logging.getLogger(__name__).warning(
-                        "Failed to attach pipeline_run_id=%s to its log entries",
-                        run.id,
-                        exc_info=True,
-                    )
+                if filter_report.run_id is not None:
+                    try:
+                        attach_outbound_run(db, filter_report.run_id)
+                    except Exception:
+                        logging.getLogger(__name__).warning(
+                            "Failed to attach outbound_run_id=%s to its log entries",
+                            filter_report.run_id,
+                            exc_info=True,
+                        )
         elif args.command == "summarize":
-            with track_pipeline_run_logs():
+            with track_outbound_run_logs():
                 summary_report = summarize.summarize_relevant_articles(db, get_llm_provider())
                 print(
                     f"Summarized {summary_report.summarized} "
                     f"({summary_report.refused} refused, {summary_report.errors} errors)"
                 )
-                print(
-                    f"Usage: {summary_report.usage_input_units} in / "
-                    f"{summary_report.usage_output_units} out units"
-                )
-                run = pipeline_runs.record_run(
-                    db,
-                    run_type=RUN_TYPE_SUMMARIZE,
-                    succeeded=summary_report.summarized,
-                    refused=summary_report.refused,
-                    errors=summary_report.errors,
-                    usage_input_units=summary_report.usage_input_units,
-                    usage_output_units=summary_report.usage_output_units,
-                )
-                try:
-                    attach_pipeline_run(db, run.id)
-                except Exception:
-                    logging.getLogger(__name__).warning(
-                        "Failed to attach pipeline_run_id=%s to its log entries",
-                        run.id,
-                        exc_info=True,
-                    )
+                if summary_report.run_id is not None:
+                    try:
+                        attach_outbound_run(db, summary_report.run_id)
+                    except Exception:
+                        logging.getLogger(__name__).warning(
+                            "Failed to attach outbound_run_id=%s to its log entries",
+                            summary_report.run_id,
+                            exc_info=True,
+                        )
         elif args.command == "extract":
             extract_report = extract.extract_relevant_articles(db)
             print(f"Extracted {extract_report.extracted}, failed {extract_report.failed}")
         elif args.command == "usage-report":
-            usage = pipeline_runs.build_usage_report(db)
-            if not usage.by_stage:
-                print("No pipeline runs recorded yet.")
+            # Tokens + latency per purpose, straight from outbound_calls - the
+            # atom-level table is the only source of truth (AD-13); no dollars,
+            # since no pricing lookup is implemented yet (deferred-work.md).
+            # The duration average excludes `avoided` rows - a cache hit's
+            # near-zero lookup time would otherwise drag down the average of
+            # real LLM call latencies for the same purpose (round 2 review
+            # finding). `call_count` still includes them.
+            real_duration_ms = case(
+                (OutboundCall.status != STATUS_AVOIDED, OutboundCall.duration_ms)
+            )
+            rows = db.execute(
+                select(
+                    OutboundCall.purpose,
+                    func.count(OutboundCall.id),
+                    func.sum(OutboundCall.tokens_in),
+                    func.sum(OutboundCall.tokens_out),
+                    func.avg(real_duration_ms),
+                )
+                .group_by(OutboundCall.purpose)
+                .order_by(OutboundCall.purpose)
+            ).all()
+            if not rows:
+                print("No outbound calls recorded yet.")
             else:
-                print("Usage by stage:")
-                for stage in usage.by_stage:
+                print("Usage by purpose:")
+                for purpose, call_count, tokens_in, tokens_out, avg_duration_ms in rows:
+                    avg_ms = f"{avg_duration_ms:.0f}" if avg_duration_ms is not None else "n/a"
                     print(
-                        f"  {stage.run_type}: {stage.usage_input_units} in / "
-                        f"{stage.usage_output_units} out units"
+                        f"  {purpose}: {call_count} calls, "
+                        f"{tokens_in or 0} in / {tokens_out or 0} out tokens, "
+                        f"avg {avg_ms}ms (excl. avoided)"
                     )
-                print("Usage by day:")
-                for day in usage.by_day:
-                    print(
-                        f"  {day.day}: {day.usage_input_units} in / "
-                        f"{day.usage_output_units} out units"
-                    )
+            retried = db.scalar(
+                select(func.count(OutboundCall.id)).where(OutboundCall.attempt > 1)
+            ) or 0
+            avoided = db.scalar(
+                select(func.count(OutboundCall.id)).where(OutboundCall.status == STATUS_AVOIDED)
+            ) or 0
+            malformed = db.scalar(
+                select(func.count(OutboundCall.id)).where(OutboundCall.status == STATUS_MALFORMED)
+            ) or 0
+            print(
+                f"Waste: {retried} retried attempts, {avoided} avoided (cache-hit) calls, "
+                f"{malformed} malformed (billed but unusable) calls"
+            )
         elif args.command == "subscribe":
             try:
                 _, created = preferences.subscribe(db, args.email, args.topic)

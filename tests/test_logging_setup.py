@@ -1,5 +1,5 @@
 """Covers newsagent.logging_setup: the DB handler, level selection, the
-uvicorn/noisy-logger re-pointing, and pipeline-run correlation.
+uvicorn/noisy-logger re-pointing, and outbound-run correlation.
 
 Two global-state hazards shape this file:
 
@@ -18,7 +18,7 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from newsagent.config import settings
-from newsagent.logging_setup import attach_pipeline_run, configure_logging, track_pipeline_run_logs
+from newsagent.logging_setup import attach_outbound_run, configure_logging, track_outbound_run_logs
 from newsagent.models import LogEntry
 from newsagent.models.base import Base
 
@@ -105,36 +105,36 @@ def test_persisted_record_carries_the_app_version(default_settings, db_session):
     assert entry.version == pkg_version("newsagent")
 
 
-def test_a_fresh_record_has_no_pipeline_run_id(default_settings, db_session):
+def test_a_fresh_record_has_no_outbound_run_id(default_settings, db_session):
     configure_logging()
     logging.getLogger("newsagent.pipeline.fetcher").warning("boom")
 
     entry = db_session.scalar(select(LogEntry))
-    assert entry.pipeline_run_id is None
+    assert entry.outbound_run_id is None
 
 
 def test_records_emitted_inside_a_tracked_run_are_attached_afterward(
     default_settings, db_session
 ):
     configure_logging()
-    with track_pipeline_run_logs():
+    with track_outbound_run_logs():
         logging.getLogger("newsagent.pipeline.relevance").warning("scored one")
         logging.getLogger("newsagent.pipeline.relevance").warning("scored two")
-        attach_pipeline_run(db_session, pipeline_run_id=42)
+        attach_outbound_run(db_session, outbound_run_id=42)
 
     entries = db_session.scalars(select(LogEntry)).all()
     assert len(entries) == 2
-    assert all(entry.pipeline_run_id == 42 for entry in entries)
+    assert all(entry.outbound_run_id == 42 for entry in entries)
 
 
 def test_records_outside_a_tracked_run_are_unaffected_by_attach(default_settings, db_session):
     configure_logging()
     logging.getLogger("newsagent.pipeline.fetcher").warning("outside any run")
-    with track_pipeline_run_logs():
-        attach_pipeline_run(db_session, pipeline_run_id=99)
+    with track_outbound_run_logs():
+        attach_outbound_run(db_session, outbound_run_id=99)
 
     entry = db_session.scalar(select(LogEntry))
-    assert entry.pipeline_run_id is None
+    assert entry.outbound_run_id is None
 
 
 def test_a_db_write_failure_does_not_raise_and_does_not_crash(default_settings, db_session):

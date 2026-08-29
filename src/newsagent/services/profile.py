@@ -5,6 +5,7 @@ suggestion-computation BackgroundTask this triggers (AD-5) - the only file
 that imports from newsagent.suggestions (AD-3's profile -> suggestions
 dependency direction)."""
 
+import contextvars
 from concurrent.futures import FIRST_EXCEPTION, Future, ThreadPoolExecutor, wait
 from datetime import datetime
 from typing import Any
@@ -14,6 +15,7 @@ from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from newsagent import telemetry
 from newsagent.models import Topic, User, UserTopicPreference
 from newsagent.models.pending_taxonomy_suggestion import KIND_FIELD, KIND_ROLE
 from newsagent.models.topic import STATUS_APPROVED as TOPIC_STATUS_APPROVED
@@ -243,15 +245,45 @@ def suggest_prompts_for_user(user: User) -> list[str]:
     Interests step (FR-5), generated from the user's already-saved
     Field/Role/Experience Bucket. Fetching never writes anything (FR-5) - a
     failure just means no prompts show, matching the pre-LLM behavior, not an
-    error surfaced to the user."""
-    try:
-        prompts = get_suggestion_source().suggest_prompts(
-            field_name=user.field_name,
-            role_name=user.role_name,
-            experience_bucket=user.experience_bucket,
-        )
-    except SuggestionError:
-        return []
+    error surfaced to the user.
+
+    One of the two real, API-reachable LLM call sites missed by the first
+    telemetry pass (the other is services/taxonomy.py's
+    suggest_roles_for_field) - both ran with no open_run() at all and so
+    recorded permanently as UNATTRIBUTED. Its own `kind`
+    (KIND_PROMPT_SUGGESTIONS), distinct from _compute_and_store_suggestions'
+    KIND_PROFILE_SUGGESTIONS above: one cheap read-only lookup versus two
+    concurrent LLM calls plus a DB write - different enough shapes that a
+    query grouped by kind needs to tell them apart (Review Finding,
+    2026-08-27)."""
+    status: str | None = None
+    with telemetry.open_run(
+        telemetry.KIND_PROMPT_SUGGESTIONS,
+        user_id=user.id,
+        intent_summary=f"prompt suggestions · field={user.field_name}",
+    ) as run:
+        try:
+            with telemetry.attribute_call(telemetry.PURPOSE_SUGGEST_PROMPTS):
+                try:
+                    prompts = get_suggestion_source().suggest_prompts(
+                        field_name=user.field_name,
+                        role_name=user.role_name,
+                        experience_bucket=user.experience_bucket,
+                    )
+                    status = "succeeded"
+                except SuggestionError:
+                    prompts = []
+                    status = "error"
+        except BaseException:
+            # An unmapped exception (not SuggestionError) must still count
+            # as an error, or run.close() below never runs and the run
+            # silently closes as 0/0/0 - indistinguishable from a no-op
+            # (round 2 review finding; same pattern as
+            # _compute_and_store_suggestions below).
+            status = "error"
+            raise
+        finally:
+            run.close(succeeded=1 if status == "succeeded" else 0, errors=1 if status == "error" else 0)
     texts = [p.text.strip() for p in prompts if p.text.strip()]
     return texts[:PROMPT_SUGGESTION_CAP]
 
@@ -328,91 +360,123 @@ def _compute_and_store_suggestions(db: Session, user_id: int, expected_seq: int)
         return  # user deleted mid-flight
 
     marked_slow = False
-    try:
-        popularity = _topic_popularity(db)
-        approved_names = [p.name for p in popularity]
-        source = get_suggestion_source()
+    # Settled by the try/except below; stays None only if an unmapped
+    # exception unwinds before either branch runs, in which case run.close()
+    # below (still inside `finally`) must not choke on it.
+    status: str | None = None
+    with telemetry.open_run(
+        telemetry.KIND_PROFILE_SUGGESTIONS,
+        user_id=user_id,
+        intent_summary=f"topic suggestions · field={user.field_name}",
+    ) as run:
+        try:
+            popularity = _topic_popularity(db)
+            approved_names = [p.name for p in popularity]
+            source = get_suggestion_source()
 
-        # Run both calls concurrently (GH #36): neither reads the other's
-        # result, so back-to-back cost their sum (~25s live) for no reason.
-        #
-        # The workers receive plain data only - dataclasses and strings, all of
-        # it already read on this thread. Nothing inside a worker may touch
-        # `db`: two threads sharing one Session corrupts it silently. Threads
-        # rather than processes because both calls block on network I/O and
-        # release the GIL while waiting, so the overlap is real.
-        with ThreadPoolExecutor(max_workers=2) as pool:
-            topics_future = pool.submit(
-                source.suggest_topics,
-                field_name=user.field_name,
-                role_name=user.role_name,
-                interest_free_text=user.interest_free_text,
-                popularity=popularity,
+            # Run both calls concurrently (GH #36): neither reads the other's
+            # result, so back-to-back cost their sum (~25s live) for no reason.
+            #
+            # The workers receive plain data only - dataclasses and strings, all of
+            # it already read on this thread. Nothing inside a worker may touch
+            # `db`: two threads sharing one Session corrupts it silently. Threads
+            # rather than processes because both calls block on network I/O and
+            # release the GIL while waiting, so the overlap is real.
+            #
+            # contextvars do NOT propagate into a ThreadPoolExecutor worker on
+            # their own (Python copies nothing into a new thread) - without
+            # copy_context()+ctx.run, both calls would silently record as
+            # UNATTRIBUTED instead of carrying this run's id (see
+            # ARCHITECTURE-SPINE's Design Notes).
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                with telemetry.attribute_call(telemetry.PURPOSE_SUGGEST_TOPICS):
+                    topics_ctx = contextvars.copy_context()
+                    topics_future = pool.submit(
+                        topics_ctx.run,
+                        source.suggest_topics,
+                        field_name=user.field_name,
+                        role_name=user.role_name,
+                        interest_free_text=user.interest_free_text,
+                        popularity=popularity,
+                    )
+                with telemetry.attribute_call(telemetry.PURPOSE_SUGGEST_NEW_TOPICS):
+                    new_topics_ctx = contextvars.copy_context()
+                    new_topics_future = pool.submit(
+                        new_topics_ctx.run,
+                        source.suggest_new_topics,
+                        field_name=user.field_name,
+                        role_name=user.role_name,
+                        interest_free_text=user.interest_free_text,
+                        existing_topic_names=approved_names,
+                    )
+                # One call has failed while the other is still going: this run is
+                # already doomed to FAILED, but we deliberately wait out the
+                # survivor's retries rather than cancelling it, so tell the poller
+                # the wait is running long instead of leaving it on plain
+                # "pending". Exiting the `with` block waits for the survivor.
+                # Annotated because the two futures carry different result types,
+                # which mypy would otherwise join to list[object].
+                pending: list[Future[Any]] = [topics_future, new_topics_future]
+                done, not_done = wait(pending, return_when=FIRST_EXCEPTION)
+                if not_done and any(isinstance(f.exception(), SuggestionError) for f in done):
+                    _mark_pending_slow(db, user, expected_seq)
+                    marked_slow = True
+
+                suggestions = topics_future.result()
+                new_options = new_topics_future.result()
+
+            computed_topic_ids = [s.topic_id for s in suggestions][:TOPIC_SUGGESTION_CAP]
+
+            # Dedupe invented names against the approved catalog (case/whitespace
+            # -insensitive, AD-6's normalize_taxonomy_text) - "ai" must not show
+            # as a separate pill next to an existing "AI" Topic. Fill only the
+            # slots the existing-topic picks above didn't already use, so the
+            # merged existing+new total never exceeds TOPIC_SUGGESTION_CAP.
+            seen = {taxonomy.normalize_taxonomy_text(name) for name in approved_names}
+            remaining = TOPIC_SUGGESTION_CAP - len(computed_topic_ids)
+            computed_new_names: list[str] = []
+            for option in new_options:
+                if remaining <= 0:
+                    break
+                name = option.name.strip()
+                if not name:
+                    continue
+                normalized = taxonomy.normalize_taxonomy_text(name)
+                if normalized in seen:
+                    continue
+                seen.add(normalized)
+                computed_new_names.append(name)
+                remaining -= 1
+
+            topic_ids: list[int] | None = computed_topic_ids
+            new_names: list[str] | None = computed_new_names
+            status = SUGGESTION_STATUS_READY
+        except SuggestionError:
+            topic_ids = None
+            new_names = None
+            status = SUGGESTION_STATUS_FAILED
+        except BaseException:
+            # pending_slow is non-terminal, so an error that aborts the run before
+            # its final write would strand the row there permanently. Only
+            # SuggestionError reaches the handler above: an adapter can still leak
+            # something unmapped (httpx.InvalidURL from a malformed
+            # LOCAL_LLM_BASE_URL derives straight from Exception, for one), and
+            # that path must not be the difference between a settled row and a
+            # stuck one. Settle it, then let the error propagate untouched.
+            #
+            # Also settles `status` for the run.close() in `finally` below - an
+            # unmapped crash must count as an error there too, or it silently
+            # reads identically to a run that did nothing at all (succeeded=0,
+            # errors=0 either way, previously indistinguishable).
+            status = SUGGESTION_STATUS_FAILED
+            if marked_slow:
+                _write_status_best_effort(db, user, expected_seq, SUGGESTION_STATUS_FAILED)
+            raise
+        finally:
+            run.close(
+                succeeded=1 if status == SUGGESTION_STATUS_READY else 0,
+                errors=1 if status == SUGGESTION_STATUS_FAILED else 0,
             )
-            new_topics_future = pool.submit(
-                source.suggest_new_topics,
-                field_name=user.field_name,
-                role_name=user.role_name,
-                interest_free_text=user.interest_free_text,
-                existing_topic_names=approved_names,
-            )
-            # One call has failed while the other is still going: this run is
-            # already doomed to FAILED, but we deliberately wait out the
-            # survivor's retries rather than cancelling it, so tell the poller
-            # the wait is running long instead of leaving it on plain
-            # "pending". Exiting the `with` block waits for the survivor.
-            # Annotated because the two futures carry different result types,
-            # which mypy would otherwise join to list[object].
-            pending: list[Future[Any]] = [topics_future, new_topics_future]
-            done, not_done = wait(pending, return_when=FIRST_EXCEPTION)
-            if not_done and any(isinstance(f.exception(), SuggestionError) for f in done):
-                _mark_pending_slow(db, user, expected_seq)
-                marked_slow = True
-
-            suggestions = topics_future.result()
-            new_options = new_topics_future.result()
-
-        computed_topic_ids = [s.topic_id for s in suggestions][:TOPIC_SUGGESTION_CAP]
-
-        # Dedupe invented names against the approved catalog (case/whitespace
-        # -insensitive, AD-6's normalize_taxonomy_text) - "ai" must not show
-        # as a separate pill next to an existing "AI" Topic. Fill only the
-        # slots the existing-topic picks above didn't already use, so the
-        # merged existing+new total never exceeds TOPIC_SUGGESTION_CAP.
-        seen = {taxonomy.normalize_taxonomy_text(name) for name in approved_names}
-        remaining = TOPIC_SUGGESTION_CAP - len(computed_topic_ids)
-        computed_new_names: list[str] = []
-        for option in new_options:
-            if remaining <= 0:
-                break
-            name = option.name.strip()
-            if not name:
-                continue
-            normalized = taxonomy.normalize_taxonomy_text(name)
-            if normalized in seen:
-                continue
-            seen.add(normalized)
-            computed_new_names.append(name)
-            remaining -= 1
-
-        topic_ids: list[int] | None = computed_topic_ids
-        new_names: list[str] | None = computed_new_names
-        status = SUGGESTION_STATUS_READY
-    except SuggestionError:
-        topic_ids = None
-        new_names = None
-        status = SUGGESTION_STATUS_FAILED
-    except BaseException:
-        # pending_slow is non-terminal, so an error that aborts the run before
-        # its final write would strand the row there permanently. Only
-        # SuggestionError reaches the handler above: an adapter can still leak
-        # something unmapped (httpx.InvalidURL from a malformed
-        # LOCAL_LLM_BASE_URL derives straight from Exception, for one), and
-        # that path must not be the difference between a settled row and a
-        # stuck one. Settle it, then let the error propagate untouched.
-        if marked_slow:
-            _write_status_best_effort(db, user, expected_seq, SUGGESTION_STATUS_FAILED)
-        raise
 
     # Race guard, checked immediately before the write, not at function entry:
     # a concurrent save may have advanced suggestion_request_seq while
