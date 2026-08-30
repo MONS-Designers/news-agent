@@ -9,6 +9,7 @@ Usage:
 import argparse
 import logging
 
+import httpx
 from sqlalchemy import case, func, select
 
 from newsagent.db import SessionLocal
@@ -19,6 +20,7 @@ from newsagent.models import OutboundCall
 from newsagent.pipeline import digest, extract, fetcher, relevance, send, summarize
 from newsagent.services import identity, preferences, sources, taxonomy
 from newsagent.telemetry import STATUS_AVOIDED, STATUS_MALFORMED
+from newsagent.telemetry import pricing as pricing_service
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -49,6 +51,9 @@ def main(argv: list[str] | None = None) -> int:
 
     subparsers.add_parser(
         "usage-report", help="Print LLM token usage, latency, and waste totals per purpose"
+    )
+    subparsers.add_parser(
+        "refresh-pricing", help="Fetch current model $/Mtok rates and add any that changed"
     )
 
     subparsers.add_parser("build-digests", help="Build today's digests for all users")
@@ -166,6 +171,23 @@ def main(argv: list[str] | None = None) -> int:
                 f"Waste: {retried} retried attempts, {avoided} avoided (cache-hit) calls, "
                 f"{malformed} malformed (billed but unusable) calls"
             )
+        elif args.command == "refresh-pricing":
+            # Exit codes are the entire contract with news-agent-infra's
+            # scheduler (infra-boundary-contract.md): 0 = updated, 2 = pricing
+            # source unavailable this run (existing rates stay in effect, not
+            # a failure), 1 = a real failure (e.g. the DB write itself).
+            try:
+                result = pricing_service.refresh_from_openrouter(db)
+            except httpx.HTTPError:
+                logging.getLogger(__name__).warning(
+                    "refresh-pricing: pricing source unavailable, existing rates stay in effect",
+                    exc_info=True,
+                )
+                return 2
+            except Exception:
+                logging.getLogger(__name__).error("refresh-pricing failed", exc_info=True)
+                return 1
+            print(f"Updated pricing for {result.updated} model(s)")
         elif args.command == "subscribe":
             try:
                 _, created = preferences.subscribe(db, args.email, args.topic)

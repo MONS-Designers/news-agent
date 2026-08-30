@@ -7,6 +7,9 @@ root logger (see test_logging_setup.py's own hazard note) for no benefit
 here.
 """
 
+import logging
+
+import httpx
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -14,6 +17,7 @@ from sqlalchemy.orm import sessionmaker
 from newsagent import cli
 from newsagent.models import OutboundCall
 from newsagent.models.base import Base
+from newsagent.telemetry.pricing import RefreshResult
 
 
 @pytest.fixture
@@ -105,3 +109,40 @@ def test_waste_counts_retries_avoided_and_malformed(db_session, capsys):
         "Waste: 1 retried attempts, 1 avoided (cache-hit) calls, "
         "1 malformed (billed but unusable) calls" in out
     )
+
+
+# -- refresh-pricing -----------------------------------------------------
+# Exit codes are the entire contract with news-agent-infra's scheduler
+# (infra-boundary-contract.md): 0 updated, 2 source unavailable (not a
+# failure), 1 a real failure.
+
+
+def test_refresh_pricing_success_prints_count_and_returns_zero(db_session, monkeypatch, capsys):
+    monkeypatch.setattr(cli.pricing_service, "refresh_from_openrouter", lambda db: RefreshResult(updated=3))
+
+    exit_code = cli.main(["refresh-pricing"])
+
+    assert exit_code == 0
+    assert "Updated pricing for 3 model(s)" in capsys.readouterr().out
+
+
+def test_refresh_pricing_source_unavailable_returns_two(db_session, monkeypatch):
+    def _raise(db):
+        raise httpx.ConnectError("no route to host")
+
+    monkeypatch.setattr(cli.pricing_service, "refresh_from_openrouter", _raise)
+
+    assert cli.main(["refresh-pricing"]) == 2
+
+
+def test_refresh_pricing_real_failure_returns_one_and_logs_error(db_session, monkeypatch, caplog):
+    def _raise(db):
+        raise RuntimeError("db write failed")
+
+    monkeypatch.setattr(cli.pricing_service, "refresh_from_openrouter", _raise)
+
+    with caplog.at_level(logging.ERROR, logger="newsagent.cli"):
+        exit_code = cli.main(["refresh-pricing"])
+
+    assert exit_code == 1
+    assert "refresh-pricing failed" in caplog.text

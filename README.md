@@ -137,7 +137,9 @@ python -m newsagent.cli send-digests   # render and send
 ```
 
 The first four run daily and the last two weekly - see [Schedule](#schedule-decided-2026-08-07).
-`newsagent.cli --help` lists the seeding, user-management, and `usage-report` commands too.
+`newsagent.cli --help` lists the seeding, user-management, and `usage-report` commands too, plus
+`refresh-pricing` (fetches current model $/Mtok rates from `EXTERNAL_LLM_BASE_URL` into
+`model_prices`, so new `outbound_calls` rows get priced instead of leaving `cost_usd` NULL).
 See [Status](#status) for the current gap list.
 
 ## Development

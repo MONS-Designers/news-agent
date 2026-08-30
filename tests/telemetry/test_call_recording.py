@@ -29,6 +29,7 @@ from newsagent.llm.types import ArticleInput
 from newsagent.models import (
     Article,
     Field,
+    ModelPrice,
     OutboundCall,
     OutboundRun,
     Role,
@@ -108,6 +109,34 @@ def test_successful_call_is_recorded_with_real_tokens_and_null_cost(telemetry_db
     assert call.duration_ms is not None and call.duration_ms >= 0
     assert call.cost_usd is None
     assert call.run_id == run.run_id
+
+
+def test_successful_call_is_priced_when_a_rate_is_on_file(telemetry_db):
+    with telemetry_db() as db:
+        db.add(
+            ModelPrice(
+                model="test-model",
+                rate_in_usd_per_mtok=Decimal("1.000000"),
+                rate_out_usd_per_mtok=Decimal("2.000000"),
+                source="api",
+            )
+        )
+        db.commit()
+
+    provider = _provider(lambda request: _ok_response())
+
+    with telemetry.attribute_call(telemetry.PURPOSE_FILTERING, article_id=1):
+        provider.score_relevance(ARTICLE, "topic")
+
+    _, calls = _read(telemetry_db)
+    call = calls[0]
+    # 42 in-tokens @ $1/Mtok + 7 out-tokens @ $2/Mtok, per-token math done in
+    # dollars-per-million (AD-16).
+    assert call.cost_usd == (Decimal(42) * Decimal("1.000000") + Decimal(7) * Decimal("2.000000")) / Decimal(
+        1_000_000
+    )
+    assert call.rate_in_usd_per_mtok == Decimal("1.000000")
+    assert call.rate_out_usd_per_mtok == Decimal("2.000000")
 
 
 # -- "Retry" row of the matrix ------------------------------------------------

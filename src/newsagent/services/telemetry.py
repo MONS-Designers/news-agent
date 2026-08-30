@@ -9,6 +9,7 @@ swallows on its own: that responsibility belongs one layer up, same as every
 other `services/*.py` module.
 """
 
+import logging
 from decimal import Decimal
 
 from sqlalchemy import func
@@ -16,6 +17,8 @@ from sqlalchemy.orm import Session
 
 from newsagent.models import OutboundCall, OutboundRun
 from newsagent.telemetry.types import STATUS_AVOIDED, TARGET_LLM, CallMeasurement
+
+logger = logging.getLogger(__name__)
 
 # AD-20 requires intent_summary stay "bounded" - a short description, never a
 # raw prompt. Every call site today is a short hand-written f-string, but
@@ -72,9 +75,33 @@ def record_call(
 ) -> None:
     # A literal zero, not a priced value: "avoided" means the transport never
     # ran, so the cost is known with certainty rather than merely unpriced
-    # (AD-16). Every other status leaves cost_usd/rate_* NULL - pricing
-    # lookup is out of scope for this revision (deferred-work.md).
-    cost_usd = Decimal(0) if measurement.status == STATUS_AVOIDED else None
+    # (AD-16). Every other status is priced below if a rate is on file;
+    # otherwise cost_usd/rate_* stay NULL - "unknown", never guessed as 0.
+    cost_usd: Decimal | None = Decimal(0) if measurement.status == STATUS_AVOIDED else None
+    rate_in_usd_per_mtok: Decimal | None = None
+    rate_out_usd_per_mtok: Decimal | None = None
+    if (
+        measurement.status != STATUS_AVOIDED
+        and measurement.model is not None
+        and measurement.unit == "tokens"
+        and measurement.tokens_in is not None
+        and measurement.tokens_out is not None
+    ):
+        # Local import: telemetry.pricing sits under the same `newsagent.telemetry`
+        # package whose __init__ imports telemetry.sink, which imports this module
+        # at top level - importing pricing back at module level here would be
+        # circular (same reasoning as sink.py's own local import of context.py).
+        from newsagent.telemetry.pricing import lookup_rate
+
+        rate = lookup_rate(db, measurement.model)
+        if rate is None:
+            logger.warning("No price on file for model=%s; cost_usd/rate_* left NULL", measurement.model)
+        else:
+            rate_in_usd_per_mtok, rate_out_usd_per_mtok = rate
+            cost_usd = (
+                Decimal(measurement.tokens_in) * rate_in_usd_per_mtok
+                + Decimal(measurement.tokens_out) * rate_out_usd_per_mtok
+            ) / Decimal(1_000_000)
     db.add(
         OutboundCall(
             run_id=run_id,
@@ -90,8 +117,8 @@ def record_call(
             unit=measurement.unit,
             output_chars=measurement.output_chars,
             cost_usd=cost_usd,
-            rate_in_usd_per_mtok=None,
-            rate_out_usd_per_mtok=None,
+            rate_in_usd_per_mtok=rate_in_usd_per_mtok,
+            rate_out_usd_per_mtok=rate_out_usd_per_mtok,
         )
     )
     db.commit()
