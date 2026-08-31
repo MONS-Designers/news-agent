@@ -8,7 +8,9 @@ All four SummaryResult fields are persisted onto Article so digest rendering
 (#13) never recomputes anything.
 """
 
+import contextvars
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 
 from sqlalchemy import select
@@ -18,7 +20,7 @@ from newsagent import telemetry
 from newsagent.config import settings
 from newsagent.llm.base import LLMProvider
 from newsagent.llm.errors import LLMError
-from newsagent.llm.types import ArticleInput, Refusal
+from newsagent.llm.types import ArticleInput, Refusal, SummaryResult
 from newsagent.pipeline.relevance import STATUS_RELEVANT, active_subscriber_count
 from newsagent.models import Article, Source, UserTopicPreference
 
@@ -61,6 +63,20 @@ def _record_failure(article: Article, report: SummarizeReport) -> None:
     report.errors += 1
 
 
+def _summarize_worker(
+    provider: LLMProvider, article_input: ArticleInput, article_id: int
+) -> SummaryResult | Refusal | LLMError:
+    """Runs off the main thread in the bounded ThreadPoolExecutor below - same
+    discipline as relevance.py's _score_worker: plain data in, the Session
+    never touched here, LLMError returned instead of raised so one failing
+    article can't abort the others still in flight."""
+    with telemetry.attribute_call(telemetry.PURPOSE_SUMMARIZING, article_id=article_id):
+        try:
+            return provider.summarize(article_input)
+        except LLMError as error:
+            return error
+
+
 def summarize_relevant_articles(db: Session, provider: LLMProvider) -> SummarizeReport:
     report = SummarizeReport()
 
@@ -91,21 +107,44 @@ def summarize_relevant_articles(db: Session, provider: LLMProvider) -> Summarize
     ) as run:
         report.run_id = run.run_id
         try:
-            for article in articles:
-                article_input = ArticleInput(
-                    title=article.title,
-                    text=article.full_text or article.rss_summary or article.title,
+            inputs = [
+                (
+                    ArticleInput(
+                        title=article.title,
+                        text=article.full_text or article.rss_summary or article.title,
+                    ),
+                    article.id,
                 )
-                with telemetry.attribute_call(telemetry.PURPOSE_SUMMARIZING, article_id=article.id):
-                    try:
-                        result = provider.summarize(article_input)
-                    except LLMError as error:
-                        _record_failure(article, report)
-                        logger.warning("Summarize failed for article %s: %s", article.id, error)
-                        db.commit()
-                        continue
+                for article in articles
+            ]
 
-                    if isinstance(result, Refusal):
+            with ThreadPoolExecutor(max_workers=settings.summarize_concurrency) as pool:
+                # contextvars (the open run above) do NOT propagate into pool
+                # workers on their own - copy_context() captures it per-submit
+                # so telemetry still attributes each call to this run.
+                future_to_article = {
+                    pool.submit(
+                        contextvars.copy_context().run,
+                        _summarize_worker,
+                        provider,
+                        article_input,
+                        article_id,
+                    ): article
+                    for article, (article_input, article_id) in zip(articles, inputs, strict=True)
+                }
+
+                # as_completed (not a fixed-order `.result()` pass) so each
+                # article commits the moment its own call finishes, not after
+                # the whole batch - a crash mid-run still only loses whichever
+                # calls hadn't landed yet, same guarantee the sequential loop
+                # gave, just no longer tied to submission order.
+                for future in as_completed(future_to_article):
+                    article = future_to_article[future]
+                    result = future.result()
+                    if isinstance(result, LLMError):
+                        _record_failure(article, report)
+                        logger.warning("Summarize failed for article %s: %s", article.id, result)
+                    elif isinstance(result, Refusal):
                         article.summary_status = SUMMARY_REFUSED
                         report.refused += 1
                     elif not result.summary_he.strip():

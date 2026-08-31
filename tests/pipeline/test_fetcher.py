@@ -5,6 +5,7 @@ import pytest
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
+from newsagent.config import settings
 from newsagent.models import Article, Source, Topic, User, UserTopicPreference
 from newsagent.models.base import Base
 from newsagent.pipeline.fetcher import extract_image_url, fetch_approved_sources, fetch_source
@@ -188,3 +189,28 @@ def test_fetch_leaves_image_url_null_when_feed_has_no_image(db: Session):
     article = db.scalar(select(Article))
     assert article is not None
     assert article.image_url is None
+
+
+# -- Bounded concurrency ------------------------------------------------------
+
+
+def test_concurrent_fetches_are_bounded_by_configured_limit(
+    db: Session, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setattr(settings, "fetch_concurrency", 3)
+    parse = make_parse({"feed://ok": FakeFeed(entries=[])})
+
+    captured_max_workers = {}
+    from newsagent.pipeline import fetcher as fetcher_module
+
+    real_executor = fetcher_module.ThreadPoolExecutor
+
+    def spying_executor(*, max_workers):
+        captured_max_workers["value"] = max_workers
+        return real_executor(max_workers=max_workers)
+
+    monkeypatch.setattr("newsagent.pipeline.fetcher.ThreadPoolExecutor", spying_executor)
+
+    fetch_approved_sources(db, parse)
+
+    assert captured_max_workers["value"] == 3

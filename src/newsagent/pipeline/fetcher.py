@@ -1,9 +1,16 @@
 """RSS fetch stage (issue #8): poll approved sources, insert new articles,
 dedupe by URL. A broken feed is logged and skipped - one bad source never
-kills the run."""
+kills the run.
+
+Parsing each source's feed (network I/O) runs through a bounded
+ThreadPoolExecutor (issue #XX) so one slow feed can't stall the whole run -
+same discipline as extract.py's page fetches: workers receive plain URLs
+only, never the Session, so the DB writes that follow stay single-threaded.
+"""
 
 import logging
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
@@ -12,6 +19,7 @@ import feedparser
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from newsagent.config import settings
 from newsagent.models import Article, Source, UserTopicPreference
 from newsagent.models.source import STATUS_APPROVED
 
@@ -87,21 +95,23 @@ def extract_image_url(entry: Any) -> str | None:
     return None
 
 
-def fetch_source(db: Session, source: Source, parse: ParseFunc = feedparser.parse) -> SourceResult:
-    result = SourceResult(source_name=source.name)
+def _parse_feed(url: str, parse: ParseFunc) -> tuple[Any | None, str | None]:
+    """No DB access - safe to run off the main thread in the bounded
+    ThreadPoolExecutor below. Returns (feed, error); at most one is set."""
     try:
-        feed = parse(source.url)
+        feed = parse(url)
     except Exception as error:  # network/parse failures must not kill the run
-        result.error = str(error)
-        logger.warning("Fetch failed for %s: %s", source.name, error)
-        return result
+        return None, str(error)
 
     entries = getattr(feed, "entries", None) or feed.get("entries", [])
     if not entries and feed.get("bozo"):
-        result.error = str(feed.get("bozo_exception", "malformed feed"))
-        logger.warning("Malformed feed for %s: %s", source.name, result.error)
-        return result
+        return None, str(feed.get("bozo_exception", "malformed feed"))
+    return feed, None
 
+
+def _write_feed_to_db(db: Session, source: Source, feed: Any) -> SourceResult:
+    result = SourceResult(source_name=source.name)
+    entries = getattr(feed, "entries", None) or feed.get("entries", [])
     for entry in entries:
         url = entry.get("link")
         title = entry.get("title")
@@ -125,6 +135,14 @@ def fetch_source(db: Session, source: Source, parse: ParseFunc = feedparser.pars
     return result
 
 
+def fetch_source(db: Session, source: Source, parse: ParseFunc = feedparser.parse) -> SourceResult:
+    feed, error = _parse_feed(source.url, parse)
+    if error is not None:
+        logger.warning("Fetch failed for %s: %s", source.name, error)
+        return SourceResult(source_name=source.name, error=error)
+    return _write_feed_to_db(db, source, feed)
+
+
 def fetch_approved_sources(db: Session, parse: ParseFunc = feedparser.parse) -> FetchReport:
     """Approved sources whose topic nobody is subscribed to are skipped
     entirely (GH #45) - fetching them for no one is pure waste that then
@@ -136,6 +154,14 @@ def fetch_approved_sources(db: Session, parse: ParseFunc = feedparser.parse) -> 
             Source.status == STATUS_APPROVED, Source.topic_id.in_(subscribed_topic_ids)
         )
     ).all()
-    for source in sources:
-        report.results.append(fetch_source(db, source, parse))
+
+    with ThreadPoolExecutor(max_workers=settings.fetch_concurrency) as executor:
+        parsed = list(executor.map(lambda source: _parse_feed(source.url, parse), sources))
+
+    for source, (feed, error) in zip(sources, parsed, strict=True):
+        if error is not None:
+            logger.warning("Fetch failed for %s: %s", source.name, error)
+            report.results.append(SourceResult(source_name=source.name, error=error))
+        else:
+            report.results.append(_write_feed_to_db(db, source, feed))
     return report
