@@ -42,28 +42,29 @@ Delivery: daily email for MVP; WhatsApp is phase 2; a pull-model website was rej
 Open technical risk (unresolved, carried to build): how the agent judges source quality when
   discovering sources from a user's stated interests (vs. picking a random low-quality blog)
 
-## Content policy: digest images (documented 2026-08-16, not yet implemented)
+## Content policy: digest images (documented 2026-08-16, V1 decision implemented 2026-08-31)
 
 Rule: the digest must never include images of women. No exceptions.
 
-Status: **documented only, not implemented.** Today the pipeline does zero image content
-analysis - `extract_image_url` in `news-agent/src/newsagent/pipeline/fetcher.py` just pulls a
-URL from RSS metadata (`media:content` / `media:thumbnail` / an image enclosure), and
-`render.py` passes it straight to the digest template. Nothing inspects what's actually in the
-image.
+Status: **V1 - images dropped entirely (option 1 below), per issue #57.** `extract_image_url`
+in `news-agent/src/newsagent/pipeline/fetcher.py` still extracts and stores `Article.image_url`
+from RSS metadata (`media:content` / `media:thumbnail` / an image enclosure) - kept as-is so V2
+classifier work isn't blocked on re-adding extraction - but `render.py`'s `ArticleView` no
+longer carries `image_url`/`alt_text`, and `digest.html.j2` no longer renders a lead image.
+Digests are text-only regardless of what `Article.image_url` holds.
 
-Open implementation question, to resolve before building: an ML/vision classifier (e.g. AWS
-Rekognition, Google Vision) cannot guarantee zero exceptions - it will produce both false
-negatives (an image of a woman slips through) and false positives (a clean image gets blocked).
-Options discussed 2026-08-16:
+Open question, still unresolved, to pick before V2 brings images back: an ML/vision classifier
+(e.g. AWS Rekognition, Google Vision) cannot guarantee zero exceptions - it will produce both
+false negatives (an image of a woman slips through) and false positives (a clean image gets
+blocked). Options discussed 2026-08-16:
   1. Drop images from the digest entirely - the only way to satisfy "no exceptions" without
-     relying on classification accuracy.
+     relying on classification accuracy. **Chosen for V1.**
   2. Automated classification with a conservative threshold, as a best-effort first line of
      defense - not a true zero-exception guarantee.
   3. Manual admin approval per image before send - reliable but not automated, adds ongoing
      editorial workload.
-No approach has been chosen yet; pick one and update this section before implementing the
-filter.
+V2 approach (2 vs. 3) still undecided; pick one and update this section before re-adding image
+rendering.
 
 ## Resolved drift (2026-08-07)
 

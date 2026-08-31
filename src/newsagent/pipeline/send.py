@@ -19,7 +19,7 @@ from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from newsagent.branding import DIGEST_NOUN_WEEKLY, PRODUCT_NAME
+from newsagent.branding import DIGEST_NOUN_WEEKLY
 from newsagent.mail.base import EmailSendError, EmailSender
 from newsagent.models import Digest, User
 from newsagent.pipeline.render import render_digest_html, render_welcome_html
@@ -57,12 +57,12 @@ def _subject(digest: Digest) -> str:
     if digest.user.welcomed_at is None:
         return _welcome_subject(digest.user)
     if not digest.articles:
-        return f"{PRODUCT_NAME} · {DIGEST_NOUN_WEEKLY} שלך"
+        return f"{DIGEST_NOUN_WEEKLY} שלך"
     top = digest.articles[0].article
     headline = (top.title_he or top.title).strip()
     if len(headline) > _MAX_SUBJECT_HEADLINE_CHARS:
         headline = headline[:_MAX_SUBJECT_HEADLINE_CHARS].rsplit(" ", 1)[0] + "…"
-    return f"{PRODUCT_NAME} · {headline}"
+    return headline
 
 
 def send_pending_digests(db: Session, sender: EmailSender) -> SendReport:

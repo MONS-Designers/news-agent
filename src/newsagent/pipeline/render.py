@@ -19,7 +19,7 @@ from markupsafe import Markup
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from newsagent.branding import DIGEST_NOUN_WEEKLY
+from newsagent.branding import DIGEST_NOUN_WEEKLY, LOGO_DATA_URI, PRODUCT_NAME
 from newsagent.config import settings
 from newsagent.models import Article, Digest, User
 from newsagent.models.digest_link import (
@@ -94,6 +94,19 @@ def _truncate_punchline(text: str) -> str:
     return text[: _MAX_PUNCHLINE_CHARS - 1].rsplit(" ", 1)[0] + "…"
 
 
+# Inbox apps show the subject and the preheader side by side, so the preheader
+# must say something the subject doesn't - send.py's _subject() already leads
+# with the top article's headline, so repeating it here would read as a stutter.
+_MAX_PREHEADER_CHARS = 90
+
+
+def _truncate_preheader(text: str) -> str:
+    text = text.strip()
+    if len(text) <= _MAX_PREHEADER_CHARS:
+        return text
+    return text[: _MAX_PREHEADER_CHARS - 1].rsplit(" ", 1)[0] + "…"
+
+
 @dataclass
 class ArticleView:
     title_he: Markup
@@ -103,11 +116,6 @@ class ArticleView:
     source_name: str
     topic_label: str
     topic_color: str
-    image_url: str | None
-    # Plain-text title for the image alt attribute: what a reader with images
-    # blocked sees instead of the picture (issue #24). Kept separate from
-    # title_he, which carries <bdi>/<strong> markup that can't live in an attr.
-    alt_text: str
     feedback_up_url: str
     feedback_down_url: str
 
@@ -152,8 +160,6 @@ def _to_view(db: Session, digest: Digest, article: Article) -> ArticleView:
         source_name=article.source.name,
         topic_label=topic_name,
         topic_color=_TOPIC_COLORS.get(topic_name, _DEFAULT_TOPIC_COLOR),
-        image_url=article.image_url,
-        alt_text=title,
         feedback_up_url=_click_url(
             _get_or_create_link(db, digest, KIND_FEEDBACK_UP, thanks_url, article=article)
         ),
@@ -235,8 +241,9 @@ def render_welcome_html(user: User) -> str:
         unsubscribe_url=f"{settings.frontend_url}/preferences",
         feedback_note_url=f"{settings.frontend_url}/?feedback=open",
         tracking_pixel_url=None,
-        logo_url=f"{settings.frontend_url}/logo-mark.png",
+        logo_url=LOGO_DATA_URI,
         home_url=settings.frontend_url,
+        preheader_text=f"{PRODUCT_NAME} - ההזמנה שלך מוכנה",
     )
 
 
@@ -246,6 +253,25 @@ def render_digest_html(digest: Digest, db: Session) -> str:
     articles = [entry.article for entry in digest.articles]
     views = [_to_view(db, digest, a) for a in articles]
     total_reading_time = sum(v.reading_time_minutes for v in views)
+
+    # Distinct from the subject line on purpose - see _truncate_preheader.
+    # The digest's own voice intro is a natural second line; if it isn't
+    # there yet, the top article's opening line stands in (still different
+    # text from the headline the subject already used).
+    if digest.intro_he:
+        preheader_text = _truncate_preheader(digest.intro_he)
+    elif articles:
+        top = articles[0]
+        lead_paragraph = (top.paragraphs_he or [None])[0] or top.summary_he
+        preheader_text = (
+            # **markdown** stripped to plain text rather than run through
+            # _emphasize: a preview snippet has no <strong> to render into.
+            _truncate_preheader(_BOLD.sub(lambda m: m.group(1), lead_paragraph))
+            if lead_paragraph
+            else f"{DIGEST_NOUN_WEEKLY} שלך מוכן"
+        )
+    else:
+        preheader_text = f"{PRODUCT_NAME} - {DIGEST_NOUN_WEEKLY} שלך"
 
     dad_joke_he = _truncate_punchline(digest.dad_joke_he) if digest.dad_joke_he else None
 
@@ -282,6 +308,7 @@ def render_digest_html(digest: Digest, db: Session) -> str:
         digest_feedback_down_url=_click_url(digest_down_link),
         feedback_note_url=f"{settings.frontend_url}/?feedback=open",
         tracking_pixel_url=f"{settings.backend_base_url}/t/{digest.tracking_token}.gif",
-        logo_url=f"{settings.frontend_url}/logo-mark.png",
+        logo_url=LOGO_DATA_URI,
         home_url=settings.frontend_url,
+        preheader_text=preheader_text,
     )

@@ -132,9 +132,30 @@ def test_tracking_pixel_present(db: Session):
 
 
 def test_logo_present_in_masthead(db: Session):
+    # Inlined as a base64 data URI rather than referencing the frontend's
+    # deployed /logo-mark.png - see render.py's _LOGO_DATA_URI docstring for
+    # why (a network dependency on the frontend's deployed domain).
     digest = build_digest(db, [add_article(db, url_suffix="a")])
     html = render_digest_html(digest, db)
-    assert "/logo-mark.png" in html
+    assert 'src="data:image/png;base64,' in html
+
+
+def test_preheader_uses_digest_intro_when_present(db: Session):
+    digest = build_digest(db, [add_article(db, url_suffix="a")], intro="שבוע עמוס בעדכוני אבטחה.")
+    html = render_digest_html(digest, db)
+    preheader = html.split("mso-hide:all;\">", 1)[1].split("</div>", 1)[0]
+    assert preheader.startswith("שבוע עמוס בעדכוני אבטחה.")
+
+
+def test_preheader_falls_back_to_lead_paragraph_without_intro(db: Session):
+    # Distinct from the subject line (send.py's _subject leads with the top
+    # headline) rather than repeating it - an inbox that shows both side by
+    # side would otherwise read as a stutter.
+    digest = build_digest(db, [add_article(db, url_suffix="a")])
+    html = render_digest_html(digest, db)
+    preheader = html.split("mso-hide:all;\">", 1)[1].split("</div>", 1)[0]
+    assert preheader.startswith("נקודה חשובה ראשונה")
+    assert "כותרת בעברית" not in preheader
 
 
 def test_article_link_is_click_tracked_not_raw_url(db: Session):
@@ -197,27 +218,13 @@ def test_no_joke_corner_when_absent(db: Session):
     assert "קינוח" not in html
 
 
-def test_lead_image_rendered_when_present(db: Session):
+def test_no_lead_image_rendered_even_when_article_has_one(db: Session):
+    # Content policy (issue #57): V1 digests are text-only regardless of
+    # whether the article carries an image_url - dropping the render is the
+    # only way to guarantee the "no images of women" rule with zero exceptions.
     digest = build_digest(db, [add_article(db, url_suffix="a", image_url="https://img/lead.jpg")])
     html = render_digest_html(digest, db)
-    assert 'src="https://img/lead.jpg"' in html
-    assert "height:auto" in html  # resilient collapse for blocked images
-
-
-def test_lead_image_alt_is_plain_title_not_markup(db: Session):
-    # alt must be plain text - the <bdi>/<strong> markup that title_he carries
-    # cannot live inside an HTML attribute.
-    digest = build_digest(db, [add_article(db, url_suffix="a", image_url="https://img/x.jpg")])
-    html = render_digest_html(digest, db)
-    assert 'alt="כותרת בעברית"' in html
-
-
-def test_no_image_element_when_absent(db: Session):
-    digest = build_digest(db, [add_article(db, url_suffix="a")])  # image_url defaults to None
-    html = render_digest_html(digest, db)
-    # The lead image carries the title as its alt; the tracking pixel uses alt="".
-    # No title-alt image → the article degraded to a text-only card.
-    assert 'alt="כותרת בעברית"' not in html
+    assert 'src="https://img/lead.jpg"' not in html
 
 
 def test_latin_name_in_the_greeting_is_bidi_isolated(db: Session):

@@ -124,7 +124,9 @@ def test_welcome_appears_only_once(db: Session):
 
     _, subject, html = sender.sent[0]
     assert "שמח שהצטרפת." not in html
-    assert subject.startswith("NewsAgent · ")
+    # The sender name already shows "NewsAgent" - the subject leads straight
+    # with the headline instead of repeating it.
+    assert subject == "כותרת"
 
 
 def test_failed_first_send_keeps_the_welcome_owed(db: Session):
