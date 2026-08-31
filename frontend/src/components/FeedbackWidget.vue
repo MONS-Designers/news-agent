@@ -32,21 +32,18 @@
         </button>
       </div>
 
-      <div class="mt-3 flex gap-2">
+      <div class="mt-3 flex justify-center gap-1.5" role="radiogroup" aria-label="דירוג">
         <button
-          v-for="option in SENTIMENTS"
-          :key="option.value"
+          v-for="(face, i) in RATING_FACES"
+          :key="i"
           type="button"
-          @click="sentiment = sentiment === option.value ? null : option.value"
-          :aria-pressed="sentiment === option.value"
-          class="flex-1 rounded-xl border py-2 text-xl transition-colors"
-          :class="
-            sentiment === option.value
-              ? 'border-neutral-900 bg-neutral-900/5'
-              : 'border-neutral-200 hover:bg-neutral-50'
-          "
+          @click="rating = rating === i + 1 ? null : i + 1"
+          :aria-pressed="rating === i + 1"
+          :aria-label="face.label"
+          class="rounded-xl p-1.5 text-2xl leading-none transition-all"
+          :class="rating === i + 1 ? 'scale-125' : 'opacity-40 hover:opacity-70'"
         >
-          {{ option.emoji }}
+          {{ face.emoji }}
         </button>
       </div>
 
@@ -54,7 +51,7 @@
         v-model="text"
         rows="3"
         maxlength="2000"
-        placeholder="אופציונלי - שורה אחת מספיקה"
+        placeholder="חשוב לנו לשמוע מה דעתך ואיך אנחנו יכולים להשתפר."
         class="mt-3 w-full resize-none rounded-xl border border-neutral-200 px-3 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-neutral-400 focus:outline-none"
       ></textarea>
 
@@ -80,27 +77,30 @@ import { submitFeedback } from "@/api/client";
 const route = useRoute();
 const router = useRouter();
 
-const SENTIMENTS = [
-  { value: "up" as const, emoji: "👍" },
-  { value: "down" as const, emoji: "👎" },
+// Faces read faster than an abstract 1-5 scale - the point is to help
+// someone pick, not to make them translate a number into a feeling first.
+const RATING_FACES = [
+  { emoji: "😞", label: "1 מתוך 5: גרוע" },
+  { emoji: "🙁", label: "2 מתוך 5: לא ממש" },
+  { emoji: "😐", label: "3 מתוך 5: בסדר" },
+  { emoji: "🙂", label: "4 מתוך 5: טוב" },
+  { emoji: "😄", label: "5 מתוך 5: מעולה" },
 ];
 
 const open = ref(false);
 const thanks = ref(false);
-const sentiment = ref<"up" | "down" | null>(null);
+const rating = ref<number | null>(null);
 const text = ref("");
 const saving = ref(false);
 const error = ref("");
 
-const isEmpty = computed(() => sentiment.value === null && text.value.trim() === "");
+const isEmpty = computed(() => rating.value === null && text.value.trim() === "");
 
-// The digest's "say it in words" link lands here with ?feedback=open, and its
-// one-tap thumbs redirect back with ?feedback=thanks. The query is consumed
-// immediately so a refresh doesn't replay either state.
+// The digest's "say it in words" link lands here with ?feedback=open. The
+// query is consumed immediately so a refresh doesn't replay it.
 onMounted(() => {
   const flag = route.query.feedback;
   if (flag === "open") open.value = true;
-  if (flag === "thanks") thanks.value = true;
   if (flag) {
     const query = { ...route.query };
     delete query.feedback;
@@ -117,10 +117,10 @@ async function submit() {
   saving.value = true;
   error.value = "";
   try {
-    await submitFeedback(sentiment.value, text.value.trim());
+    await submitFeedback(rating.value, text.value.trim());
     open.value = false;
     thanks.value = true;
-    sentiment.value = null;
+    rating.value = null;
     text.value = "";
   } catch {
     error.value = "השליחה נכשלה. אפשר לנסות שוב.";

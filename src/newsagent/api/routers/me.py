@@ -16,7 +16,7 @@ from newsagent.api.schemas import (
     TopicSuggestionsOut,
 )
 from newsagent.models import Field, User
-from newsagent.models.feedback import SENTIMENT_DOWN, SENTIMENT_UP, SOURCE_APP
+from newsagent.models.feedback import RATING_CHOICES, SOURCE_APP
 from newsagent.services import feedback, preferences, profile, subscription, taxonomy
 
 router = APIRouter(prefix="/me", tags=["me"])
@@ -64,12 +64,16 @@ def submit_my_feedback(
     user: User = Depends(require_user),
     db: Session = Depends(get_db),
 ) -> dict[str, str]:
-    if body.sentiment is not None and body.sentiment not in (SENTIMENT_UP, SENTIMENT_DOWN):
-        raise HTTPException(status_code=400, detail="Invalid sentiment")
-    if body.sentiment is None and not (body.text or "").strip():
-        raise HTTPException(status_code=400, detail="Feedback must carry a sentiment or text")
+    if body.rating is not None and body.rating not in RATING_CHOICES:
+        raise HTTPException(status_code=400, detail="Invalid rating")
+    if body.rating is None and not (body.text or "").strip():
+        raise HTTPException(status_code=400, detail="Feedback must carry a rating or text")
     feedback.record(
-        db, source=SOURCE_APP, user_id=user.id, sentiment=body.sentiment, text=body.text
+        db,
+        source=SOURCE_APP,
+        user_id=user.id,
+        sentiment=str(body.rating) if body.rating is not None else None,
+        text=body.text,
     )
     return {"status": "recorded"}
 
