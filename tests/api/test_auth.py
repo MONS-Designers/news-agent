@@ -75,3 +75,34 @@ def test_existing_email_ignores_cap(db: Session):
     identity = resolve_identity(db, "user@example.com", cap=0)
     assert identity is not None
     assert identity.is_admin is False
+
+
+def test_new_row_gets_given_and_family_name(db: Session):
+    """GH #62: forwarded into brand-new-row creation."""
+    identity = resolve_identity(
+        db,
+        "stranger@example.com",
+        name="Nagy János",
+        cap=10,
+        given_name="Nagy",
+        family_name="János",
+    )
+    assert identity is not None
+    created = db.scalar(select(User).where(User.email == "stranger@example.com"))
+    assert created is not None
+    assert created.given_name == "Nagy"
+    assert created.family_name == "János"
+
+
+def test_existing_row_never_receives_given_or_family_name(db: Session):
+    """An existing user re-authenticating must never be mutated - the
+    existing-row branch stays read-only even if given_name/family_name are
+    passed in."""
+    identity = resolve_identity(
+        db, "user@example.com", name="Someone", given_name="Given", family_name="Family"
+    )
+    assert identity is not None
+    existing = db.scalar(select(User).where(User.email == "user@example.com"))
+    assert existing is not None
+    assert existing.given_name is None
+    assert existing.family_name is None

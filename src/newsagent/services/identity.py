@@ -34,7 +34,14 @@ def add_user(db: Session, email: str, name: str | None = None) -> tuple[User, bo
     return user, True
 
 
-def register_user_if_capacity(db: Session, email: str, name: str | None, cap: int) -> User | None:
+def register_user_if_capacity(
+    db: Session,
+    email: str,
+    name: str | None,
+    cap: int,
+    given_name: str | None = None,
+    family_name: str | None = None,
+) -> User | None:
     """Create a User row for a brand-new email, but only if the total User
     count is still under `cap` - and do it atomically (FR3): the count check
     and the insert are one SQL statement (INSERT...SELECT...WHERE), not a
@@ -43,14 +50,17 @@ def register_user_if_capacity(db: Session, email: str, name: str | None, cap: in
     lock is held for the whole statement, so the second caller's subquery
     only runs after the first has committed and is already reflected in it.
 
+    `given_name`/`family_name` (GH #62) are the raw Google OAuth claims,
+    stored only at this creation - never backfilled or refreshed later.
+
     Returns the created User, or None if the cap was already full. Callers
     are expected to have already ruled out an existing Admin/User match for
     this email (this function does not check for that itself).
     """
     normalized = email.strip().lower()
     stmt = insert(User).from_select(
-        ["email", "name"],
-        select(literal(normalized), literal(name)).where(
+        ["email", "name", "given_name", "family_name"],
+        select(literal(normalized), literal(name), literal(given_name), literal(family_name)).where(
             select(func.count()).select_from(User).scalar_subquery() < cap
         ),
     )

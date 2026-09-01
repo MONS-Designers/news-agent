@@ -24,7 +24,14 @@ class Identity:
     user_id: int | None
 
 
-def resolve_identity(db: Session, email: str, name: str | None = None, cap: int = 10) -> Identity | None:
+def resolve_identity(
+    db: Session,
+    email: str,
+    name: str | None = None,
+    cap: int = 10,
+    given_name: str | None = None,
+    family_name: str | None = None,
+) -> Identity | None:
     """Map a verified Google email to our seeded Admin/User rows - or, for a
     brand-new email with room under the registration cap, create one (FR1).
 
@@ -34,6 +41,10 @@ def resolve_identity(db: Session, email: str, name: str | None = None, cap: int 
     everyone else - no special exemption. The one thing that never changes is
     that an Admin always signs in: if the cap is full, they just keep
     `user_id=None` instead of being turned away.
+
+    `given_name`/`family_name` (GH #62) are forwarded only into brand-new-row
+    creation below - an existing row (the branch just above) is never
+    mutated, even if Google's claims for it have since changed.
 
     Returns None only when the email has no Admin row either *and* the cap is
     already full - the caller then routes to the waitlist (FR11) instead of
@@ -46,7 +57,7 @@ def resolve_identity(db: Session, email: str, name: str | None = None, cap: int 
     if user is not None:
         return Identity(email=email, is_admin=admin is not None, user_id=user.id)
 
-    created = register_user_if_capacity(db, email, name, cap)
+    created = register_user_if_capacity(db, email, name, cap, given_name=given_name, family_name=family_name)
     if created is not None:
         return Identity(email=email, is_admin=admin is not None, user_id=created.id)
     if admin is not None:

@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 from newsagent.branding import DIGEST_NOUN_WEEKLY
 from newsagent.mail.base import EmailSendError, EmailSender
 from newsagent.models import Digest, User
+from newsagent.models.user import first_name
 from newsagent.pipeline.render import render_digest_html, render_welcome_html
 
 logger = logging.getLogger(__name__)
@@ -38,13 +39,9 @@ class SendReport:
     failed: int = 0
 
 
-def _first_name(user: User) -> str | None:
-    return user.name.split()[0] if user.name and user.name.strip() else None
-
-
 def _welcome_subject(user: User) -> str:
     """The first email's climax is getting in, not any one headline."""
-    name = _first_name(user)
+    name = first_name(user)
     opening = f"{name}, ה" if name else "ה"
     return f"{opening}דייג'סט הראשון שלך מוכן."
 

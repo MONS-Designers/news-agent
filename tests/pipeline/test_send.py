@@ -220,3 +220,33 @@ def test_only_the_first_name_is_used(db: Session):
     _, subject, html = sender.sent[0]
     assert subject == "דנה, הדייג'סט הראשון שלך מוכן."
     assert "שלום דנה," in html
+
+
+def test_given_name_is_used_verbatim_over_name_split(db: Session):
+    """GH #62: family-name-first cultures break under name.split()[0] - a
+    stored given_name from Google OAuth must win instead."""
+    user = db.get(User, 1)
+    user.name = "Nagy János"
+    user.given_name = "Nagy"
+    db.commit()
+    sender = RecordingSender()
+
+    send_pending_digests(db, sender)
+
+    _, subject, html = sender.sent[0]
+    assert subject == "Nagy, הדייג'סט הראשון שלך מוכן."
+    assert "שלום <bdi>Nagy,</bdi>" in html
+
+
+def test_absent_given_name_falls_back_to_name_split(db: Session):
+    user = db.get(User, 1)
+    user.name = "דנה לוי-כהן"
+    user.given_name = None
+    db.commit()
+    sender = RecordingSender()
+
+    send_pending_digests(db, sender)
+
+    _, subject, html = sender.sent[0]
+    assert subject == "דנה, הדייג'סט הראשון שלך מוכן."
+    assert "שלום דנה," in html

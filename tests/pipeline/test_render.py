@@ -253,3 +253,29 @@ def test_latin_field_name_in_the_welcome_is_bidi_isolated(db: Session):
     html = render_digest_html(digest, db)
 
     assert "שבחרת ב<bdi>DevOps,</bdi>" in html
+
+
+def test_given_name_used_verbatim_in_greeting(db: Session):
+    """GH #62: family-name-first cultures break under name.split()[0] - a
+    stored given_name from Google OAuth must win instead."""
+    user = db.get(User, 1)
+    user.name = "Nagy János"
+    user.given_name = "Nagy"
+    db.commit()
+    digest = build_digest(db, [add_article(db, url_suffix="a")])
+
+    html = render_digest_html(digest, db)
+
+    assert "שלום <bdi>Nagy,</bdi>" in html
+
+
+def test_absent_given_name_falls_back_to_name_split_in_greeting(db: Session):
+    user = db.get(User, 1)
+    user.name = "Nomi Magnus"
+    user.given_name = None
+    db.commit()
+    digest = build_digest(db, [add_article(db, url_suffix="a")])
+
+    html = render_digest_html(digest, db)
+
+    assert "שלום <bdi>Nomi,</bdi>" in html

@@ -30,6 +30,7 @@ from newsagent.models.digest_link import (
     KIND_UNSUBSCRIBE,
     DigestLink,
 )
+from newsagent.models.user import first_name
 
 _TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 _env = Environment(
@@ -188,11 +189,8 @@ def _welcome_view(user: User, *, has_articles: bool) -> WelcomeView:
     # direction line: without the <bdi> that _emphasize adds, bidi resolution
     # can drag the comma to the wrong side of the name. Same treatment the
     # article text already gets, applied here too rather than assumed unneeded.
-    greeting = (
-        _emphasize(f"שלום {user.name.split()[0]},")
-        if user.name and user.name.strip()
-        else None
-    )
+    name = first_name(user)
+    greeting = _emphasize(f"שלום {name},") if name else None
 
     # Every sentence stays free of second-person present tense, which Hebrew
     # cannot write without picking a gender. Past tense ("הצטרפת", "סיפרת",

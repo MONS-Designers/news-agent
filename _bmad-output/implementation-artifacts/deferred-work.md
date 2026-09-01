@@ -237,6 +237,21 @@
   summary: `attempt_scope()`'s buffering has no identity check tying a reported `CallMeasurement` to the scope that will consume it - if two overlapping scopes on the same context both call `sink.report()`, one measurement is silently absorbed into the wrong `outbound_calls` row instead of erroring.
   evidence: Surfaced by round-2 adversarial review as a theoretical gap - `contextvars` are inherently isolated per async task/thread, so no current call path can actually trigger this, but nothing in the code would catch it if a future refactor introduced overlapping scopes on a shared context.
 
+## Deferred from: code review of spec-gh-62-oauth-given-family-name (2026-08-31)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-gh-62-oauth-given-family-name.md`
+  summary: `users.given_name`/`family_name` are unbounded `String` columns with no length cap, flowing untruncated into the digest subject line and greeting - an unusually long value from a Google profile field would produce an unwieldy subject/greeting with nothing like `_MAX_SUBJECT_HEADLINE_CHARS`'s truncation.
+  evidence: Surfaced by adversarial review of GH #62. Pre-existing pattern, not introduced by this story - `users.name` (the column these two mirror) has carried the identical unbounded-`String`-into-subject-line shape since the original schema, with no reported issue. Worth a shared length guard across all three name-like columns if it ever becomes a real problem, not a one-off fix on the two new columns alone.
+
+## Deferred from: code review round 2 of spec-gh-62-oauth-given-family-name (2026-09-01)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-gh-62-oauth-given-family-name.md`
+  summary: `capture_to_waitlist()` (`services/waitlist.py`) only takes `name`, even though `routers/auth.py::callback()` already has `given_name`/`family_name` in hand when a visitor overflows the registration cap - that data is lost for anyone captured to the waitlist, so if they're later promoted to a real user their greeting still falls back to `name.split()[0]`, the exact bug GH #62 fixes for everyone else.
+  evidence: Surfaced independently by both review passes (adversarial and edge-case) of GH #62's second implementation. Out of scope for this issue: the approved spec's Intent explicitly scopes to `users` columns populated via Google sign-in, not the `Waitlist` model, and adding columns there is a separate schema change. Worth revisiting once/if a waitlist-promotion flow exists - there's no evidence in this codebase that promotion is implemented yet.
+- source_spec: `_bmad-output/implementation-artifacts/spec-gh-62-oauth-given-family-name.md`
+  summary: No test exercises `routers/auth.py::callback()`'s actual extraction lines (`userinfo.get("given_name")` etc.) through the router itself - all new GH #62 tests call `resolve_identity`/`register_user_if_capacity`/`first_name` directly, one layer below where the OAuth dict keys are actually read.
+  evidence: Surfaced by adversarial review. Pre-existing gap, not introduced by this story: `callback()` has no test mocking `oauth.google.authorize_access_token` at all (only `login`/`logout`/`me` are covered in `tests/api/routers/test_auth.py`), so building one is a test-infrastructure investment (mocking Authlib's OAuth flow) disproportionate to this issue's scope.
+
 ## Deferred from: code review of spec-outbound-call-telemetry.md (2026-08-27)
 
 - source_spec: `_bmad-output/implementation-artifacts/spec-outbound-call-telemetry.md`

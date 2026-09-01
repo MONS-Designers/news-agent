@@ -39,6 +39,16 @@ class User(Base):
     name: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
+    # Raw Google OAuth claims (GH #62), captured only at row creation - see
+    # services/identity.py's register_user_if_capacity. None for dev-login,
+    # CLI-seeded users, and every row that predates this column. given_name is
+    # preferred over `name` for the greeting via first_name() below because it
+    # doesn't break for family-name-first cultures the way `name.split()[0]`
+    # does; family_name is captured alongside it for completeness but has no
+    # reader today.
+    given_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    family_name: Mapped[str | None] = mapped_column(String, nullable=True)
+
     # Digest delivery opt-out (GH #46) - same nullable-timestamp shape as
     # Digest.opened_at/DigestLink.clicked_at: None = receiving digests,
     # a timestamp = when they stopped. Reversible by clearing it back to None.
@@ -90,3 +100,11 @@ class User(Base):
 
     topic_preferences: Mapped[list["UserTopicPreference"]] = relationship(back_populates="user")
     digests: Mapped[list["Digest"]] = relationship(back_populates="user")
+
+
+def first_name(user: User) -> str | None:
+    if isinstance(user.given_name, str) and user.given_name.strip():
+        return user.given_name.strip()
+    if user.name and user.name.strip():
+        return user.name.split()[0]
+    return None
