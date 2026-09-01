@@ -4,10 +4,11 @@ Acceptance Criteria: measurer (http_llm_client) -> ambient context
 through the real ExternalLLMProvider + httpx.MockTransport (no network) so
 the whole chain runs, not just one layer in isolation.
 
-`telemetry_db` (tests/conftest.py) is the same in-memory sqlite the autouse
-`_isolate_telemetry_from_real_db` fixture already points telemetry.sink at
-for every test in the suite - it's requested explicitly here to read back
-what got written.
+`telemetry_db` is overridden below (shadowing tests/conftest.py's version for
+every test in this file) - it's requested explicitly in most tests here to
+read back what got written, and the autouse `_isolate_telemetry_from_real_db`
+fixture picks up whichever `telemetry_db` is in scope to point telemetry.sink
+(and logging_setup's DB handler) at.
 """
 
 import logging
@@ -18,7 +19,7 @@ from decimal import Decimal
 import httpx
 import pytest
 from sqlalchemy import create_engine, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 
 from newsagent import telemetry
 from newsagent.config import settings
@@ -46,6 +47,47 @@ from newsagent.suggestions.errors import SuggestionProviderError
 from newsagent.suggestions.llm import LLMSuggestionSource
 
 ARTICLE = ArticleInput(title="An article", text="a" * 60)
+
+
+@pytest.fixture
+def telemetry_db(tmp_path):
+    """Overrides tests/conftest.py's in-memory `telemetry_db` with a real
+    file-backed one, for this file only.
+
+    This file's `test_filter_run_over_five_articles_...` and the two
+    `test_thread_call_...` tests write from real ThreadPoolExecutor workers
+    genuinely concurrently - unlike conftest's default, a single sqlite3
+    connection shared via StaticPool is not safe for that: two threads
+    mid-statement on the very same connection object can corrupt each
+    other's cursor state ("sqlite3.InterfaceError: bad parameter or other
+    API misuse", or a FlushError from one thread's autoincrement lastrowid
+    read landing between another thread's statements), silently dropping a
+    worker's OutboundCall row (AD-13 swallows the write failure by design,
+    so nothing else surfaces it) - the intermittent cause of this file's
+    5-worker test occasionally recording 3 or 4 calls instead of 5.
+
+    A real file (not :memory:) gives each thread its own actual connection
+    to the same database, safe the same way pooled Postgres connections
+    are; `timeout` lets a second concurrent writer wait for the first's
+    file lock instead of erroring. A *shared-cache* :memory: DB
+    (`cache=shared`) was tried instead and rejected: it avoids the
+    single-connection problem too, but trades it for
+    "sqlite3.OperationalError: database table is locked" (SQLITE_LOCKED) -
+    a shared-cache-specific table lock that, unlike plain SQLITE_BUSY,
+    `timeout`/busy_timeout does not retry.
+
+    Deliberately not the conftest default for every test: real file I/O
+    made the full suite take ~3x longer, and - worse - a `telemetry.db`
+    file written into every test's shared `tmp_path` broke an unrelated
+    test elsewhere that asserts on its own tmp_path's exact contents. Only
+    this file's tests need genuine multi-writer safety.
+    """
+    engine = create_engine(
+        f"sqlite:///{tmp_path / 'telemetry.db'}",
+        connect_args={"check_same_thread": False, "timeout": 30},
+    )
+    Base.metadata.create_all(engine)
+    return sessionmaker(bind=engine, expire_on_commit=False)
 
 
 @pytest.fixture(autouse=True)
