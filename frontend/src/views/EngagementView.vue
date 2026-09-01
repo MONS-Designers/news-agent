@@ -11,7 +11,7 @@
         @click="loadEngagement"
         class="inline-flex items-center justify-center rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900"
       >
-        רענן
+        רענון
       </button>
     </div>
 
@@ -84,7 +84,7 @@ async function loadEngagement() {
     rows.value = await listDigestEngagement();
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) {
-      errorMessage.value = "התחבר עם Google כדי לצפות במעורבות בשליחות.";
+      errorMessage.value = "יש להתחבר עם Google כדי לצפות במעורבות בשליחות.";
     } else if (error instanceof ApiError && error.status === 403) {
       errorMessage.value = "לחשבון שלך אין הרשאת מנהל.";
     } else {

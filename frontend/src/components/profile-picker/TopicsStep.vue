@@ -32,7 +32,7 @@
           <span v-if="isPicked(chip)" class="ms-1 text-[11px] opacity-60" aria-hidden="true">✕</span>
         </button>
       </div>
-      <p class="mt-3.5 text-xs text-hd-muted">{{ capHintMessage || "הקש על נושא דהוי כדי לבחור בו." }}</p>
+      <p class="mt-3.5 text-xs text-hd-muted">{{ capHintMessage || "יש להקיש על נושא דהוי כדי לבחור בו." }}</p>
     </template>
 
     <div class="mt-7 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3.5">
@@ -149,7 +149,7 @@ const capHintMessage = ref("");
 let capHintTimer: ReturnType<typeof setTimeout> | undefined;
 
 function showCapHint() {
-  capHintMessage.value = "בטל בחירה של נושא קודם - הגעת ל-4.";
+  capHintMessage.value = "יש לבטל בחירה של נושא קודם - הגעת ל-4.";
   clearTimeout(capHintTimer);
   capHintTimer = setTimeout(() => {
     capHintMessage.value = "";

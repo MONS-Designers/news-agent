@@ -51,7 +51,7 @@ describe("HomeView - happy path", () => {
     ensureMe.mockResolvedValue(null);
     const { wrapper } = await mountHome();
     expect(wrapper.text()).toContain("דייג'סט אחד.");
-    expect(wrapper.text()).not.toContain("אתה בפנים");
+    expect(wrapper.text()).not.toContain("נכנסת.");
     expect(getMyProfile).not.toHaveBeenCalled();
   });
 
@@ -71,7 +71,7 @@ describe("HomeView - happy path", () => {
       interest_free_text: null,
     });
     const { wrapper } = await mountHome();
-    expect(wrapper.text()).toContain("אתה בפנים");
+    expect(wrapper.text()).toContain("נכנסת.");
     expect(wrapper.text()).not.toContain("דייג'סט אחד.");
   });
 
@@ -84,7 +84,7 @@ describe("HomeView - happy path", () => {
       interest_free_text: null,
     });
     const { wrapper } = await mountHome();
-    expect(wrapper.text()).not.toContain("אתה בפנים");
+    expect(wrapper.text()).not.toContain("נכנסת.");
     expect(wrapper.text()).toContain("דייג'סט אחד.");
   });
 
@@ -110,7 +110,7 @@ describe("HomeView - unhappy path / edge cases", () => {
     getMyProfile.mockRejectedValue(new Error("network down"));
     const { wrapper } = await mountHome();
 
-    expect(wrapper.text()).not.toContain("אתה בפנים");
+    expect(wrapper.text()).not.toContain("נכנסת.");
     expect(wrapper.text()).toContain("דייג'סט אחד.");
   });
 

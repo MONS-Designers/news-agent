@@ -43,8 +43,8 @@
           </span>
         </h2>
         <p v-if="group.blocked" class="mb-3 -mt-2 text-sm text-neutral-500">
-          התחום שהתפקידים האלה הוגשו תחתיו טרם אושר. אשר קודם את התחום המתאים בקבוצת
-          "תחומים חדשים" למעלה, ואז חזור לקדם אותם - או דחה אותם ישירות.
+          התחום שהתפקידים האלה הוגשו תחתיו טרם אושר. יש לאשר קודם את התחום המתאים בקבוצת
+          "תחומים חדשים" למעלה, ואז לחזור ולקדם אותם - או לדחות אותם ישירות.
         </p>
         <ul class="space-y-3" :class="{ 'border-s-2 border-neutral-200 ps-4': !group.blocked && group.key !== '__fields' }">
           <li
@@ -87,14 +87,14 @@
                   :disabled="pendingId === suggestion.id || !canPromote(suggestion)"
                   class="inline-flex items-center justify-center rounded-lg bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-700 disabled:opacity-50"
                 >
-                  קדם
+                  קידום
                 </button>
                 <button
                   @click="decide(suggestion, 'rejected')"
                   :disabled="pendingId === suggestion.id"
                   class="inline-flex items-center justify-center rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-red-500 disabled:opacity-50"
                 >
-                  דחה
+                  דחייה
                 </button>
               </div>
             </div>
@@ -205,7 +205,7 @@ async function loadSuggestions() {
     curatedNames.value = Object.fromEntries(suggestions.value.map((s) => [s.id, s.text]));
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) {
-      errorMessage.value = "התחבר עם Google כדי לצפות בהצעות הממתינות.";
+      errorMessage.value = "יש להתחבר עם Google כדי לצפות בהצעות הממתינות.";
     } else if (error instanceof ApiError && error.status === 403) {
       errorMessage.value = "לחשבון שלך אין הרשאת מנהל.";
     } else {

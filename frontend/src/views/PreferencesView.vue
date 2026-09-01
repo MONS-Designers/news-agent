@@ -160,9 +160,9 @@ async function loadPreferences() {
     subscription.value = sub;
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) {
-      errorMessage.value = "התחבר עם Google כדי לצפות בהעדפות שלך.";
+      errorMessage.value = "יש להתחבר עם Google כדי לצפות בהעדפות שלך.";
     } else if (error instanceof ApiError && error.status === 403) {
-      errorMessage.value = "לחשבון הזה אין פרופיל משתמש. פנה למנהל המערכת.";
+      errorMessage.value = "לחשבון הזה אין פרופיל משתמש. ניתן לפנות למנהל המערכת.";
     } else {
       errorMessage.value = "טעינת ההעדפות נכשלה.";
     }

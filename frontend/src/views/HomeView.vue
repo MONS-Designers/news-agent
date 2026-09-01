@@ -12,7 +12,7 @@
       <h1 class="title">אנחנו במלוא התפוסה כרגע.</h1>
       <p class="subtitle">
         NewsAgent פתוח כרגע לקבוצה קטנה של משתמשים מוקדמים בזמן שאנחנו מכווננים את המערכת. שמרנו
-        את כתובת המייל שלך - תקבל הזמנה ברגע שיתפנה מקום.
+        את כתובת המייל שלך - ההזמנה תישלח ברגע שיתפנה מקום.
       </p>
     </section>
 
@@ -20,7 +20,7 @@
       <section class="hero">
         <p class="kicker">NewsAgent · גרסת בטא</p>
         <template v-if="firstRun">
-          <h1 class="title">אתה בפנים.<br />נשאר רק להגדיר מי אתה.</h1>
+          <h1 class="title">נכנסת.<br />נשאר רק להגדיר את הפרופיל.</h1>
           <p class="subtitle">
             שתי דקות, פעם אחת - התחום שלך, התפקיד שלך, מה מעניין אותך. משם אנחנו בונים את
             {{ DIGEST_NOUN_WEEKLY }} הראשון שלך סביב מה שבאמת חשוב לך.
@@ -34,7 +34,7 @@
           </p>
         </template>
         <button type="button" class="cta" @click="goToPreferences">
-          {{ firstRun ? "בוא נכיר, זה לוקח 2 דקות" : "אני רוצה להגדיר את הדייג'סט שלי" }}
+          {{ firstRun ? "נכיר, זה לוקח 2 דקות" : "אני רוצה להגדיר את הדייג'סט שלי" }}
           <span class="cta-arrow" aria-hidden="true">←</span>
         </button>
       </section>

@@ -66,6 +66,27 @@ blocked). Options discussed 2026-08-16:
 V2 approach (2 vs. 3) still undecided; pick one and update this section before re-adding image
 rendering.
 
+## Content policy: gender-neutral Hebrew copy (documented 2026-09-01, per issue #61)
+
+Rule: no user-facing Hebrew string may address the reader in a way that assumes their gender.
+Hebrew has no gender-neutral second-person present tense, so the trap is almost always a
+present-tense verb or an imperative aimed at "you" - not the words `אתה`/`את` in isolation.
+
+Technique - rewrite around the problem, never use slashed forms (`את/ה`) in prose:
+- Second-person **past** tense is spelled identically for both genders (`הצטרפת`, `סיפרת`,
+  `בחרת`) - prefer it over present tense.
+- `אליך`, `אותך`, `שלך`, `לך` are already neutral in writing.
+- Avoid bare imperatives (`בחר תחום קודם`, a button labeled just `אשר`) - use `יש ל` + infinitive
+  (`יש לבחור תחום קודם`), a noun phrase (`אישור`), or reword the state entirely.
+- Slashed forms stay acceptable only in taxonomy role names the reader picks for themselves
+  (`מהנדס/ת תוכנה`, in `services/taxonomy.py`'s `DEFAULT_ROLES`) - never in body copy.
+- `src/newsagent/pipeline/render.py`'s `_welcome_view` is the reference example.
+
+A regression guard scans for the most common offenders (`אתה `, `תוכל`, bare imperatives) in
+`.vue` files (`frontend/src/__tests__/gendered-copy.spec.ts`) and in the digest template
+(`tests/test_gendered_digest_copy.py`) - it's a targeted word-boundary scan, not a parser, so a
+genuinely new phrasing may need the denylist extended rather than the check silenced.
+
 ## Resolved drift (2026-08-07)
 
 The self-registration question flagged below was resolved in favor of the original idea doc:

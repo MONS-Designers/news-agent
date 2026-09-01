@@ -88,7 +88,7 @@ describe("TaxonomyQueueView - unhappy path / edge cases", () => {
 
     const buttons = wrapper.find("li").findAll("button");
     const [promote, reject] = buttons;
-    expect(promote.text()).toBe("קדם");
+    expect(promote.text()).toBe("קידום");
     expect(promote.attributes("disabled")).toBeDefined();
     expect(reject.attributes("disabled")).toBeUndefined();
   });

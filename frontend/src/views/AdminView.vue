@@ -53,14 +53,14 @@
               :disabled="pendingId === source.id"
               class="inline-flex items-center justify-center rounded-lg bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-700 disabled:opacity-50"
             >
-              אשר
+              אישור
             </button>
             <button
               @click="updateStatus(source, 'rejected')"
               :disabled="pendingId === source.id"
               class="inline-flex items-center justify-center rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-red-500 disabled:opacity-50"
             >
-              דחה
+              דחייה
             </button>
           </div>
         </div>
@@ -102,7 +102,7 @@ async function loadSources() {
     sources.value = await listPendingSources();
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) {
-      errorMessage.value = "התחבר עם Google כדי לצפות במקורות הממתינים.";
+      errorMessage.value = "יש להתחבר עם Google כדי לצפות במקורות הממתינים.";
     } else if (error instanceof ApiError && error.status === 403) {
       errorMessage.value = "לחשבון שלך אין הרשאת מנהל.";
     } else {
