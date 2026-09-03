@@ -15,10 +15,10 @@ test.describe("admin taxonomy curation queue", () => {
     const devRel = page.locator("li", { hasText: "DevRel Engineer" });
     await expect(devRel).toBeVisible();
 
-    await robotics.getByRole("button", { name: "קדם" }).click();
+    await robotics.getByRole("button", { name: "קידום" }).click();
     await expect(robotics).not.toBeVisible();
 
-    await devRel.getByRole("button", { name: "דחה" }).click();
+    await devRel.getByRole("button", { name: "דחייה" }).click();
     await expect(devRel).not.toBeVisible();
 
     await expect(page.getByText("אין הצעות טקסונומיה ממתינות.")).toBeVisible();
