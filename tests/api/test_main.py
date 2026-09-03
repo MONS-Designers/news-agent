@@ -14,7 +14,7 @@ client = TestClient(app)
 def test_health_returns_200():
     response = client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    assert response.json() == {"status": "ok", "commit": "unknown"}
 
 
 def test_health_db_returns_200_when_db_reachable(monkeypatch: pytest.MonkeyPatch):

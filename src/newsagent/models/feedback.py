@@ -14,6 +14,15 @@ if TYPE_CHECKING:
 SENTIMENT_UP = "up"
 SENTIMENT_DOWN = "down"
 
+# The in-app widget (SOURCE_APP) asks a different question than the email
+# thumbs - "how's the product overall?" vs. "was this one article good?" - so
+# it collects a 1-5 star rating instead of up/down. Stored in the same
+# `sentiment` column as its string digit ("1".."5") rather than a new column:
+# the column is already a free-form nullable string with no DB-level
+# constraint, and SOURCE_APP is the only source that ever writes a rating, so
+# there's no ambiguity reading it back.
+RATING_CHOICES = (1, 2, 3, 4, 5)
+
 # Where the reader was when they told us. Not derivable from the nullable FKs:
 # a digest-level thumb and a footer note both carry digest_id and no article_id.
 SOURCE_ARTICLE = "article"

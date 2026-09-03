@@ -10,7 +10,7 @@ from sqlalchemy.pool import StaticPool
 from newsagent.api.deps import get_db
 from newsagent.api.main import app
 from newsagent.config import settings
-from newsagent.models import Digest, DigestLink, User
+from newsagent.models import Digest, DigestLink, Feedback, User
 from newsagent.models.base import Base
 
 
@@ -198,3 +198,36 @@ def test_article_click_does_not_unsubscribe(
     user = db_session.get(User, 1)
     assert user is not None
     assert user.unsubscribed_at is None
+
+
+@pytest.fixture
+def feedback_up_link(db_session: Session, digest: Digest) -> DigestLink:
+    link = DigestLink(
+        digest_id=digest.id,
+        kind="feedback_up",
+        target_url=f"{settings.frontend_url}/?feedback=thanks",
+    )
+    db_session.add(link)
+    db_session.commit()
+    return link
+
+
+def test_feedback_click_returns_thanks_page_without_redirect(
+    client: TestClient, feedback_up_link: DigestLink
+) -> None:
+    # No session cookie/header is sent - this is the "reader isn't logged in
+    # on this device" case, and the page must render regardless (previously
+    # the confirmation lived behind `v-if="me"` in the frontend SPA).
+    resp = client.get(f"/c/{feedback_up_link.token}", follow_redirects=False)
+    assert resp.status_code == 200
+    assert "text/html" in resp.headers["content-type"]
+    assert "תודה" in resp.text
+
+
+def test_feedback_click_records_sentiment(
+    client: TestClient, db_session: Session, feedback_up_link: DigestLink
+) -> None:
+    client.get(f"/c/{feedback_up_link.token}", follow_redirects=False)
+    row = db_session.query(Feedback).one()
+    assert row.sentiment == "up"
+    assert row.digest_id == feedback_up_link.digest_id

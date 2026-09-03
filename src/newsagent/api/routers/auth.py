@@ -64,12 +64,24 @@ async def callback(request: Request, db: Session = Depends(get_db)) -> RedirectR
         return RedirectResponse(f"{settings.frontend_url}/?error=oauth_failed")
 
     userinfo = token.get("userinfo")
+    if userinfo:
+        # Keys only, never values (GH #62): this is a log line, not the place
+        # to print a reader's email/name.
+        logger.info("Google OAuth callback userinfo keys: %s", sorted(userinfo.keys()))
     email = userinfo.get("email") if userinfo else None
     if not email:
         return RedirectResponse(f"{settings.frontend_url}/?error=oauth_failed")
     name = userinfo.get("name") if userinfo else None
+    # isinstance guards: a malformed claim (non-string) should be dropped here
+    # rather than stored, same as first_name()'s read-side guard in models/user.py.
+    given_name = userinfo.get("given_name") if userinfo else None
+    given_name = given_name if isinstance(given_name, str) else None
+    family_name = userinfo.get("family_name") if userinfo else None
+    family_name = family_name if isinstance(family_name, str) else None
 
-    identity = auth.resolve_identity(db, email, name=name, cap=settings.max_users)
+    identity = auth.resolve_identity(
+        db, email, name=name, cap=settings.max_users, given_name=given_name, family_name=family_name
+    )
     if identity is None:
         # Brand-new email, but the registration cap is already full - leave a
         # real trace (FR11) instead of a dead-end sign-in attempt.

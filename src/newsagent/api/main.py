@@ -1,4 +1,5 @@
 import logging
+import os
 
 from fastapi import FastAPI, Response
 from sqlalchemy import text
@@ -51,7 +52,7 @@ def create_app() -> FastAPI:
 
     @app.get("/health")
     def health() -> dict[str, str]:
-        return {"status": "ok"}
+        return {"status": "ok", "commit": os.environ.get("GIT_SHA", "unknown")}
 
     @app.get("/health/db")
     def health_db(response: Response) -> dict[str, str]:

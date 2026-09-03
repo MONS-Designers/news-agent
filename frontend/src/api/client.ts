@@ -203,14 +203,11 @@ export async function getMyProfile(): Promise<Profile> {
   return request("/me/profile");
 }
 
-export async function submitFeedback(
-  sentiment: "up" | "down" | null,
-  text: string,
-): Promise<void> {
+export async function submitFeedback(rating: number | null, text: string): Promise<void> {
   await request("/me/feedback", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ sentiment, text: text || null }),
+    body: JSON.stringify({ rating, text: text || null }),
   });
 }
 

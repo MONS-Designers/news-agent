@@ -42,28 +42,50 @@ Delivery: daily email for MVP; WhatsApp is phase 2; a pull-model website was rej
 Open technical risk (unresolved, carried to build): how the agent judges source quality when
   discovering sources from a user's stated interests (vs. picking a random low-quality blog)
 
-## Content policy: digest images (documented 2026-08-16, not yet implemented)
+## Content policy: digest images (documented 2026-08-16, V1 decision implemented 2026-08-31)
 
 Rule: the digest must never include images of women. No exceptions.
 
-Status: **documented only, not implemented.** Today the pipeline does zero image content
-analysis - `extract_image_url` in `news-agent/src/newsagent/pipeline/fetcher.py` just pulls a
-URL from RSS metadata (`media:content` / `media:thumbnail` / an image enclosure), and
-`render.py` passes it straight to the digest template. Nothing inspects what's actually in the
-image.
+Status: **V1 - images dropped entirely (option 1 below), per issue #57.** `extract_image_url`
+in `news-agent/src/newsagent/pipeline/fetcher.py` still extracts and stores `Article.image_url`
+from RSS metadata (`media:content` / `media:thumbnail` / an image enclosure) - kept as-is so V2
+classifier work isn't blocked on re-adding extraction - but `render.py`'s `ArticleView` no
+longer carries `image_url`/`alt_text`, and `digest.html.j2` no longer renders a lead image.
+Digests are text-only regardless of what `Article.image_url` holds.
 
-Open implementation question, to resolve before building: an ML/vision classifier (e.g. AWS
-Rekognition, Google Vision) cannot guarantee zero exceptions - it will produce both false
-negatives (an image of a woman slips through) and false positives (a clean image gets blocked).
-Options discussed 2026-08-16:
+Open question, still unresolved, to pick before V2 brings images back: an ML/vision classifier
+(e.g. AWS Rekognition, Google Vision) cannot guarantee zero exceptions - it will produce both
+false negatives (an image of a woman slips through) and false positives (a clean image gets
+blocked). Options discussed 2026-08-16:
   1. Drop images from the digest entirely - the only way to satisfy "no exceptions" without
-     relying on classification accuracy.
+     relying on classification accuracy. **Chosen for V1.**
   2. Automated classification with a conservative threshold, as a best-effort first line of
      defense - not a true zero-exception guarantee.
   3. Manual admin approval per image before send - reliable but not automated, adds ongoing
      editorial workload.
-No approach has been chosen yet; pick one and update this section before implementing the
-filter.
+V2 approach (2 vs. 3) still undecided; pick one and update this section before re-adding image
+rendering.
+
+## Content policy: gender-neutral Hebrew copy (documented 2026-09-01, per issue #61)
+
+Rule: no user-facing Hebrew string may address the reader in a way that assumes their gender.
+Hebrew has no gender-neutral second-person present tense, so the trap is almost always a
+present-tense verb or an imperative aimed at "you" - not the words `אתה`/`את` in isolation.
+
+Technique - rewrite around the problem, never use slashed forms (`את/ה`) in prose:
+- Second-person **past** tense is spelled identically for both genders (`הצטרפת`, `סיפרת`,
+  `בחרת`) - prefer it over present tense.
+- `אליך`, `אותך`, `שלך`, `לך` are already neutral in writing.
+- Avoid bare imperatives (`בחר תחום קודם`, a button labeled just `אשר`) - use `יש ל` + infinitive
+  (`יש לבחור תחום קודם`), a noun phrase (`אישור`), or reword the state entirely.
+- Slashed forms stay acceptable only in taxonomy role names the reader picks for themselves
+  (`מהנדס/ת תוכנה`, in `services/taxonomy.py`'s `DEFAULT_ROLES`) - never in body copy.
+- `src/newsagent/pipeline/render.py`'s `_welcome_view` is the reference example.
+
+A regression guard scans for the most common offenders (`אתה `, `תוכל`, bare imperatives) in
+`.vue` files (`frontend/src/__tests__/gendered-copy.spec.ts`) and in the digest template
+(`tests/test_gendered_digest_copy.py`) - it's a targeted word-boundary scan, not a parser, so a
+genuinely new phrasing may need the denylist extended rather than the check silenced.
 
 ## Resolved drift (2026-08-07)
 

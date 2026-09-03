@@ -22,6 +22,16 @@ RUN npm ci
 COPY frontend/ .
 RUN npm run build
 
+# CAP-5 (spec-gitops-deploy-trigger): a static version.json, same shape as
+# the backend's /health commit field, so a deploy/rollback can be verified
+# against what's actually running rather than trusting a green build (both
+# environments track a fixed, reused ACR tag). Written into dist/ here (this
+# stage runs as root, no permission questions) so the single COPY below picks
+# it up like any other build asset -- no separate copy step, no nginx config
+# change needed. Defaults to "unknown" for any build that doesn't pass it.
+ARG GIT_SHA=unknown
+RUN echo "{\"commit\": \"$GIT_SHA\"}" > dist/version.json
+
 # --- Stage 2: serve -- only stage that ships ---
 FROM nginxinc/nginx-unprivileged:1.27-alpine AS serve
 

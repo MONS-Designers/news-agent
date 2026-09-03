@@ -7,7 +7,9 @@ for re-scoring. Scored exactly once: only pending/error articles enter, and the
 DB row is the cache. Per-article commit so progress survives crashes.
 """
 
+import contextvars
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 
 from sqlalchemy import func, select
@@ -17,7 +19,7 @@ from newsagent import telemetry
 from newsagent.config import settings
 from newsagent.llm.base import LLMProvider
 from newsagent.llm.errors import LLMError
-from newsagent.llm.types import ArticleInput, Refusal
+from newsagent.llm.types import ArticleInput, RelevanceScore, Refusal
 from newsagent.models import Article, Source, User, UserTopicPreference
 from newsagent.models.source import STATUS_APPROVED
 
@@ -76,6 +78,25 @@ def active_subscriber_count(db: Session, topic_ids: set[int]) -> int:
     )
 
 
+def _score_worker(
+    provider: LLMProvider,
+    article_input: ArticleInput,
+    topic_name: str,
+    article_id: int,
+) -> RelevanceScore | Refusal | LLMError:
+    """Runs off the main thread in the bounded ThreadPoolExecutor below.
+    Receives plain data only - the Session is never touched here (same
+    discipline as extract.py / GH #36's concurrent LLM calls). LLMError is
+    returned rather than raised so a slow/failed article can't abort the
+    others still in flight; the caller re-raises nothing, it just branches
+    on the return type once collected back on the main thread."""
+    with telemetry.attribute_call(telemetry.PURPOSE_FILTERING, article_id=article_id):
+        try:
+            return provider.score_relevance(article_input, topic_name)
+        except LLMError as error:
+            return error
+
+
 def filter_pending_articles(
     db: Session,
     provider: LLMProvider,
@@ -113,23 +134,49 @@ def filter_pending_articles(
     ) as run:
         report.run_id = run.run_id
         try:
-            for article in articles:
-                article_input = ArticleInput(
-                    title=article.title,
-                    text=article.rss_summary or article.title,
+            # Build every article's plain input on the main thread - nothing
+            # ORM-backed (article.source.topic access included) crosses into a
+            # worker thread, only strings/dataclasses do.
+            inputs = [
+                (
+                    ArticleInput(title=article.title, text=article.rss_summary or article.title),
+                    article.source.topic.name,
+                    article.id,
                 )
-                topic_name = article.source.topic.name
-                with telemetry.attribute_call(telemetry.PURPOSE_FILTERING, article_id=article.id):
-                    try:
-                        result = provider.score_relevance(article_input, topic_name)
-                    except LLMError as error:
+                for article in articles
+            ]
+
+            with ThreadPoolExecutor(max_workers=settings.filter_concurrency) as pool:
+                # contextvars (the open run above) do NOT propagate into pool
+                # workers on their own - copy_context() captures it per-submit
+                # so telemetry still attributes each call to this run.
+                future_to_article = {
+                    pool.submit(
+                        contextvars.copy_context().run,
+                        _score_worker,
+                        provider,
+                        article_input,
+                        topic_name,
+                        article_id,
+                    ): article
+                    for article, (article_input, topic_name, article_id) in zip(
+                        articles, inputs, strict=True
+                    )
+                }
+
+                # as_completed (not a fixed-order `.result()` pass) so each
+                # article commits the moment its own call finishes, not after
+                # the whole batch - a crash mid-run still only loses whichever
+                # calls hadn't landed yet, same guarantee the sequential loop
+                # gave, just no longer tied to submission order.
+                for future in as_completed(future_to_article):
+                    article = future_to_article[future]
+                    result = future.result()
+                    if isinstance(result, LLMError):
                         article.relevance_status = STATUS_ERROR
                         report.errors += 1
-                        logger.warning("Scoring failed for article %s: %s", article.id, error)
-                        db.commit()
-                        continue
-
-                    if isinstance(result, Refusal):
+                        logger.warning("Scoring failed for article %s: %s", article.id, result)
+                    elif isinstance(result, Refusal):
                         article.relevance_status = STATUS_REFUSED
                         report.refused += 1
                     else:

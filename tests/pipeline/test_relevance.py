@@ -2,6 +2,7 @@ import pytest
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
+from newsagent.config import settings
 from newsagent.llm.mock import MockLLMProvider
 from newsagent.models import Article, Source, Topic, User, UserTopicPreference
 from newsagent.models.base import Base
@@ -143,3 +144,28 @@ def test_run_id_is_populated_on_the_report(db: Session):
     add_article(db)
     report = filter_pending_articles(db, MockLLMProvider())
     assert report.run_id is not None
+
+
+# -- Bounded concurrency ------------------------------------------------------
+
+
+def test_concurrent_scoring_is_bounded_by_configured_limit(
+    db: Session, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setattr(settings, "filter_concurrency", 3)
+    add_article(db)
+
+    captured_max_workers = {}
+    from newsagent.pipeline import relevance as relevance_module
+
+    real_executor = relevance_module.ThreadPoolExecutor
+
+    def spying_executor(*, max_workers):
+        captured_max_workers["value"] = max_workers
+        return real_executor(max_workers=max_workers)
+
+    monkeypatch.setattr("newsagent.pipeline.relevance.ThreadPoolExecutor", spying_executor)
+
+    filter_pending_articles(db, MockLLMProvider())
+
+    assert captured_max_workers["value"] == 3

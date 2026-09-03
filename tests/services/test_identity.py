@@ -56,6 +56,23 @@ def test_register_user_if_capacity_creates_row_under_cap(db: Session):
     assert user.name == "Friend"
 
 
+def test_register_user_if_capacity_stores_given_and_family_name(db: Session):
+    """GH #62: the raw Google OAuth claims land on the row at creation."""
+    user = register_user_if_capacity(
+        db, "nagy@example.com", "Nagy János", cap=10, given_name="Nagy", family_name="János"
+    )
+    assert user is not None
+    assert user.given_name == "Nagy"
+    assert user.family_name == "János"
+
+
+def test_register_user_if_capacity_defaults_given_and_family_name_to_none(db: Session):
+    user = register_user_if_capacity(db, "plain@example.com", "Plain", cap=10)
+    assert user is not None
+    assert user.given_name is None
+    assert user.family_name is None
+
+
 def test_register_user_if_capacity_refuses_at_cap(db: Session):
     register_user_if_capacity(db, "first@example.com", None, cap=1)
     second = register_user_if_capacity(db, "second@example.com", None, cap=1)

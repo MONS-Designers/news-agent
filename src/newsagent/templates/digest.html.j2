@@ -7,6 +7,10 @@
 <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800;900&family=Gveret+Levin&display=swap" rel="stylesheet">
 </head>
 <body style="margin:0; padding:0; background-color:#1c2333; direction:rtl;">
+<!-- Preview text: shown by the inbox list next to the subject, not inside the
+     opened email. The padding entities keep clients from pulling in trailing
+     body text when the preheader itself is shorter than their preview slot. -->
+<div style="display:none; font-size:1px; line-height:1px; max-height:0; max-width:0; opacity:0; overflow:hidden; mso-hide:all;">{{ preheader_text }}&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#1c2333; padding:32px 0; direction:rtl;">
 <tr><td align="center">
 <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background-color:#0b1020; border-radius:16px; overflow:hidden; max-width:600px; width:100%; direction:rtl;">
@@ -75,17 +79,6 @@
 {% endif %}
 <tr><td style="padding:24px 32px 10px; direction:rtl; text-align:right;">
   <span style="display:inline-block; font-family:'Segoe UI',Arial,sans-serif; font-size:10px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:{{ article.topic_color }}; padding:5px 13px; border-radius:20px; border:1px solid {{ article.topic_color }};">{{ article.topic_label }}</span>
-  {% if article.image_url %}
-  <!-- Lead image: a blocked/broken image collapses to its padded grey alt-text
-       card (height:auto + styled alt) instead of leaving a white gap. #24 -->
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:14px 0 4px;">
-    <tr><td style="background-color:#141b32; border-radius:12px; padding:0;">
-      <a href="{{ article.url }}" style="text-decoration:none;">
-        <img src="{{ article.image_url }}" alt="{{ article.alt_text }}" width="536" style="display:block; width:100%; max-width:536px; height:auto; border-radius:12px; font-family:'Segoe UI',Arial,sans-serif; font-size:15px; font-weight:700; color:#a3adc4; line-height:1.5; padding:22px; box-sizing:border-box;">
-      </a>
-    </td></tr>
-  </table>
-  {% endif %}
   <div style="font-family:'Segoe UI',Arial,sans-serif; font-size:24px; font-weight:800; color:#ffffff; line-height:1.35; margin:14px 0 12px; letter-spacing:-.2px;">{{ article.title_he }}</div>
   {% for paragraph in article.paragraphs %}
   <p style="font-family:'Segoe UI',Arial,sans-serif; font-size:15.5px; color:#cfd7e8; line-height:1.75; margin:0 0 12px; direction:rtl; text-align:right;">{{ paragraph }}</p>
@@ -118,7 +111,7 @@
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid rgba(240,180,41,.28); border-radius:14px; background-color:rgba(240,180,41,.05);">
     <tr><td style="padding:20px 22px; text-align:center; direction:rtl;">
       <div style="font-family:'Segoe UI',Arial,sans-serif; font-size:14.5px; font-weight:600; color:#f4f6fb; margin-bottom:4px;">{% if welcome and not articles %}משהו על הדעת כבר עכשיו?{% elif welcome %}איך יצא הראשון?{% else %}איך היה השבוע?{% endif %}</div>
-      <div style="font-family:'Segoe UI',Arial,sans-serif; font-size:12.5px; color:#a3adc4; margin-bottom:14px;">{% if welcome and not articles %}אם יש נושא שחשוב לך שאכסה, זה הרגע להגיד.{% elif welcome %}אני עוד לומד אותך. לחיצה אחת עכשיו משנה את מה שיגיע בשבוע הבא.{% else %}הקבוצה שרואה את זה עדיין קטנה, אז כל לחיצה כאן נשמעת.{% endif %}</div>
+      <div style="font-family:'Segoe UI',Arial,sans-serif; font-size:12.5px; color:#a3adc4; margin-bottom:14px;">{% if welcome and not articles %}אם יש נושא שחשוב לך שאכסה, זה הרגע להגיד.{% elif welcome %}אני עוד לומד את התוכן שמתאים לך. לחיצה אחת עכשיו משנה את מה שיגיע בשבוע הבא.{% else %}זו ההזדמנות שלך להשפיע ולשפר את המערכת.{% endif %}</div>
       {# No thumbs without articles: there is nothing to rate yet, and the
          links are Digest-scoped tokens that do not exist in that render. #}
       {% if articles %}

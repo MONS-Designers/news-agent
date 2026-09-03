@@ -35,6 +35,14 @@ class Settings(BaseSettings):
     extraction_concurrency: int = 5
     extraction_user_agent: str = "NewsAgent/1.0 (+https://github.com/MONS-Designers/news-agent)"
 
+    # Bounded worker pools for the other network-bound stages, same reasoning
+    # as extraction_concurrency above: overlap I/O-bound calls instead of
+    # paying for them back-to-back, without unboundedly hammering RSS hosts
+    # or the LLM provider's own rate limit.
+    fetch_concurrency: int = 5
+    filter_concurrency: int = 5
+    summarize_concurrency: int = 5
+
     # Weighted digest ranking (issue #25): final_score = relevance_weight*relevance
     # + recency_weight*recency + interest_weight*interest. Weight trio sums to 1.0.
     relevance_weight: float = 0.40

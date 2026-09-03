@@ -155,7 +155,7 @@ const selectedField = computed(() =>
 const rolesLoading = ref(false);
 
 const rolePlaceholder = computed(() => {
-  if (!fieldSatisfied.value) return "בחר תחום קודם";
+  if (!fieldSatisfied.value) return "יש לבחור תחום קודם";
   if (rolesLoading.value) return "טוען תפקידים…";
   return null;
 });

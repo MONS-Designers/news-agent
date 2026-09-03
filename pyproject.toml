@@ -10,6 +10,9 @@ requires-python = ">=3.12"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+newsagent = ["templates/*.j2", "templates/assets/*.b64"]
+
 [tool.mypy]
 python_version = "3.12"
 packages = ["newsagent"]

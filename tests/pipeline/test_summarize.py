@@ -233,6 +233,28 @@ def test_an_article_is_never_summarized_twice(db: Session):
     assert provider.calls == 1
 
 
+def test_concurrent_summarizing_is_bounded_by_configured_limit(
+    db: Session, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setattr(settings, "summarize_concurrency", 3)
+    add_article(db)
+
+    captured_max_workers = {}
+    from newsagent.pipeline import summarize as summarize_module
+
+    real_executor = summarize_module.ThreadPoolExecutor
+
+    def spying_executor(*, max_workers):
+        captured_max_workers["value"] = max_workers
+        return real_executor(max_workers=max_workers)
+
+    monkeypatch.setattr("newsagent.pipeline.summarize.ThreadPoolExecutor", spying_executor)
+
+    summarize_relevant_articles(db, MockLLMProvider())
+
+    assert captured_max_workers["value"] == 3
+
+
 def test_extra_readers_on_the_same_topic_cost_nothing_extra(db: Session):
     """The case worth protecting: ten beta readers on one topic must not mean
     ten translations of the same story."""
