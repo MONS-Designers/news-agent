@@ -46,6 +46,14 @@ RUN pip install --no-cache-dir -r requirements.txt \
 # --- Stage 2: deploy -- only stage that ships ---
 FROM python:3.12-slim AS deploy
 
+# Baked in at build time (spec-gitops-deploy-trigger) -- exposed by /health
+# so a deploy/rollback can be verified against what's actually running, not
+# just against static App Service config (both environments track a fixed,
+# reused ACR tag rather than a tag that changes per push). Defaults to
+# "unknown" for any build that doesn't pass it (local dev, other contexts).
+ARG GIT_SHA=unknown
+ENV GIT_SHA=${GIT_SHA}
+
 RUN useradd --system --create-home --shell /usr/sbin/nologin newsagent
 
 WORKDIR /app
