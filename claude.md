@@ -97,6 +97,42 @@ from user interests remains **out**: RSS sources stay admin-curated; only the se
 Field/Role taxonomy has a user-facing "Other" suggestion path, reviewed by admins before
 promotion.
 
+## Infra: GH Environments exist but aren't wired up (documented 2026-09-06)
+
+`news-agent-infra` has two GitHub Environments (`stage`, `prod`) under Settings → Environments,
+each with its own Secrets (`NEWSAGENT_DATABASE_URL`, `NEWSAGENT_SESSION_SECRET`,
+`NEWSAGENT_GOOGLE_CLIENT_ID/SECRET`, `NEWSAGENT_SMTP_USERNAME/PASSWORD`,
+`EXTERNAL_LLM_AUTH_TOKEN`, `LOCAL_LLM_AUTH_TOKEN`) and Variables (`NEWSAGENT_FRONTEND_URL`,
+`NEWSAGENT_BACKEND_BASE_URL`, `NEWSAGENT_LOG_LEVEL`, `NEWSAGENT_MAX_USERS`, etc.).
+
+**These are currently orphaned - `deploy.yml` never reads them.** The job has no
+`environment:` key and no `${{ secrets.* }}`/`${{ vars.* }}` references; it only builds/pushes
+Docker images and restarts the App Service. The real source of truth for what the app actually
+runs with is **Terraform** (`news-agent-infra/terraform/main.tf`'s `app_settings` blocks),
+with secrets injected via Azure Key Vault references (`@Microsoft.KeyVault(SecretUri=...)`),
+not GH Secrets.
+
+Why this matters: don't assume setting a GH Environment secret/variable changes production
+behavior - it doesn't, unless `deploy.yml` is changed to consume it (not currently planned;
+Terraform+Key Vault is the better-established pattern here, no need to migrate).
+
+**Known discrepancies found while investigating a prod login 500 (2026-09-06)**, flagged to
+Moshe, not yet fixed (infra changes are his to make):
+- Terraform's prod `NEWSAGENT_FRONTEND_URL`/`NEWSAGENT_BACKEND_BASE_URL` use the App Service's
+  raw `default_hostname` (`*.azurewebsites.net`), not the real custom domain
+  (`newsagent-ai.com` / `api.newsagent-ai.com`, confirmed mapped in Azure, outside Terraform).
+- `NEWSAGENT_SESSION_COOKIE_DOMAIN` doesn't appear anywhere in `main.tf` - needed as
+  `.newsagent-ai.com` on prod per `config.py`'s split-subdomain cookie logic, since frontend
+  and backend are on different subdomains of the same parent domain.
+- Open question for Moshe: does the custom domain actually serve HTTPS? Google OAuth's
+  registered redirect URI must match the scheme exactly - if `frontend_url` ends up computed
+  as `http://` while Google has `https://` registered (or vice versa), the callback breaks.
+- Separately (same investigation): production was pointed at the wrong Neon DB branch (the
+  TEST one) until 2026-09-06, and `newsagent/src/newsagent/db.py`'s engine lacked
+  `pool_pre_ping`, causing `SSL connection has been closed unexpectedly` 500s on requests after
+  Neon closed an idle connection - both fixed (connection string fixed directly in
+  Azure/Terraform by Nomi; `pool_pre_ping=True` added in `news-agent` commit `b124d3e`).
+
 ## Cross-repo integration
 
 Before hardcoding or changing anything that assumes a particular deployment topology (API base

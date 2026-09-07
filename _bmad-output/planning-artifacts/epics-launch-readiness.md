@@ -44,7 +44,7 @@ is out.
 
 FR1: A visitor whose email matches no existing `Admin` or `User` row can sign in with Google and have a `User` row created automatically on first successful authentication, with no admin action and no separate registration form.
 FR2: Self-registration is capped at a configurable maximum number of users (10 at launch). Once the cap is reached, a first-time sign-in is refused; users who already have an account are never affected by the cap.
-FR3: The cap check and the user-row insert are atomic - two concurrent first-time sign-ins can never both pass the check and push the total past the cap.
+FR3: The cap check and the user-row insert are atomic - two concurrent first-time sign-ins can never both pass the check and push the total past the cap. Atomicity is a property of the SQL statement itself; the application-level code that reports the outcome of that statement must be independently correct (see sprint-change-proposal-2026-09-07.md) - the statement can be perfectly atomic while the caller still misreports whether it succeeded.
 FR4: The pipeline can deliver a digest through a real email provider selected by the existing `NEWSAGENT_EMAIL_SENDER` configuration value, with no change to `pipeline/send.py` or any other pipeline module.
 FR5: For an article that has already passed relevance filtering, the system fetches the source page and extracts the full article text, storing it in the existing `Article.full_text` column before the summarize stage runs.
 FR6: Full-text extraction failure is non-fatal: the article keeps a null `full_text`, `summarize` falls back to `rss_summary` exactly as it does today, and the run continues.
@@ -93,6 +93,7 @@ UX-DR7: Touch-target sizing across the picker meets a minimum tap area, alongsid
 - **OQ1 - What does user #11 see? RESOLVED 2026-08-07.** A message-only capacity screen was rejected: "אין טעם לאפשר למשתמש לבצע לוגין לחינם, אלא אם כן ניתן להכניס אותו לרשימת המתנה" - if the login can't result in an account, it must at least result in a captured waitlist entry. `FR11` added. Admin visibility into the waitlist (a list view, a manual promote-from-waitlist action) is deliberately deferred as a fast-follow, not built in this epic - DB storage only for launch.
 - **OQ2 - Does relevance ever get the full text?** Extraction currently must run after relevance filtering, precisely so full-text fetching is limited to articles worth fetching. That means relevance is permanently judged on an RSS snippet - sometimes on a headline alone. Accepted for this epic, but it caps how good relevance can get, and a future re-score pass after extraction is the obvious lever.
 - **OQ3 - Is the 8s budget met by concurrency alone?** `#36` measures the two calls at ~11.4s and ~14.0s, both against `LOCAL_LLM_BASE_URL` pointed at a remote OpenRouter model (`local` names a config, not a physical machine - see AD-3). Concurrency alone yields ~14s, still above NFR2's 8 seconds. **RESOLVED for this epic (2026-08-07):** self-hosted-on-own-hardware inference is deliberately deferred to a later stage - it mainly removes the network hop, not the compute time, and needs its own hardware/ops decision this epic doesn't own. NFR2 must be met within this epic by the levers that don't wait on hardware: a smaller/faster model on the existing remote provider, prompt/context trimming, and/or partial rendering (surface Role suggestions as soon as they arrive instead of blocking on both calls).
+- **OQ4 - Should Waitlist merge into User via a status column? OPEN, raised 2026-09-07** alongside the rowcount bug fix. Nomi wants single-table user management (direct DB approve/promote, no delete-from-one-insert-into-other for waitlist promotion). Trade-off: a separate table makes "a waitlist row can never accidentally count as a user" structurally guaranteed; a merged table makes it convention-dependent unless backed by a DB check constraint, a partial/functional index the count query itself relies on, or a single centralized counting function enforced by code review - see sprint-change-proposal-2026-09-07.md section 3.2 for the options table. Not decided here. If approved, requires a new epic/story (not part of Epic A's original scope) and a new Alembic migration (AD-4), and should not start before the historical duplicate User+Waitlist rows are reconciled (Nomi handling separately). Tracked as [news-agent#75](https://github.com/MONS-Designers/news-agent/issues/75).
 
 ### FR Coverage Map
 
@@ -315,6 +316,10 @@ So that I don't need Nomi to manually add me before I can use the product.
 **When** it is made
 **Then** no `User` row can be created - row creation happens only inside `resolve_identity`, reached only from a successful Google auth callback, never from any other code path (NFR4's "the cap is the only admission control" holds only if nothing else can create a row)
 
+**Given** the atomic INSERT...SELECT...WHERE statement in register_user_if_capacity executes successfully against the configured database (Postgres via Neon's pooler in production/STAGE, SQLite in tests)
+**When** the caller determines whether the insert actually happened
+**Then** that determination does not rely on the DBAPI's `rowcount` for this statement shape - `rowcount` is documented as driver/pooler-dependent and has been observed to return -1 (a successful-but-indeterminate value) for this exact statement against psycopg+Neon's pooler even when the row was inserted - the outcome must be read back explicitly (e.g. RETURNING, or a follow-up SELECT within the same transaction) so the result is correct regardless of driver or pooler behavior *(added 2026-09-07, per sprint-change-proposal-2026-09-07.md#4.1 - fixes a confirmed bug where a successful registration was misreported as cap-full)*
+
 ### Story A.2: Waitlist capture when the cap is full
 
 As a visitor who arrives after the cap is full,
@@ -338,6 +343,10 @@ So that there's a chance I get invited when a slot opens up.
 **Given** the waitlist is stored in the DB
 **When** this epic is done
 **Then** there is no admin screen to view it - that is a declared fast-follow, not a forgotten gap
+
+**Given** resolve_identity determines whether a brand-new email was successfully registered or should be waitlisted
+**When** that determination is made
+**Then** it must never route an email whose User row was actually just created to the waitlist path - this story's AC1 ("my email...is saved to a new waitlist table") is violated whenever a real registration is misclassified as a waitlist arrival *(added 2026-09-07, per sprint-change-proposal-2026-09-07.md#4.2 - depends on Story A.1's new outcome-detection AC above)*
 
 ### Story A.3: First-run state for a freshly self-registered user
 

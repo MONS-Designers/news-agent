@@ -46,8 +46,8 @@ def register_user_if_capacity(
     count is still under `cap` - and do it atomically (FR3): the count check
     and the insert are one SQL statement (INSERT...SELECT...WHERE), not a
     separate count-then-insert from the application. Two concurrent callers
-    racing for the last slot can never both succeed; SQLite's single-writer
-    lock is held for the whole statement, so the second caller's subquery
+    racing for the last slot can never both succeed - the statement is a
+    single atomic unit regardless of dialect, so the second caller's subquery
     only runs after the first has committed and is already reflected in it.
 
     `given_name`/`family_name` (GH #62) are the raw Google OAuth claims,
@@ -56,6 +56,13 @@ def register_user_if_capacity(
     Returns the created User, or None if the cap was already full. Callers
     are expected to have already ruled out an existing Admin/User match for
     this email (this function does not check for that itself).
+
+    Whether the conditional insert actually happened is read back via
+    `RETURNING`, not `result.rowcount` - `rowcount` is documented as
+    driver/pooler-dependent and was confirmed to come back -1 (indeterminate)
+    for this exact statement shape against psycopg + Neon's pooler even when
+    the row was inserted successfully, which silently misreported a
+    successful registration as "cap full".
     """
     normalized = email.strip().lower()
     stmt = insert(User).from_select(
@@ -63,9 +70,9 @@ def register_user_if_capacity(
         select(literal(normalized), literal(name), literal(given_name), literal(family_name)).where(
             select(func.count()).select_from(User).scalar_subquery() < cap
         ),
-    )
-    result = db.execute(stmt)
+    ).returning(User.id)
+    inserted_id = db.execute(stmt).scalar_one_or_none()
     db.commit()
-    if result.rowcount != 1:  # type: ignore[attr-defined]
+    if inserted_id is None:
         return None
-    return db.scalar(select(User).where(User.email == normalized))
+    return db.get(User, inserted_id)

@@ -13,7 +13,14 @@ from dataclasses import dataclass
 # `purpose` values (spine's Consistency Conventions) - call sites pass one of
 # these constants, never a free-form string, so a typo can't silently create
 # a new, unindexed category.
+# One call per article (relevance.py's _score_worker): score_relevance
+# scores the article against its source's topic - the only work in this
+# purpose is producing that single relevance score.
 PURPOSE_FILTERING = "FILTERING"
+# One call per article (summarize.py's _summarize_worker): provider.summarize
+# returns title translation, body summary/translation, source_language,
+# paragraph split, reading time, and interestingness all at once - one HTTP
+# attempt (AD-13's row unit) bundling several outputs, not several calls.
 PURPOSE_SUMMARIZING = "SUMMARIZING"
 PURPOSE_DIGEST_VOICE = "DIGEST_VOICE"
 PURPOSE_SUGGEST_TOPICS = "SUGGEST_TOPICS"

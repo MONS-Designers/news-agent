@@ -79,6 +79,27 @@ def test_register_user_if_capacity_refuses_at_cap(db: Session):
     assert second is None
 
 
+def test_register_user_if_capacity_ignores_unreliable_rowcount(db: Session, monkeypatch: pytest.MonkeyPatch):
+    """Regression for a bug confirmed live against Neon's pooler: `rowcount` came
+    back -1 (indeterminate) for this statement shape even when the insert
+    succeeded, and the old code's `rowcount != 1` check treated that the same
+    as "cap full" - silently registering the user while also reporting failure
+    (which then incorrectly waitlisted someone who already had an account).
+
+    SQLite's own `rowcount` is accurate for this statement, so it never
+    exercises this path on its own - the monkeypatch forces the exact
+    indeterminate value observed against the real driver/pooler.
+    """
+    from sqlalchemy.engine.cursor import CursorResult
+
+    monkeypatch.setattr(CursorResult, "rowcount", property(lambda self: -1))
+
+    user = register_user_if_capacity(db, "flaky-driver@example.com", "Flaky", cap=10)
+
+    assert user is not None
+    assert user.email == "flaky-driver@example.com"
+
+
 def test_register_user_if_capacity_boundary_exact_cap(db: Session):
     # cap=2: two slots total, both fill, third is refused.
     a = register_user_if_capacity(db, "a@example.com", None, cap=2)
