@@ -106,20 +106,19 @@ import {
   getMySubscription,
   listMyPreferences,
   updateMySubscription,
-  type Profile,
   type Subscription,
-  type TopicPreference,
 } from "@/api/client";
 import HybridDepthBackground from "@/components/HybridDepthBackground.vue";
 import HybridSpinner from "@/components/HybridSpinner.vue";
 import ProfilePickerShell from "@/components/profile-picker/ProfilePickerShell.vue";
 import { DIGEST_NOUN_WEEKLY } from "@/branding";
+import { profileDraft as profile, preferencesDraft as preferences, initProfileDraft } from "@/profile-draft";
 
 // Reused verbatim from TopicsStep.vue / AboutYouStep.vue (see those files) -
 // the edit-profile button and the topics-stale alert's action button.
 const BTN_BASE =
   "inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-[10px] border-0 text-[13.5px] font-semibold [font-family:inherit] [transition:transform_0.18s_ease] motion-reduce:transition-none active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-hd-accent-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:active:scale-100";
-const BTN_PRIMARY = `${BTN_BASE} px-[22px] py-[11px] bg-gradient-to-b from-[#7b86ff] to-[#5c68e8] text-white shadow-[0_10px_24px_-10px_rgba(109,123,255,0.6)] disabled:opacity-35 disabled:shadow-none`;
+const BTN_PRIMARY = `${BTN_BASE} px-[22px] py-[11px] [background-image:linear-gradient(to_bottom_in_oklch,_#5460ff,_#261761)] text-white shadow-[0_10px_24px_-10px_rgba(109,123,255,0.6)] disabled:opacity-35 disabled:shadow-none`;
 
 // New combo (no existing button-secondary in the codebase yet) - bordered/
 // unfilled, between BTN_GHOST (too weak) and BTN_PRIMARY (too heavy), for
@@ -138,8 +137,6 @@ const TOPIC_PICKED =
   "border-hd-accent-2/50 bg-gradient-to-b from-hd-accent-2/22 to-hd-accent-2/[0.09] text-white";
 const TOPIC_READONLY_PICKED = `${TOPIC_BASE_READONLY} ${TOPIC_PICKED}`;
 
-const preferences = ref<TopicPreference[]>([]);
-const profile = ref<Profile | null>(null);
 const subscription = ref<Subscription | null>(null);
 const subscriptionSaving = ref(false);
 const loading = ref(true);
@@ -175,8 +172,7 @@ async function loadPreferences() {
       getMyProfile(),
       getMySubscription(),
     ]);
-    preferences.value = prefs;
-    profile.value = prof;
+    initProfileDraft(prof, prefs);
     subscription.value = sub;
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) {

@@ -8,8 +8,11 @@
       <span class="text-[11px] font-bold uppercase tracking-[2px] text-hd-label">תחומי עניין </span>
     </div>
 
+    <div v-if="promptsLoading" class="mb-3 flex items-center gap-2 text-[12.5px] text-hd-subtitle">
+      <HybridSpinner size="inline" /> טעינת הצעות…
+    </div>
     <div
-      v-if="promptSuggestions.length"
+      v-else-if="promptSuggestions.length"
       class="mb-3 flex flex-wrap gap-2"
       role="group"
       aria-label="דוגמאות להשראה"
@@ -48,7 +51,9 @@
 
 <script setup lang="ts">
 import { watch, ref, onMounted } from "vue";
-import { getMyProfile, getPromptSuggestions, updateMyProfile } from "@/api/client";
+import { getPromptSuggestions, updateMyProfile } from "@/api/client";
+import HybridSpinner from "@/components/HybridSpinner.vue";
+import { profileDraft, patchProfileDraft } from "@/profile-draft";
 
 const props = defineProps<{ active: boolean }>();
 const emit = defineEmits<{ continue: []; back: [] }>();
@@ -57,23 +62,18 @@ const interestFreeText = ref("");
 const saving = ref(false);
 const saveError = ref("");
 const promptSuggestions = ref<string[]>([]);
+const promptsLoading = ref(false);
 
 const BTN_BASE =
   "inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-[10px] border-0 text-[13.5px] font-semibold [font-family:inherit] [transition:transform_0.18s_ease] motion-reduce:transition-none active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-hd-accent-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:active:scale-100";
-const BTN_PRIMARY = `${BTN_BASE} px-[22px] py-[11px] bg-gradient-to-b from-[#7b86ff] to-[#5c68e8] text-white shadow-[0_10px_24px_-10px_rgba(109,123,255,0.6)] disabled:opacity-35 disabled:shadow-none`;
+const BTN_PRIMARY = `${BTN_BASE} px-[22px] py-[11px] [background-image:linear-gradient(to_bottom_in_oklch,_#5460ff,_#261761)] text-white shadow-[0_10px_24px_-10px_rgba(109,123,255,0.6)] disabled:opacity-35 disabled:shadow-none`;
 const BTN_GHOST = `${BTN_BASE} px-2 py-[11px] bg-transparent text-hd-label [@media(hover:hover)]:[&:hover:not(:disabled)]:text-hd-chip disabled:opacity-35`;
 
 let initialText = "";
 
-onMounted(async () => {
-  try {
-    const profile = await getMyProfile();
-    interestFreeText.value = profile.interest_free_text ?? "";
-    initialText = interestFreeText.value;
-  } catch {
-    // Best-effort pre-fill only - a failure here just means the textarea
-    // starts blank, same as today's behavior, not a blocking error.
-  }
+onMounted(() => {
+  interestFreeText.value = profileDraft.value?.interest_free_text ?? "";
+  initialText = interestFreeText.value;
 });
 
 // Prompts are generated server-side from Field/Role/Experience Bucket
@@ -101,22 +101,19 @@ watch(
   () => props.active,
   async (newActive: boolean) => {
     if (!newActive) return;
-    let profile;
-    try {
-      profile = await getMyProfile();
-    } catch {
-      // Can't tell whether Field/Role changed - leave existing prompts (if
-      // any) as-is rather than clearing on an inconclusive check.
-      return;
-    }
+    const profile = profileDraft.value;
+    if (!profile) return; // shouldn't happen - profileDraft is seeded before this step can ever activate
     const key = profileKey(profile);
     if (key === lastPromptsProfileKey) return; // unchanged - keep current chips, skip the fetch entirely
     promptSuggestions.value = [];
+    promptsLoading.value = true;
     try {
       promptSuggestions.value = (await getPromptSuggestions()).slice(0, 3);
       lastPromptsProfileKey = key;
     } catch {
       promptSuggestions.value = [];
+    } finally {
+      promptsLoading.value = false;
     }
   }
 );
@@ -138,6 +135,7 @@ async function advance() {
   try {
     await updateMyProfile({ interestFreeText: text });
     initialText = text;
+    patchProfileDraft({ interest_free_text: text });
     emit("continue");
   } catch {
     saveError.value = "השמירה נכשלה. ניתן לבדוק את החיבור ולנסות שוב.";

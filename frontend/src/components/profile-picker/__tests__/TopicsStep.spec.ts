@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import TopicsStep from "../TopicsStep.vue";
+import { preferencesDraft } from "@/profile-draft";
 
 const push = vi.fn();
 vi.mock("vue-router", () => ({
@@ -8,11 +9,9 @@ vi.mock("vue-router", () => ({
 }));
 
 const getTopicSuggestions = vi.fn();
-const listMyPreferences = vi.fn();
 const updateMyPreferences = vi.fn();
 vi.mock("@/api/client", () => ({
   getTopicSuggestions: (...args: unknown[]) => getTopicSuggestions(...args),
-  listMyPreferences: (...args: unknown[]) => listMyPreferences(...args),
   updateMyPreferences: (...args: unknown[]) => updateMyPreferences(...args),
 }));
 
@@ -31,9 +30,8 @@ function mountStep() {
 beforeEach(() => {
   push.mockClear();
   getTopicSuggestions.mockReset();
-  listMyPreferences.mockReset();
   updateMyPreferences.mockReset();
-  listMyPreferences.mockResolvedValue(PREFS);
+  preferencesDraft.value = PREFS.map((p) => ({ ...p }));
 });
 
 afterEach(() => {
@@ -41,7 +39,43 @@ afterEach(() => {
 });
 
 describe("TopicsStep - happy path", () => {
-  it("renders every suggestion but pre-picks only the real topics", async () => {
+  it("renders picked chips instantly from preferencesDraft, with no loading state, before the suggestion poll resolves", async () => {
+    let resolveSuggestions: (v: unknown) => void = () => {};
+    getTopicSuggestions.mockReturnValue(new Promise((resolve) => (resolveSuggestions = resolve)));
+    const wrapper = mountStep();
+    await flushPromises();
+
+    // Subscribed-first fallback, rendered synchronously from preferencesDraft.
+    const buttons = wrapper.findAll('[role="group"] button');
+    expect(buttons).toHaveLength(5);
+    const pressed = buttons.filter((b) => b.attributes("aria-pressed") === "true");
+    expect(pressed.map((b) => b.text())).toEqual(
+      expect.arrayContaining([expect.stringContaining("AI"), expect.stringContaining("Cloud")]),
+    );
+    expect(pressed).toHaveLength(2);
+    // No blocking loading text anywhere.
+    expect(wrapper.text()).not.toContain("מוצא הצעות בשבילך");
+
+    resolveSuggestions({ suggestion_status: "ready", suggested_topic_ids: [1], suggested_new_topic_names: [] });
+    await flushPromises();
+  });
+
+  it("shows a small candidates-loading indicator while the suggestion poll is in flight, that clears once it resolves", async () => {
+    let resolveSuggestions: (v: unknown) => void = () => {};
+    getTopicSuggestions.mockReturnValue(new Promise((resolve) => (resolveSuggestions = resolve)));
+    const wrapper = mountStep();
+    await flushPromises();
+
+    expect(wrapper.text()).toContain("חיפוש הצעות נוספות…");
+    expect(wrapper.find("svg").exists()).toBe(true);
+
+    resolveSuggestions({ suggestion_status: "ready", suggested_topic_ids: [1], suggested_new_topic_names: [] });
+    await flushPromises();
+
+    expect(wrapper.text()).not.toContain("חיפוש הצעות נוספות…");
+  });
+
+  it("upgrades to the curated suggestion set once ready, pre-picking only the real topics", async () => {
     getTopicSuggestions.mockResolvedValue({
       suggestion_status: "ready",
       suggested_topic_ids: [1, 2, 3],
@@ -56,6 +90,40 @@ describe("TopicsStep - happy path", () => {
     expect(pressed).toHaveLength(3);
     expect(buttons[3].text()).toContain("Robotics");
     expect(buttons[3].attributes("aria-pressed")).toBe("false");
+  });
+
+  it("does not overwrite a manual pick made while the suggestion poll is still in flight", async () => {
+    let resolveSuggestions: (v: unknown) => void = () => {};
+    getTopicSuggestions.mockReturnValue(new Promise((resolve) => (resolveSuggestions = resolve)));
+    const wrapper = mountStep();
+    await flushPromises();
+
+    // Fallback chips are already interactive - the user picks one before the
+    // background poll (still pending) ever resolves.
+    const securityChip = wrapper.findAll('[role="group"] button').find((b) => b.text().includes("Security"))!;
+    await securityChip.trigger("click");
+    expect(securityChip.attributes("aria-pressed")).toBe("true");
+
+    resolveSuggestions({
+      suggestion_status: "ready",
+      suggested_topic_ids: [4, 5],
+      suggested_new_topic_names: [],
+    });
+    await flushPromises();
+
+    // The picks must not have been swapped out from under the user: the
+    // fallback's own picks (AI, Cloud - subscribed) plus the manual add
+    // (Security) all stand; the suggestion result's picks (Mobile/Data,
+    // topic ids 4/5) never got applied.
+    const buttons = wrapper.findAll('[role="group"] button');
+    const pressedNames = buttons
+      .filter((b) => b.attributes("aria-pressed") === "true")
+      .map((b) => b.text());
+    expect(pressedNames.some((t) => t.includes("AI"))).toBe(true);
+    expect(pressedNames.some((t) => t.includes("Cloud"))).toBe(true);
+    expect(pressedNames.some((t) => t.includes("Security"))).toBe(true);
+    expect(pressedNames.some((t) => t.includes("Mobile"))).toBe(false);
+    expect(pressedNames.some((t) => t.includes("Data"))).toBe(false);
   });
 
   it("never auto-picks an invented topic, even when real ones don't fill the cap", async () => {
@@ -128,18 +196,36 @@ describe("TopicsStep - happy path", () => {
     expect(wrapper.emitted("saved")).toBeTruthy();
     expect(push).toHaveBeenCalledWith("/");
   });
-});
 
-describe("TopicsStep - unhappy path / edge cases", () => {
-  it("shows a load error and disables Save when both calls fail", async () => {
-    getTopicSuggestions.mockRejectedValue(new Error("network down"));
-    listMyPreferences.mockRejectedValue(new Error("network down"));
+  it("can save immediately, before the suggestion poll resolves, using the instantly-rendered picked chips", async () => {
+    getTopicSuggestions.mockReturnValue(new Promise(() => {})); // never resolves
+    updateMyPreferences.mockResolvedValue(PREFS);
     const wrapper = mountStep();
     await flushPromises();
 
-    expect(wrapper.text()).toContain("טעינת הנושאים נכשלה");
-    const saveButton = wrapper.findAll("button").find((b) => b.attributes("disabled") !== undefined);
-    expect(saveButton).toBeTruthy();
+    const saveButton = wrapper.findAll("button").find((b) => b.text().includes("אני רוצה לקבל"))!;
+    expect(saveButton.attributes("disabled")).toBeUndefined();
+    await saveButton.trigger("click");
+    await flushPromises();
+
+    expect(updateMyPreferences).toHaveBeenCalledWith([1, 3], []); // AI, Cloud - the subscribed fallback picks
+    expect(push).toHaveBeenCalledWith("/");
+  });
+});
+
+describe("TopicsStep - unhappy path / edge cases", () => {
+  it("keeps the already-rendered fallback chips, with no error banner, when the suggestion poll fails", async () => {
+    getTopicSuggestions.mockRejectedValue(new Error("network down"));
+    const wrapper = mountStep();
+    await flushPromises();
+
+    expect(wrapper.text()).not.toContain("נכשל");
+    const buttons = wrapper.findAll('[role="group"] button');
+    expect(buttons).toHaveLength(5);
+    const pressed = buttons.filter((b) => b.attributes("aria-pressed") === "true");
+    expect(pressed).toHaveLength(2);
+    const saveButton = wrapper.findAll("button").find((b) => b.text().includes("אני רוצה לקבל"))!;
+    expect(saveButton.attributes("disabled")).toBeUndefined();
   });
 
   it("falls back to current subscriptions (subscribed-first) when suggestions come back failed", async () => {
@@ -175,7 +261,7 @@ describe("TopicsStep - unhappy path / edge cases", () => {
   });
 
   it("falls back to all topics (no subscriptions to prefer) when nothing is subscribed", async () => {
-    listMyPreferences.mockResolvedValue(PREFS.map((p) => ({ ...p, subscribed: false })));
+    preferencesDraft.value = PREFS.map((p) => ({ ...p, subscribed: false }));
     getTopicSuggestions.mockResolvedValue({
       suggestion_status: "failed",
       suggested_topic_ids: null,

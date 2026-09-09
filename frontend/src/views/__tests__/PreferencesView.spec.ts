@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import PreferencesView from "../PreferencesView.vue";
 import { ApiError } from "@/api/client";
+import { profileDraft, preferencesDraft } from "@/profile-draft";
 
 const listMyPreferences = vi.fn();
 const getMyProfile = vi.fn();
@@ -67,6 +68,15 @@ describe("PreferencesView - happy path", () => {
 
     await flushPromises();
     expect(wrapper.text()).not.toContain("טעינה…");
+  });
+
+  it("seeds the shared profile-draft store (initProfileDraft) with the fetched profile and preferences", async () => {
+    getMyProfile.mockResolvedValue(RETURNING_PROFILE);
+    mountView();
+    await flushPromises();
+
+    expect(profileDraft.value).toEqual(RETURNING_PROFILE);
+    expect(preferencesDraft.value).toEqual(PREFS);
   });
 
   it("shows the returning-user summary with subscribed topics and profile fields", async () => {

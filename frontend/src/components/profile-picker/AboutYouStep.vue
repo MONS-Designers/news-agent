@@ -59,13 +59,13 @@
       <p v-if="saveError" class="text-xs text-hd-subtitle">{{ saveError }}</p>
       <button
         type="button"
-        class="inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center gap-2 rounded-[10px] border-0 bg-gradient-to-b from-[#7b86ff] to-[#5c68e8] px-[22px] py-[11px] text-[13.5px] font-semibold text-white [font-family:inherit] [transition:transform_0.18s_ease] motion-reduce:transition-none shadow-[0_10px_24px_-10px_rgba(109,123,255,0.6)] active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-hd-accent-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-35 disabled:shadow-none disabled:active:scale-100"
+        class="inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center gap-2 rounded-[10px] border-0 [background-image:linear-gradient(to_bottom_in_oklch,_#5460ff,_#261761)] px-[22px] py-[11px] text-[13.5px] font-semibold text-white [font-family:inherit] [transition:transform_0.18s_ease] motion-reduce:transition-none shadow-[0_10px_24px_-10px_rgba(109,123,255,0.6)] active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-hd-accent-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-35 disabled:shadow-none disabled:active:scale-100"
         :class="{ disabled: !canContinue }"
         :disabled="!canContinue || saving"
         @click="onContinue"
       >
         <HybridSpinner v-if="rolesLoading" size="inline" />
-        {{ rolesLoading ? "טעינה…" : saving ? "שמירה..." : "המשך" }}
+        {{ rolesLoading ? "טעינה…" : saving ? "שומר…" : "המשך" }}
       </button>
     </div>
   </div>
@@ -75,14 +75,8 @@
 import { computed, onMounted, ref, watch } from "vue";
 import HybridSpinner from "@/components/HybridSpinner.vue";
 import ChipRow from "./ChipRow.vue";
-import {
-  getMyProfile,
-  listFields,
-  listRoles,
-  updateMyProfile,
-  type FieldOption,
-  type RoleOption,
-} from "@/api/client";
+import { listFields, listRoles, updateMyProfile, type FieldOption, type RoleOption } from "@/api/client";
+import { profileDraft, patchProfileDraft } from "@/profile-draft";
 
 const emit = defineEmits<{ continue: [] }>();
 
@@ -176,11 +170,21 @@ watch([fieldName, fieldIsOther], async () => {
   const token = ++rolesFetchToken;
   const rolePrefill = pendingRolePrefill.value;
   pendingRolePrefill.value = null;
+  const isPrefill = rolePrefill !== null;
 
-  roleName.value = null;
+  // A prefill already knows its Role from the saved profile - show it right
+  // away rather than blanking the row while the (Field-scoped) Role list
+  // reloads. A genuine user-initiated Field change still clears it, since the
+  // previous Field's Role no longer belongs to anything.
+  roleName.value = isPrefill ? rolePrefill : null;
   roleIsOther.value = false;
   roleOtherText.value = "";
   roles.value = [];
+  // Snapshot-able immediately: the Role shown above is already valid, so
+  // Continue must not wait on the background refresh below to know "nothing
+  // changed" (see the hard-gate below, which only applies to a genuine
+  // change).
+  if (isPrefill) captureSnapshot();
 
   const field = selectedField.value;
   if (!field) {
@@ -188,35 +192,35 @@ watch([fieldName, fieldIsOther], async () => {
     // otherwise never reach its own `finally` (its token no longer matches),
     // leaving the "טוען תפקידים…" placeholder stuck on forever.
     rolesLoading.value = false;
-    if (rolePrefill !== null) captureSnapshot(); // "Other" Field pre-fill, no Role row to resolve
     return; // an "Other" Field has no curated roles by definition
   }
 
   // The Role fetch now merges in an LLM call (Role and Prompt Suggestions
   // story), so it can take noticeably longer than the old DB-only read -
-  // without this, the row just looks empty/broken for that stretch.
-  rolesLoading.value = true;
+  // without this, the row just looks empty/broken for that stretch. A
+  // prefill's Role is already shown and snapshotted above, so only a genuine
+  // user-initiated Field change hard-gates Continue on this fetch.
+  if (!isPrefill) rolesLoading.value = true;
   try {
     const fetched = await listRoles(field.id);
     if (token === rolesFetchToken) {
       roles.value = fetched;
-      if (rolePrefill !== null) {
+      if (isPrefill) {
         const match = fetched.find((r) => r.name === rolePrefill);
-        if (match) {
-          roleName.value = match.name;
-          roleIsOther.value = false;
-        } else {
+        if (!match) {
           roleName.value = rolePrefill;
           roleIsOther.value = true;
           roleOtherText.value = rolePrefill;
         }
-        captureSnapshot();
       }
     }
   } catch {
-    if (token === rolesFetchToken) loadError.value = true;
+    // A prefill's background-refresh failure is silent - the Role shown
+    // (already snapshotted above) is already valid. Only a genuine change's
+    // fetch failure surfaces loadError.
+    if (!isPrefill && token === rolesFetchToken) loadError.value = true;
   } finally {
-    if (token === rolesFetchToken) rolesLoading.value = false;
+    if (!isPrefill && token === rolesFetchToken) rolesLoading.value = false;
   }
 });
 
@@ -229,6 +233,11 @@ async function onContinue() {
     initialSnapshot.value.role === effectiveRole() &&
     initialSnapshot.value.experienceBucket === experienceBucket.value
   ) {
+    patchProfileDraft({
+      field_name: effectiveField(),
+      role_name: effectiveRole(),
+      experience_bucket: experienceBucket.value,
+    });
     emit("continue");
     return;
   }
@@ -244,6 +253,11 @@ async function onContinue() {
       experienceBucket: experienceBucket.value,
     });
     captureSnapshot();
+    patchProfileDraft({
+      field_name: effectiveField(),
+      role_name: effectiveRole(),
+      experience_bucket: experienceBucket.value,
+    });
     emit("continue");
   } catch {
     saveError.value = "השמירה נכשלה. ניתן לבדוק את החיבור ולנסות שוב.";
@@ -254,8 +268,17 @@ async function onContinue() {
 
 onMounted(async () => {
   try {
-    const [fetchedFields, profile] = await Promise.all([listFields(), getMyProfile()]);
+    const fetchedFields = await listFields();
     fields.value = fetchedFields;
+
+    const profile = profileDraft.value;
+    if (!profile) {
+      // Shouldn't happen in practice - PreferencesView seeds profileDraft
+      // before this step ever mounts - but keeps this typed as Profile|null
+      // honestly rather than asserting it away.
+      loadError.value = true;
+      return;
+    }
     experienceBucket.value = profile.experience_bucket;
 
     if (profile.field_name === null) {

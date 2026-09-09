@@ -8,38 +8,40 @@
         >
         <span class="text-[11px] font-bold uppercase tracking-[2px] text-hd-label">נושאים מוצעים</span>
       </div>
-      <p v-if="!loading && !loadError" class="text-xs text-hd-muted">
+      <p class="text-xs text-hd-muted">
         נבחרו <b class="text-hd-accent">{{ pickedChips.length }}</b> מתוך {{ MAX_TOPICS }}
       </p>
     </div>
 
-    <p v-if="loading" class="text-[13px] text-hd-muted" role="status" aria-live="polite">
-      {{ extendedWait ? "עדיין מנסים - זה לוקח יותר זמן מהרגיל…" : "מוצא הצעות בשבילך…" }}
+    <div class="flex flex-wrap gap-2.5" role="group" aria-label="נושאים מוצעים">
+      <button
+        v-for="chip in allChips"
+        :key="chipKey(chip)"
+        type="button"
+        :class="topicClasses(isPicked(chip))"
+        :aria-pressed="isPicked(chip)"
+        @click="toggleChip(chip)"
+      >
+        {{ chip.name }}
+        <span v-if="isPicked(chip)" class="ms-1 text-[11px] opacity-60" aria-hidden="true">✕</span>
+      </button>
+    </div>
+    <p
+      v-if="candidatesLoading"
+      class="mt-2 flex items-center gap-1.5 text-[11px] text-hd-muted"
+      role="status"
+      aria-live="polite"
+    >
+      <HybridSpinner size="inline" />
+      {{ extendedWait ? "עדיין מנסים למצוא הצעות נוספות…" : "חיפוש הצעות נוספות…" }}
     </p>
-    <p v-else-if="loadError" class="text-xs text-hd-subtitle">טעינת הנושאים נכשלה. אפשר לרענן את הדף.</p>
-
-    <template v-else>
-      <div class="flex flex-wrap gap-2.5" role="group" aria-label="נושאים מוצעים">
-        <button
-          v-for="chip in allChips"
-          :key="chipKey(chip)"
-          type="button"
-          :class="topicClasses(isPicked(chip))"
-          :aria-pressed="isPicked(chip)"
-          @click="toggleChip(chip)"
-        >
-          {{ chip.name }}
-          <span v-if="isPicked(chip)" class="ms-1 text-[11px] opacity-60" aria-hidden="true">✕</span>
-        </button>
-      </div>
-      <p class="mt-3.5 text-xs text-hd-muted">{{ capHintMessage || "יש להקיש על נושא דהוי כדי לבחור בו." }}</p>
-    </template>
+    <p class="mt-3.5 text-xs text-hd-muted">{{ capHintMessage || "יש להקיש על נושא דהוי כדי לבחור בו." }}</p>
 
     <div class="mt-7 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3.5">
       <button type="button" :class="BTN_GHOST" :disabled="saving" @click="emit('back')">חזרה →</button>
       <div class="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:gap-3.5">
         <p v-if="saveMessage" class="text-xs text-hd-subtitle">{{ saveMessage }}</p>
-        <button type="button" :class="BTN_PRIMARY" :disabled="saving || loading || loadError" @click="onSave">
+        <button type="button" :class="BTN_PRIMARY" :disabled="saving" @click="onSave">
           {{ saving ? "שומר…" : "אני רוצה לקבל את זה" }}
         </button>
       </div>
@@ -50,7 +52,9 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
 import { useRouter } from "vue-router";
-import { getTopicSuggestions, listMyPreferences, updateMyPreferences } from "@/api/client";
+import { getTopicSuggestions, updateMyPreferences, type TopicPreference } from "@/api/client";
+import HybridSpinner from "@/components/HybridSpinner.vue";
+import { preferencesDraft } from "@/profile-draft";
 
 const router = useRouter();
 
@@ -70,12 +74,15 @@ const POLL_INTERVAL_MS = 400;
 // at all.
 const MAX_POLL_ATTEMPTS = 112;
 
-const loading = ref(true);
+// Only gates the small "candidates still loading" indicator below the grid -
+// picked chips (and a reasonable candidate set) render instantly from
+// preferencesDraft in load() below, so nothing here blocks the whole step on
+// this fetch.
+const candidatesLoading = ref(false);
 // Set while the backend reports "pending_slow" - one of its two concurrent
 // LLM calls failed and it's waiting out the other's retries (GH #36). Only
-// swaps the loading copy; polling and the fallback are unchanged.
+// swaps the candidates-loading copy; polling and the fallback are unchanged.
 const extendedWait = ref(false);
-const loadError = ref(false);
 const saving = ref(false);
 const saveMessage = ref("");
 
@@ -105,7 +112,7 @@ function topicClasses(picked: boolean): string {
 
 const BTN_BASE =
   "inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-[10px] border-0 text-[13.5px] font-semibold [font-family:inherit] [transition:transform_0.18s_ease] motion-reduce:transition-none active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-hd-accent-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:active:scale-100";
-const BTN_PRIMARY = `${BTN_BASE} px-[22px] py-[11px] bg-gradient-to-b from-[#7b86ff] to-[#5c68e8] text-white shadow-[0_10px_24px_-10px_rgba(109,123,255,0.6)] disabled:opacity-35 disabled:shadow-none`;
+const BTN_PRIMARY = `${BTN_BASE} px-[22px] py-[11px] [background-image:linear-gradient(to_bottom_in_oklch,_#5460ff,_#261761)] text-white shadow-[0_10px_24px_-10px_rgba(109,123,255,0.6)] disabled:opacity-35 disabled:shadow-none`;
 const BTN_GHOST = `${BTN_BASE} px-2 py-[11px] bg-transparent text-hd-label [@media(hover:hover)]:[&:hover:not(:disabled)]:text-hd-chip disabled:opacity-35`;
 
 function chipKey(chip: SuggestionChip | Pick): string {
@@ -156,7 +163,16 @@ function showCapHint() {
   }, 2500);
 }
 
+// The grid is interactive from the first paint now (fallback chips render
+// instantly - see load() below), unlike the old code where the whole
+// component stayed hidden behind `loading` until the suggestion poll
+// resolved. That means a user can now toggle chips while candidatesLoading
+// is still true - if the poll then resolves "ready", load() must not
+// silently swap their picks out from under them.
+let userEditedPicks = false;
+
 function toggleChip(chip: SuggestionChip) {
+  userEditedPicks = true;
   const key = chipKey(chip);
   if (isPicked(chip)) {
     pickedChips.value = pickedChips.value.filter((pick) => chipKey(pick) !== key);
@@ -191,13 +207,37 @@ async function onSave() {
   }
 }
 
+// The user's own current subscriptions, ordered subscribed-first - the same
+// shape the old code only used as a post-suggestion-failure fallback, now
+// rendered immediately since preferencesDraft already has it (no fetch, no
+// loading state - FR-9's "never risk a dead end" holds from the first paint).
+function fallbackChips(prefs: TopicPreference[]): { chips: SuggestionChip[]; picked: Pick[] } {
+  const subscribed = prefs.filter((p) => p.subscribed);
+  const rest = prefs.filter((p) => !p.subscribed);
+  const ordered = [...subscribed, ...rest];
+  const chips: SuggestionChip[] = ordered.map((p) => ({
+    kind: "existing" as const,
+    topicId: p.topic_id,
+    name: p.name,
+  }));
+  const pickedFrom = subscribed.length > 0 ? subscribed : ordered;
+  const picked: Pick[] = pickedFrom
+    .slice(0, MAX_TOPICS)
+    .map((p) => ({ kind: "existing" as const, topicId: p.topic_id }));
+  return { chips, picked };
+}
+
 async function load() {
+  const prefs = preferencesDraft.value;
+  const fallback = fallbackChips(prefs);
+  allChips.value = fallback.chips;
+  pickedChips.value = fallback.picked;
+
+  candidatesLoading.value = true;
   try {
-    const [suggestionResult, allPrefs] = await Promise.all([
-      pollForSuggestions(),
-      listMyPreferences(),
-    ]);
-    const topicNames = new Map(allPrefs.map((p) => [p.topic_id, p.name]));
+    const suggestionResult = await pollForSuggestions();
+    if (userEditedPicks) return; // user already picked for themselves during the wait - leave their choice alone
+    const topicNames = new Map(prefs.map((p) => [p.topic_id, p.name]));
 
     const suggestedExistingIds = suggestionResult.suggested_topic_ids ?? [];
     const suggestedNewNames = suggestionResult.suggested_new_topic_names ?? [];
@@ -224,27 +264,15 @@ async function load() {
       // Invented names stay on screen as unselected chips the user can opt
       // into deliberately.
       pickedChips.value = existingChips.slice(0, MAX_TOPICS).map(toPick);
-    } else {
-      // Failed, or ready-but-empty (shouldn't happen given the popularity
-      // fallback ranks every topic, but never risk a dead end - FR-9).
-      // Prefer the user's own existing subscriptions over arbitrary topics.
-      const subscribed = allPrefs.filter((p) => p.subscribed);
-      const rest = allPrefs.filter((p) => !p.subscribed);
-      const ordered = [...subscribed, ...rest];
-      allChips.value = ordered.map((p) => ({
-        kind: "existing" as const,
-        topicId: p.topic_id,
-        name: p.name,
-      }));
-      const picked = subscribed.length > 0 ? subscribed : ordered;
-      pickedChips.value = picked
-        .slice(0, MAX_TOPICS)
-        .map((p) => ({ kind: "existing" as const, topicId: p.topic_id }));
     }
+    // Otherwise (failed, or ready-but-empty): the fallback chips rendered
+    // above already stand - nothing to change.
   } catch {
-    loadError.value = true;
+    // Poll failure - same as above: the fallback chips already shown stand,
+    // and the already-picked chips are unaffected. Nothing to surface as an
+    // error (I/O matrix: "candidates area just stays empty/unchanged").
   } finally {
-    loading.value = false;
+    candidatesLoading.value = false;
   }
 }
 
