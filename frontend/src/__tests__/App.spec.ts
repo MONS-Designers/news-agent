@@ -85,16 +85,18 @@ describe("App - happy path", () => {
     expect(wrapper.text()).not.toContain("מעורבות");
   });
 
-  it("always shows the Preferences nav link regardless of sign-in state", async () => {
+  it("shows the Preferences nav link only to a signed-in visitor", async () => {
+    // Anonymous visitors have nothing behind that link - it used to render
+    // for them anyway and dead-ended on the /preferences guard.
     const { wrapper: anon } = await mountApp();
-    expect(anon.text()).toContain("העדפות");
+    expect(anon.text()).not.toContain("העדפות");
 
     me.value = { email: "user@example.com", is_admin: false, user_id: 3 };
     const { wrapper: signedIn } = await mountApp();
     expect(signedIn.text()).toContain("העדפות");
   });
 
-  it("signs out and navigates to /preferences", async () => {
+  it("signs out and navigates to the landing page", async () => {
     me.value = { email: "user@example.com", is_admin: false, user_id: 3 };
     const { wrapper, router } = await mountApp();
 
@@ -103,7 +105,7 @@ describe("App - happy path", () => {
     await flushPromises();
 
     expect(signOut).toHaveBeenCalled();
-    expect(router.currentRoute.value.path).toBe("/preferences");
+    expect(router.currentRoute.value.path).toBe("/");
   });
 });
 
@@ -142,5 +144,38 @@ describe("App - unhappy path / edge cases", () => {
     window.history.pushState({}, "", "/?error=unauthorized");
     await mountApp();
     expect(ensureMe).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("App - responsive header", () => {
+  // jsdom has no layout engine, so the horizontal overflow this guards against
+  // can't be measured here - these assert the Tailwind utilities that prevent
+  // it. An admin's four nav links don't fit beside the brand and the sign-out
+  // button at phone widths, so the nav drops to its own row below sm; a
+  // non-admin has a single link that fits, and keeps the one-row header.
+  it("lets the header row wrap instead of overflowing", async () => {
+    me.value = { email: "admin@example.com", is_admin: true, user_id: 1 };
+    const { wrapper } = await mountApp();
+    expect(wrapper.find("header > div").classes()).toContain("flex-wrap");
+  });
+
+  it("drops the admin nav to its own scrollable row below sm and restores it at sm", async () => {
+    me.value = { email: "admin@example.com", is_admin: true, user_id: 1 };
+    const { wrapper } = await mountApp();
+    const nav = wrapper.find("header nav");
+    expect(nav.classes()).toEqual(
+      expect.arrayContaining(["order-last", "w-full", "overflow-x-auto"]),
+    );
+    expect(nav.classes()).toEqual(
+      expect.arrayContaining(["sm:order-none", "sm:w-auto", "sm:overflow-visible"]),
+    );
+  });
+
+  it("leaves the nav inline for a non-admin, whose single link already fits", async () => {
+    me.value = { email: "user@example.com", is_admin: false, user_id: 3 };
+    const { wrapper } = await mountApp();
+    const nav = wrapper.find("header nav");
+    expect(nav.classes()).not.toContain("order-last");
+    expect(nav.classes()).not.toContain("w-full");
   });
 });

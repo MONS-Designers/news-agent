@@ -33,6 +33,9 @@
             שבוע, בנוי סביב מה שבאמת מעניין אותך.
           </p>
         </template>
+        <p v-if="signInRequired" class="signin-note">
+          כדי להגדיר את הדייג'סט יש להתחבר עם Google תחילה.
+        </p>
         <button type="button" class="cta" @click="goToPreferences">
           {{ firstRun ? "נכיר, זה לוקח 2 דקות" : "אני רוצה להגדיר את הדייג'סט שלי" }}
           <span class="cta-arrow" aria-hidden="true">←</span>
@@ -67,7 +70,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { getMyProfile } from "@/api/client";
+import { getMyProfile, loginUrl } from "@/api/client";
 import { ensureMe } from "@/auth";
 import { DIGEST_NOUN_WEEKLY } from "@/branding";
 
@@ -93,7 +96,20 @@ async function checkFirstRun() {
   }
 }
 
-function goToPreferences() {
+// Set by the /preferences router guard when it turns an anonymous visitor
+// away - a direct URL, an old bookmark, or a session that expired since.
+const signInRequired = computed(() => route.query.signin === "required");
+
+async function goToPreferences() {
+  const identity = await ensureMe();
+  if (!identity) {
+    // Everything behind this button is account-bound, so an anonymous click
+    // means "sign me in", not "navigate" - pushing /preferences would only
+    // bounce off that route's guard and land back on this same page, which
+    // reads as a dead button.
+    window.location.href = loginUrl();
+    return;
+  }
   router.push("/preferences");
 }
 
@@ -320,19 +336,32 @@ onBeforeUnmount(() => {
   margin: 0 auto 36px;
 }
 
+/* Accent-tinted frame, single hue - the same alert treatment the profile
+   summary's stale-topics box uses (DESIGN.md bans a second accent color). */
+.signin-note {
+  display: inline-block;
+  margin: -12px 0 24px;
+  padding: 10px 18px;
+  border-radius: 10px;
+  border: 1px solid rgba(109, 123, 255, 0.4);
+  background: rgba(109, 123, 255, 0.14);
+  font-size: 13.5px;
+  color: #c4cadb;
+}
+
 .cta {
   display: inline-flex;
   align-items: center;
   gap: 10px;
   padding: 15px 30px;
   border-radius: 10px;
-  border: none;
+  border: 1px solid rgba(169, 177, 255, 0.3);
   font-size: 14.5px;
   font-weight: 600;
   font-family: inherit;
   color: #ffffff;
-  background: linear-gradient(180deg, #7b86ff, #5c68e8);
-  box-shadow: 0 14px 34px -12px rgba(109, 123, 255, 0.65);
+  background: linear-gradient(180deg in oklch, #434ed2, #231666);
+  box-shadow: 0 4px 12px -6px rgba(109, 123, 255, 0.35);
   cursor: pointer;
   transition:
     transform 0.2s ease,
@@ -340,7 +369,7 @@ onBeforeUnmount(() => {
 }
 .cta:hover {
   transform: translateY(-2px);
-  box-shadow: 0 18px 40px -12px rgba(109, 123, 255, 0.8);
+  box-shadow: 0 8px 20px -8px rgba(109, 123, 255, 0.5);
 }
 .cta:focus-visible {
   outline: 2px solid #6d7bff;

@@ -31,7 +31,17 @@ export async function signInAs(context: BrowserContext, identity: Identity): Pro
  * hidden in other wizard steps (ProfilePickerShell keeps every step mounted
  * via v-show, so more than one "המשך" button can exist in the DOM at once). */
 export function visibleButton(page: Page, exactText: string) {
-  return page.locator("button:visible", { hasText: new RegExp(`^${exactText}$`) });
+  // `:visible` is what disambiguates here: the wizard keeps all three step
+  // panels mounted behind v-show, so "המשך" exists three times in the DOM
+  // and only one of them is on screen.
+  //
+  // The whitespace tolerance matters because a RegExp `hasText` is tested
+  // against raw textContent, with no normalization. Step 1's Continue button
+  // carries a `v-if` spinner beside its label, and the whitespace between
+  // that node and the label survives as a leading space - so a bare
+  // `^המשך$` stopped matching the moment the spinner was added, while the
+  // button's accessible name never changed.
+  return page.locator("button:visible", { hasText: new RegExp(`^\\s*${exactText}\\s*$`) });
 }
 
 export const test = base;

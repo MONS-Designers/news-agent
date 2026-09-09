@@ -1,7 +1,7 @@
 <template>
   <div class="min-h-screen bg-neutral-50 text-neutral-900 antialiased">
     <header class="sticky top-0 z-10 border-b border-neutral-200 bg-white/80 backdrop-blur">
-      <div class="mx-auto flex max-w-4xl items-center gap-8 px-4 py-3 sm:px-6">
+      <div class="mx-auto flex max-w-4xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 sm:gap-x-8 sm:px-6">
         <router-link
           to="/"
           dir="ltr"
@@ -10,7 +10,13 @@
           <img :src="logoMark" alt="" class="h-7 w-7 rounded-lg" />
           <span>News<span class="text-amber-500">Agent</span></span>
         </router-link>
-        <nav class="flex gap-1">
+        <nav
+          class="flex gap-1"
+          :class="{
+            'order-last w-full overflow-x-auto sm:order-none sm:w-auto sm:overflow-visible':
+              me?.is_admin,
+          }"
+        >
           <router-link
             v-if="me?.is_admin"
             to="/admin"
@@ -36,6 +42,7 @@
             מעורבות
           </router-link>
           <router-link
+            v-if="me"
             to="/preferences"
             class="rounded-lg px-3 py-1.5 text-sm font-medium text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
             active-class="bg-neutral-100 text-neutral-900"
@@ -115,6 +122,8 @@ onMounted(async () => {
 
 async function signOut() {
   await authSignOut();
-  router.push("/preferences");
+  // The landing page is where a signed-out visitor belongs. Pushing to
+  // /preferences here used to work only by bouncing off that route's guard.
+  router.push("/");
 }
 </script>
