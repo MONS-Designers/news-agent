@@ -57,18 +57,30 @@
 
     <p v-if="loadError" class="mt-3 text-xs text-hd-subtitle">טעינת האפשרויות נכשלה. אפשר לרענן את הדף.</p>
 
-    <div class="mt-7 flex items-center justify-end gap-3.5">
-      <p v-if="saveError" class="text-xs text-hd-subtitle">{{ saveError }}</p>
-      <button
-        type="button"
-        class="inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center gap-2 rounded-[10px] border-[1px] border-[#a9b1ff]/30 [background-image:linear-gradient(to_bottom_in_oklch,_#434ed2,_#231666)] px-[22px] py-[11px] text-[13.5px] font-semibold text-white [font-family:inherit] [transition:transform_0.18s_ease] motion-reduce:transition-none shadow-[0_4px_12px_-6px_rgba(109,123,255,0.35)] active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-hd-accent-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-35 disabled:shadow-none disabled:active:scale-100"
-        :class="{ disabled: !canContinue }"
-        :disabled="!canContinue || saving"
-        @click="onContinue"
-      >
-        <HybridSpinner v-if="rolesLoading" size="inline" />
-        {{ rolesLoading ? "טעינה…" : saving ? "שמירה…" : "המשך" }}
+    <div class="mt-7 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3.5">
+      <!--
+        Back on Step 1 leaves the wizard rather than moving between steps -
+        ProfilePickerShell forwards it to whoever opened the wizard. Rendered
+        only when there is something behind it: a brand-new user has no saved
+        profile to return to.
+      -->
+      <button v-if="showBack" type="button" :class="BTN_GHOST" :disabled="saving" @click="emit('back')">
+        חזרה →
       </button>
+      <span v-else></span>
+      <div class="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:gap-3.5">
+        <p v-if="saveError" class="text-xs text-hd-subtitle">{{ saveError }}</p>
+        <button
+          type="button"
+          class="inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center gap-2 rounded-[10px] border-[1px] border-[#a9b1ff]/30 [background-image:linear-gradient(to_bottom_in_oklch,_#434ed2,_#231666)] px-[22px] py-[11px] text-[13.5px] font-semibold text-white [font-family:inherit] [transition:transform_0.18s_ease] motion-reduce:transition-none shadow-[0_4px_12px_-6px_rgba(109,123,255,0.35)] active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-hd-accent-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-35 disabled:shadow-none disabled:active:scale-100"
+          :class="{ disabled: !canContinue }"
+          :disabled="!canContinue || saving"
+          @click="onContinue"
+        >
+          <HybridSpinner v-if="rolesLoading" size="inline" />
+          {{ rolesLoading ? "טעינה…" : saving ? "שמירה…" : "המשך" }}
+        </button>
+      </div>
     </div>
   </div>
 </template>
@@ -80,7 +92,15 @@ import ChipRow from "./ChipRow.vue";
 import { listFields, listRoles, updateMyProfile, type FieldOption, type RoleOption } from "@/api/client";
 import { profileDraft, patchProfileDraft } from "@/profile-draft";
 
-const emit = defineEmits<{ continue: [] }>();
+defineProps<{ showBack?: boolean }>();
+const emit = defineEmits<{ continue: []; back: [] }>();
+
+// Copied verbatim from InterestsStep.vue / TopicsStep.vue, matching this
+// folder's existing convention - the Back control has to be the same ghost
+// button on every step, Step 1 included.
+const BTN_BASE =
+  "inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-[10px] border-0 text-[13.5px] font-semibold [font-family:inherit] [transition:transform_0.18s_ease] motion-reduce:transition-none active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-hd-accent-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:active:scale-100";
+const BTN_GHOST = `${BTN_BASE} px-2 py-[11px] bg-transparent text-hd-label [@media(hover:hover)]:[&:hover:not(:disabled)]:text-hd-chip disabled:opacity-35`;
 
 // Storage values must match services/profile.py:EXPERIENCE_BUCKETS exactly;
 // display labels (en dash) are presentation-only and never sent to the API.

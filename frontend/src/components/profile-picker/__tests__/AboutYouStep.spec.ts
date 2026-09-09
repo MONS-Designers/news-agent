@@ -282,6 +282,24 @@ describe("AboutYouStep - happy path", () => {
   });
 });
 
+describe("AboutYouStep - leaving the step backwards", () => {
+  it("shows a Back control and emits back when the caller says there is somewhere to return to", async () => {
+    const wrapper = mount(AboutYouStep, { props: { showBack: true } });
+    await flushPromises();
+
+    const back = wrapper.findAll("button").find((b) => b.text().includes("חזרה"))!;
+    expect(back).toBeTruthy();
+    await back.trigger("click");
+    expect(wrapper.emitted("back")).toHaveLength(1);
+  });
+
+  it("shows no Back control by default - a brand-new user has no summary behind Step 1", async () => {
+    const wrapper = mount(AboutYouStep);
+    await flushPromises();
+    expect(wrapper.findAll("button").find((b) => b.text().includes("חזרה"))).toBeUndefined();
+  });
+});
+
 describe("AboutYouStep - unhappy path / edge cases", () => {
   it("shows a load error when the initial fields fetch fails", async () => {
     listFields.mockRejectedValue(new Error("network down"));

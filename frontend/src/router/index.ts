@@ -53,7 +53,10 @@ router.beforeEach(async (to) => {
   if (to.meta.requiresAuth) {
     const identity = await ensureMe();
     if (!identity) {
-      return { path: "/" };
+      // An anonymous visitor's home is the landing page. The flag is what
+      // lets HomeView say why they ended up there - without it the guard
+      // silently swallows the navigation and the click reads as broken.
+      return { path: "/", query: { signin: "required" } };
     }
   }
 });

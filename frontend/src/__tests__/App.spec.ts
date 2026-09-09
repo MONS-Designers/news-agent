@@ -85,16 +85,18 @@ describe("App - happy path", () => {
     expect(wrapper.text()).not.toContain("מעורבות");
   });
 
-  it("always shows the Preferences nav link regardless of sign-in state", async () => {
+  it("shows the Preferences nav link only to a signed-in visitor", async () => {
+    // Anonymous visitors have nothing behind that link - it used to render
+    // for them anyway and dead-ended on the /preferences guard.
     const { wrapper: anon } = await mountApp();
-    expect(anon.text()).toContain("העדפות");
+    expect(anon.text()).not.toContain("העדפות");
 
     me.value = { email: "user@example.com", is_admin: false, user_id: 3 };
     const { wrapper: signedIn } = await mountApp();
     expect(signedIn.text()).toContain("העדפות");
   });
 
-  it("signs out and navigates to /preferences", async () => {
+  it("signs out and navigates to the landing page", async () => {
     me.value = { email: "user@example.com", is_admin: false, user_id: 3 };
     const { wrapper, router } = await mountApp();
 
@@ -103,7 +105,7 @@ describe("App - happy path", () => {
     await flushPromises();
 
     expect(signOut).toHaveBeenCalled();
-    expect(router.currentRoute.value.path).toBe("/preferences");
+    expect(router.currentRoute.value.path).toBe("/");
   });
 });
 

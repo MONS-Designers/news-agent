@@ -1,101 +1,118 @@
 <template>
-  <div class="space-y-6">
-    <div>
-      <h1 class="text-2xl font-semibold tracking-tight">העדפות הנושאים שלי</h1>
-      <p class="mt-1 text-sm text-neutral-500">
-        בחירת הנושאים שיופיעו ב{{ DIGEST_NOUN_WEEKLY }} שלך.
-      </p>
+  <!--
+    A floor under the surface so it stops resizing under the reader as they
+    move between states - loading would otherwise collapse it to a single
+    line, and the summary, each wizard step, and the error banner are all
+    different heights. The floor is the screen below the app header, or
+    56rem, whichever is larger: on a tall window the surface simply fills it,
+    and on a short one 56rem still clears every state's natural height at
+    desktop widths (measured: summary 855px, tallest wizard step 764px).
+    A phone, or an unusually long interests paragraph, still scrolls past it.
+  -->
+  <HybridDepthBackground class="min-h-[max(calc(100vh-8rem),56rem)]">
+    <div class="mb-7">
+      <p class="mb-2.5 text-[11px] font-bold uppercase tracking-[3px] text-hd-kicker">העדפות</p>
+      <h1 class="mb-2.5 text-[26px] font-[650] tracking-[-0.5px] text-hd-title sm:text-[30px]">
+        {{ headingTitle }}
+      </h1>
+      <p class="max-w-[52ch] text-sm leading-[1.55] text-hd-subtitle">{{ headingSubtitle }}</p>
     </div>
 
-    <div v-if="loading" class="flex items-center gap-2 text-sm text-neutral-500">
+    <div v-if="loading" class="flex items-center gap-2 text-sm text-hd-subtitle">
       <HybridSpinner size="standalone" /> טעינה…
     </div>
 
+    <!-- Accent-tinted alert frame, not red/amber: DESIGN.md's anti-pattern
+         table bans any second chromatic hue for warnings and errors inside
+         Hybrid Depth. Same treatment as the topics-stale box below. -->
     <div
       v-else-if="errorMessage"
-      class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800"
+      class="rounded-xl border border-hd-accent-2/40 bg-hd-accent-2/[0.14] px-5 py-[18px] text-[13.5px] leading-[1.55] text-hd-body"
     >
       {{ errorMessage }}
     </div>
 
-    <HybridDepthBackground v-else-if="showSummary">
-      <div class="flex flex-col gap-[18px]">
-        <div
-          v-if="topicsStale"
-          class="rounded-xl border border-hd-accent-2/40 bg-hd-accent-2/[0.14] px-5 py-[18px]"
-        >
-          <p class="mb-1.5 text-[13.5px] font-semibold leading-[1.55] text-hd-title">
-            שינית את הפרופיל, אבל הנושאים נשארו כפי שהיו.
-          </p>
-          <p class="text-[13.5px] leading-[1.55] text-hd-body">
-            הנושאים שלמטה נבחרו לפי התשובות הקודמות שלך, ולכן {{ DIGEST_NOUN_WEEKLY }} עדיין נבנה
-            סביבן. אפשר לרענן אותם בהתאם לפרופיל החדש.
-          </p>
-          <button type="button" :class="[BTN_PRIMARY, 'mt-3.5']" @click="editing = true">
-            עדכון הנושאים שלי
-          </button>
-        </div>
-
-        <div class="rounded-2xl border border-white/[0.09] bg-white/[0.035] p-4 backdrop-blur-[18px] sm:p-[30px]">
-          <dl class="mb-6 grid grid-cols-1 gap-x-6 gap-y-3.5 sm:grid-cols-2">
-            <div>
-              <dt class="mb-1 text-[11px] tracking-[1px] text-hd-subtitle">תחום</dt>
-              <dd class="text-sm font-semibold text-hd-fg">{{ profile?.field_name }}</dd>
-            </div>
-            <div>
-              <dt class="mb-1 text-[11px] tracking-[1px] text-hd-subtitle">תפקיד</dt>
-              <dd class="text-sm font-semibold text-hd-fg">{{ profile?.role_name }}</dd>
-            </div>
-            <div>
-              <dt class="mb-1 text-[11px] tracking-[1px] text-hd-subtitle">ניסיון</dt>
-              <dd class="text-sm font-semibold text-hd-fg">{{ experienceLabel }}</dd>
-            </div>
-            <div v-if="profile?.interest_free_text" class="sm:col-span-2">
-              <dt class="mb-1 text-[11px] tracking-[1px] text-hd-subtitle">תחומי עניין</dt>
-              <dd class="text-sm font-normal text-hd-body">{{ profile.interest_free_text }}</dd>
-            </div>
-          </dl>
-
-          <div>
-            <p class="mb-2.5 text-[13px] text-hd-subtitle">נושאים רשומים</p>
-            <div class="mb-6 flex flex-wrap gap-2.5">
-              <span
-                v-for="topic in subscribedTopics"
-                :key="topic.topic_id"
-                :class="TOPIC_READONLY_PICKED"
-              >
-                {{ topic.name }}
-              </span>
-              <span v-if="subscribedTopics.length === 0" class="text-xs text-hd-muted">עדיין אין</span>
-            </div>
-          </div>
-
-          <button type="button" :class="BTN_PRIMARY" @click="editing = true">עריכת פרופיל</button>
-        </div>
-
-        <div
-          class="flex flex-col items-stretch gap-3.5 rounded-2xl border border-white/[0.09] bg-white/[0.035] px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-5"
-        >
-          <div>
-            <p class="mb-1 text-sm font-semibold text-hd-fg">מיילים שבועיים</p>
-            <p :class="['text-xs', subscription?.unsubscribed ? 'text-hd-accent' : 'text-hd-subtitle']">
-              {{ subscription?.unsubscribed ? `מושהה - ${DIGEST_NOUN_WEEKLY} לא יישלח.` : "פעיל" }}
-            </p>
-          </div>
-          <button
-            type="button"
-            :disabled="subscriptionSaving"
-            :class="[BTN_SECONDARY, 'self-start sm:self-auto']"
-            @click="toggleSubscription"
-          >
-            {{ subscription?.unsubscribed ? "המשך" : "השהיה" }}
-          </button>
-        </div>
+    <div v-else-if="showSummary" class="flex flex-col gap-[18px]">
+      <div
+        v-if="topicsStale"
+        class="rounded-xl border border-hd-accent-2/40 bg-hd-accent-2/[0.14] px-5 py-[18px]"
+      >
+        <p class="mb-1.5 text-[13.5px] font-semibold leading-[1.55] text-hd-title">
+          שינית את הפרופיל, אבל הנושאים נשארו כפי שהיו.
+        </p>
+        <p class="text-[13.5px] leading-[1.55] text-hd-body">
+          הנושאים שלמטה נבחרו לפי התשובות הקודמות שלך, ולכן {{ DIGEST_NOUN_WEEKLY }} עדיין נבנה
+          סביבן. אפשר לרענן אותם בהתאם לפרופיל החדש.
+        </p>
+        <button type="button" :class="[BTN_PRIMARY, 'mt-3.5']" @click="editing = true">
+          עדכון הנושאים שלי
+        </button>
       </div>
-    </HybridDepthBackground>
 
-    <ProfilePickerShell v-else @topics-saved="refreshPreferencesQuietly" />
-  </div>
+      <div class="rounded-2xl border border-white/[0.09] bg-white/[0.035] p-4 backdrop-blur-[18px] sm:p-[30px]">
+        <dl class="mb-6 grid grid-cols-1 gap-x-6 gap-y-3.5 sm:grid-cols-2">
+          <div>
+            <dt class="mb-1 text-[11px] tracking-[1px] text-hd-subtitle">תחום</dt>
+            <dd class="text-sm font-semibold text-hd-fg">{{ profile?.field_name }}</dd>
+          </div>
+          <div>
+            <dt class="mb-1 text-[11px] tracking-[1px] text-hd-subtitle">תפקיד</dt>
+            <dd class="text-sm font-semibold text-hd-fg">{{ profile?.role_name }}</dd>
+          </div>
+          <div>
+            <dt class="mb-1 text-[11px] tracking-[1px] text-hd-subtitle">ניסיון</dt>
+            <dd class="text-sm font-semibold text-hd-fg">{{ experienceLabel }}</dd>
+          </div>
+          <div v-if="profile?.interest_free_text" class="sm:col-span-2">
+            <dt class="mb-1 text-[11px] tracking-[1px] text-hd-subtitle">תחומי עניין</dt>
+            <dd class="text-sm font-normal text-hd-body">{{ profile.interest_free_text }}</dd>
+          </div>
+        </dl>
+
+        <div>
+          <p class="mb-2.5 text-[13px] text-hd-subtitle">נושאים רשומים</p>
+          <div class="mb-6 flex flex-wrap gap-2.5">
+            <span
+              v-for="topic in subscribedTopics"
+              :key="topic.topic_id"
+              :class="TOPIC_READONLY_PICKED"
+            >
+              {{ topic.name }}
+            </span>
+            <span v-if="subscribedTopics.length === 0" class="text-xs text-hd-muted">עדיין אין</span>
+          </div>
+        </div>
+
+        <button type="button" :class="BTN_PRIMARY" @click="editing = true">עריכת פרופיל</button>
+      </div>
+
+      <div
+        class="flex flex-col items-stretch gap-3.5 rounded-2xl border border-white/[0.09] bg-white/[0.035] px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-5"
+      >
+        <div>
+          <p class="mb-1 text-sm font-semibold text-hd-fg">מיילים שבועיים</p>
+          <p :class="['text-xs', subscription?.unsubscribed ? 'text-hd-accent' : 'text-hd-subtitle']">
+            {{ subscription?.unsubscribed ? `מושהה - ${DIGEST_NOUN_WEEKLY} לא יישלח.` : "פעיל" }}
+          </p>
+        </div>
+        <button
+          type="button"
+          :disabled="subscriptionSaving"
+          :class="[BTN_SECONDARY, 'self-start sm:self-auto']"
+          @click="toggleSubscription"
+        >
+          {{ subscription?.unsubscribed ? "המשך" : "השהיה" }}
+        </button>
+      </div>
+    </div>
+
+    <ProfilePickerShell
+      v-else
+      :can-exit="hasSavedProfile"
+      @topics-saved="refreshPreferencesQuietly"
+      @back="editing = false"
+    />
+  </HybridDepthBackground>
 </template>
 
 <script setup lang="ts">
@@ -153,6 +170,30 @@ const errorMessage = ref("");
 const editing = ref(false);
 const showSummary = computed(() => !editing.value && !!profile.value?.field_name);
 const topicsStale = computed(() => !!profile.value?.topics_stale_at);
+
+// The wizard is the chain's last branch. Naming it lets the heading and the
+// cancel button read the same state the template's v-else does, without
+// switching the title for the split second before the first fetch resolves.
+const showWizard = computed(() => !loading.value && !errorMessage.value && !showSummary.value);
+
+// Whether stepping back off the wizard's first step has anywhere to land - a
+// brand-new user has no summary behind it, so that step shows no Back.
+const hasSavedProfile = computed(() => !!profile.value?.field_name);
+
+// One heading owns the screen, swapping text per state. ProfilePickerShell
+// used to carry its own title, which stacked two headings on top of each
+// other the moment the wizard opened.
+const headingTitle = computed(() =>
+  showWizard.value ? "הגדרת הפרופיל שלך" : "העדפות הנושאים שלי",
+);
+const headingSubtitle = computed(() =>
+  showWizard.value
+    ? "שלושה שלבים מהירים. אפשר לשנות כל דבר אחר כך - שום דבר לא ננעל."
+    // Phrased to avoid a "ב" prefix on DIGEST_NOUN_WEEKLY - the constant
+    // already carries its own definite "ה", and the old wording rendered as
+    // "בהדייג'סט השבועי".
+    : `${DIGEST_NOUN_WEEKLY} שלך נבנה מהנושאים שנבחרו כאן.`,
+);
 
 // Mirrors AboutYouStep.vue's EXPERIENCE_BUCKETS display labels.
 const EXPERIENCE_LABELS: Record<string, string> = {

@@ -33,6 +33,9 @@
             שבוע, בנוי סביב מה שבאמת מעניין אותך.
           </p>
         </template>
+        <p v-if="signInRequired" class="signin-note">
+          כדי להגדיר את הדייג'סט יש להתחבר עם Google תחילה.
+        </p>
         <button type="button" class="cta" @click="goToPreferences">
           {{ firstRun ? "נכיר, זה לוקח 2 דקות" : "אני רוצה להגדיר את הדייג'סט שלי" }}
           <span class="cta-arrow" aria-hidden="true">←</span>
@@ -67,7 +70,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { getMyProfile } from "@/api/client";
+import { getMyProfile, loginUrl } from "@/api/client";
 import { ensureMe } from "@/auth";
 import { DIGEST_NOUN_WEEKLY } from "@/branding";
 
@@ -93,7 +96,20 @@ async function checkFirstRun() {
   }
 }
 
-function goToPreferences() {
+// Set by the /preferences router guard when it turns an anonymous visitor
+// away - a direct URL, an old bookmark, or a session that expired since.
+const signInRequired = computed(() => route.query.signin === "required");
+
+async function goToPreferences() {
+  const identity = await ensureMe();
+  if (!identity) {
+    // Everything behind this button is account-bound, so an anonymous click
+    // means "sign me in", not "navigate" - pushing /preferences would only
+    // bounce off that route's guard and land back on this same page, which
+    // reads as a dead button.
+    window.location.href = loginUrl();
+    return;
+  }
   router.push("/preferences");
 }
 
@@ -318,6 +334,19 @@ onBeforeUnmount(() => {
   line-height: 1.6;
   max-width: 46ch;
   margin: 0 auto 36px;
+}
+
+/* Accent-tinted frame, single hue - the same alert treatment the profile
+   summary's stale-topics box uses (DESIGN.md bans a second accent color). */
+.signin-note {
+  display: inline-block;
+  margin: -12px 0 24px;
+  padding: 10px 18px;
+  border-radius: 10px;
+  border: 1px solid rgba(109, 123, 255, 0.4);
+  background: rgba(109, 123, 255, 0.14);
+  font-size: 13.5px;
+  color: #c4cadb;
 }
 
 .cta {

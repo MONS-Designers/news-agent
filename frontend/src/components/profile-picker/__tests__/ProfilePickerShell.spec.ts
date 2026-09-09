@@ -4,7 +4,12 @@ import HybridDepthBackground from "@/components/HybridDepthBackground.vue";
 import ProfilePickerShell from "../ProfilePickerShell.vue";
 
 const AboutYouStepStub = {
-  template: `<button class="stub-about-continue" @click="$emit('continue')">about-continue</button>`,
+  props: ["showBack"],
+  emits: ["continue", "back"],
+  template: `<div>
+    <button class="stub-about-continue" @click="$emit('continue')">about-continue</button>
+    <button class="stub-about-back" :data-show-back="showBack" @click="$emit('back')">about-back</button>
+  </div>`,
 };
 const InterestsStepStub = {
   props: ["active"],
@@ -23,8 +28,9 @@ const TopicsStepStub = {
   </div>`,
 };
 
-function mountShell() {
+function mountShell(props: { canExit?: boolean } = {}) {
   return mount(ProfilePickerShell, {
+    props,
     global: {
       stubs: {
         AboutYouStep: AboutYouStepStub,
@@ -107,17 +113,32 @@ describe("ProfilePickerShell - back navigation / edge cases", () => {
     expect(wrapper.find(".stub-topics").attributes("data-active")).toBe("false");
   });
 
-  it("mounts and unmounts cleanly via its composed HybridDepthBackground (matchMedia/scroll/IntersectionObserver listeners attach and detach without throwing)", () => {
+  it("mounts and unmounts cleanly", () => {
     const wrapper = mountShell();
     expect(() => wrapper.unmount()).not.toThrow();
   });
 
-  it("renders its header/stepper/steps inside HybridDepthBackground", () => {
+  it("hands Step 1's Back up to its caller instead of handling it - there is no step behind Step 1", async () => {
+    const wrapper = mountShell({ canExit: true });
+    expect(wrapper.find(".stub-about-back").attributes("data-show-back")).toBe("true");
+
+    await wrapper.find(".stub-about-back").trigger("click");
+    expect(wrapper.emitted("back")).toHaveLength(1);
+    // Still on Step 1 - the shell does not move anywhere itself.
+    expect(wrapper.find(".stub-about-continue").isVisible()).toBe(true);
+  });
+
+  it("passes canExit through to Step 1, so a caller with nothing behind the wizard gets no Back there", () => {
+    expect(mountShell().find(".stub-about-back").attributes("data-show-back")).toBe("false");
+  });
+
+  it("owns neither the screen's background nor its heading - PreferencesView does", () => {
+    // Both used to live here, which stacked two headings (this one and the
+    // page's own) the moment the wizard opened, and made a single-background
+    // screen impossible.
     const wrapper = mountShell();
-    const background = wrapper.findComponent(HybridDepthBackground);
-    expect(background.exists()).toBe(true);
-    // The stepper and the step content are slotted into it, not siblings of it.
-    expect(background.find(".stub-about-continue").exists()).toBe(true);
-    expect(background.text()).toContain("הגדרת הפרופיל שלך");
+    expect(wrapper.findComponent(HybridDepthBackground).exists()).toBe(false);
+    expect(wrapper.text()).not.toContain("הגדרת הפרופיל שלך");
+    expect(wrapper.text()).toContain("עליך"); // the stepper it does still own
   });
 });

@@ -36,6 +36,7 @@
             מעורבות
           </router-link>
           <router-link
+            v-if="me"
             to="/preferences"
             class="rounded-lg px-3 py-1.5 text-sm font-medium text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
             active-class="bg-neutral-100 text-neutral-900"
@@ -115,6 +116,8 @@ onMounted(async () => {
 
 async function signOut() {
   await authSignOut();
-  router.push("/preferences");
+  // The landing page is where a signed-out visitor belongs. Pushing to
+  // /preferences here used to work only by bouncing off that route's guard.
+  router.push("/");
 }
 </script>

@@ -31,7 +31,7 @@
     <textarea
       v-model="interestFreeText"
       class="min-h-[110px] w-full resize-y rounded-xl border border-white/[0.09] bg-white/[0.02] p-3.5 text-[13.5px] leading-[1.55] text-hd-fg [font-family:inherit] placeholder:text-hd-muted focus-visible:border-hd-accent-2/35 focus-visible:outline-none"
-      placeholder="כתוב בחופשיות - נשתמש בזה כדי לחדד את ההצעות שלך..."
+      placeholder="אפשר לכתוב בחופשיות - נשתמש בזה כדי לחדד את ההצעות שלך..."
       rows="4"
       aria-label="תחומי העניין שלך, במילים שלך"
     ></textarea>

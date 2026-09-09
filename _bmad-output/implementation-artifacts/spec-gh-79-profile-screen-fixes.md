@@ -78,6 +78,9 @@ baseline_commit: '0024938d7fb7edc6be2b1413a16350466b9adccd'
 
 ## Spec Change Log
 
+- **2026-09-09 - the `"שומר…"` review finding above was wrong, and is reversed.** That finding treated `"שמירה…"` as an unintended drift and restored `"שומר…"` for consistency with the sibling step components. But `"שומר…"` is masculine present tense, exactly the shape CLAUDE.md's gender-neutral Hebrew rule tells us to rewrite around, and the noun form was the correct instinct. All three step components (`AboutYouStep`, `InterestsStep`, `TopicsStep`) now read `"שמירה…"`, matching the `"טעינה…"` this spec already chose on the same reasoning. The regression guard did not catch it because its denylist only carries the imperative `"שמור"`, not the present-tense `"שומר"`.
+- **2026-09-09 - a second gendered string surfaced in the same audit.** `InterestsStep.vue`'s textarea placeholder opened with the masculine imperative `"כתוב בחופשיות..."`; reworded to `"אפשר לכתוב בחופשיות..."` and `"כתוב"` added to `gendered-copy.spec.ts`'s sentence-start denylist.
+
 ## Verification
 
 **Commands:**

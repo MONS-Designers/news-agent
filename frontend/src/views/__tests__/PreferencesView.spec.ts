@@ -20,8 +20,12 @@ vi.mock("@/api/client", async (importOriginal) => {
 });
 
 const ProfilePickerShellStub = {
-  emits: ["topics-saved"],
-  template: `<button class="stub-shell-saved" @click="$emit('topics-saved')">shell</button>`,
+  props: ["canExit"],
+  emits: ["topics-saved", "back"],
+  template: `<div>
+    <button class="stub-shell-saved" @click="$emit('topics-saved')">shell</button>
+    <button class="stub-shell-back" :data-can-exit="canExit" @click="$emit('back')">back</button>
+  </div>`,
 };
 
 const PREFS = [
@@ -192,6 +196,58 @@ describe("PreferencesView - happy path", () => {
 
     expect(updateMySubscription).toHaveBeenCalledWith(true);
     expect(wrapper.text()).toContain("מושהה");
+  });
+
+  it("swaps the single page heading between the summary and the wizard instead of stacking two", async () => {
+    getMyProfile.mockResolvedValue(RETURNING_PROFILE);
+    const wrapper = mountView();
+    await flushPromises();
+    expect(wrapper.text()).toContain("העדפות הנושאים שלי");
+    expect(wrapper.text()).not.toContain("הגדרת הפרופיל שלך");
+
+    await wrapper.findAll("button").find((b) => b.text() === "עריכת פרופיל")!.trigger("click");
+    expect(wrapper.text()).toContain("הגדרת הפרופיל שלך");
+    expect(wrapper.text()).not.toContain("העדפות הנושאים שלי");
+  });
+
+  it("keeps the page heading (not the wizard's) while the first fetch is still in flight", async () => {
+    // showSummary is false until a profile with a field_name arrives, so
+    // without gating on `loading` the title would read as the wizard's for
+    // the split second before the fetch resolves.
+    getMyProfile.mockReturnValue(new Promise(() => {}));
+    const wrapper = mountView();
+    expect(wrapper.text()).toContain("טעינה…");
+    expect(wrapper.text()).toContain("העדפות הנושאים שלי");
+    expect(wrapper.text()).not.toContain("הגדרת הפרופיל שלך");
+  });
+
+  it("returns a returning user to the read-only summary when the wizard steps back off its first step", async () => {
+    getMyProfile.mockResolvedValue(RETURNING_PROFILE);
+    const wrapper = mountView();
+    await flushPromises();
+
+    await wrapper.findAll("button").find((b) => b.text() === "עריכת פרופיל")!.trigger("click");
+    expect(wrapper.find(".stub-shell-saved").exists()).toBe(true);
+
+    await wrapper.find(".stub-shell-back").trigger("click");
+    expect(wrapper.find(".stub-shell-saved").exists()).toBe(false);
+    expect(wrapper.text()).toContain("עריכת פרופיל");
+  });
+
+  it("tells the wizard it may be exited when a saved profile sits behind it", async () => {
+    getMyProfile.mockResolvedValue(RETURNING_PROFILE);
+    const wrapper = mountView();
+    await flushPromises();
+    await wrapper.findAll("button").find((b) => b.text() === "עריכת פרופיל")!.trigger("click");
+    expect(wrapper.find(".stub-shell-back").attributes("data-can-exit")).toBe("true");
+  });
+
+  it("tells the wizard it may not be exited for a new user - there is no summary behind it yet", async () => {
+    getMyProfile.mockResolvedValue(NEW_PROFILE);
+    const wrapper = mountView();
+    await flushPromises();
+    expect(wrapper.find(".stub-shell-saved").exists()).toBe(true);
+    expect(wrapper.find(".stub-shell-back").attributes("data-can-exit")).toBe("false");
   });
 
   it("refreshes preferences quietly (without a loading flicker) after the wizard reports topics-saved", async () => {

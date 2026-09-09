@@ -1,11 +1,11 @@
 <template>
-  <HybridDepthBackground>
-    <p class="mb-2.5 text-[11px] font-bold uppercase tracking-[3px] text-hd-kicker">העדפות</p>
-    <h2 class="mb-2.5 text-[30px] font-[650] tracking-[-0.5px] text-hd-title">הגדרת הפרופיל שלך</h2>
-    <p class="mb-7 max-w-[52ch] text-sm leading-[1.55] text-hd-subtitle">
-      שלושה שלבים מהירים. אפשר לשנות כל דבר אחר כך - שום דבר לא ננעל.
-    </p>
-
+  <!--
+    Kicker, heading and the Hybrid Depth background all belong to
+    PreferencesView now - it owns the whole screen's chrome so the page has
+    exactly one heading and one background, whichever state it's in. This
+    component is the stepper and the step panel, nothing else.
+  -->
+  <div>
     <ol class="mb-7 flex list-none items-center gap-2 p-0" aria-label="התקדמות ההגדרה">
       <li v-for="step in steps" :key="step.n" class="flex min-w-0 flex-1 items-center gap-2">
         <span :class="stepDotClasses(step.n)">{{ step.n }}</span>
@@ -24,7 +24,7 @@
         destroying the DOM to work.
       -->
       <div ref="step1El" v-show="currentStep === 1" :class="STAGGER">
-        <AboutYouStep @continue="currentStep = 2" />
+        <AboutYouStep :show-back="canExit" @continue="currentStep = 2" @back="emit('back')" />
       </div>
       <div ref="step2El" v-show="currentStep === 2" :class="STAGGER">
         <InterestsStep :active="currentStep === 2" @continue="currentStep = 3" @back="currentStep = 1" />
@@ -37,17 +37,20 @@
         />
       </div>
     </div>
-  </HybridDepthBackground>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { nextTick, ref, watch } from "vue";
-import HybridDepthBackground from "@/components/HybridDepthBackground.vue";
 import AboutYouStep from "./AboutYouStep.vue";
 import InterestsStep from "./InterestsStep.vue";
 import TopicsStep from "./TopicsStep.vue";
 
-const emit = defineEmits<{ "topics-saved": [] }>();
+// `canExit` says whether Back on Step 1 has anywhere to go - the shell owns
+// navigation between steps, but stepping back off the first one leaves the
+// wizard entirely, which only whoever opened it can decide and perform.
+defineProps<{ canExit?: boolean }>();
+const emit = defineEmits<{ "topics-saved": []; back: [] }>();
 
 const steps = [
   { n: 1, label: "עליך" },

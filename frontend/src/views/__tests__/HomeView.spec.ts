@@ -88,11 +88,53 @@ describe("HomeView - happy path", () => {
     expect(wrapper.text()).toContain("דייג'סט אחד.");
   });
 
-  it("navigates to /preferences when the CTA is clicked", async () => {
+  it("navigates to /preferences when a signed-in visitor clicks the CTA", async () => {
+    ensureMe.mockResolvedValue({ email: "returning@example.com", is_admin: false, user_id: 8 });
+    getMyProfile.mockResolvedValue({
+      field_name: "פיתוח",
+      role_name: "מפתח",
+      experience_bucket: "3-5",
+      interest_free_text: null,
+    });
     const { wrapper, router } = await mountHome();
     await wrapper.find("button.cta").trigger("click");
     await flushPromises();
     expect(router.currentRoute.value.path).toBe("/preferences");
+  });
+
+  it("sends an anonymous visitor straight to Google sign-in instead of a dead CTA click", async () => {
+    // Pushing /preferences here would bounce off that route's guard back to
+    // this same page, which reads as a button that does nothing.
+    const realLocation = window.location;
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      writable: true,
+      value: { href: "" },
+    });
+    try {
+      ensureMe.mockResolvedValue(null);
+      const { wrapper, router } = await mountHome();
+      await wrapper.find("button.cta").trigger("click");
+      await flushPromises();
+      expect(window.location.href).toContain("/auth/login");
+      expect(router.currentRoute.value.path).toBe("/");
+    } finally {
+      Object.defineProperty(window, "location", {
+        configurable: true,
+        writable: true,
+        value: realLocation,
+      });
+    }
+  });
+
+  it("explains the sign-in requirement when the /preferences guard turned the visitor away", async () => {
+    const { wrapper } = await mountHome({ signin: "required" });
+    expect(wrapper.text()).toContain("יש להתחבר עם Google");
+  });
+
+  it("shows no sign-in notice on an ordinary visit", async () => {
+    const { wrapper } = await mountHome();
+    expect(wrapper.find(".signin-note").exists()).toBe(false);
   });
 
   it("renders all 3 'how it works' step cards", async () => {
