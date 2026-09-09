@@ -118,7 +118,7 @@ import { profileDraft as profile, preferencesDraft as preferences, initProfileDr
 // the edit-profile button and the topics-stale alert's action button.
 const BTN_BASE =
   "inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-[10px] border-0 text-[13.5px] font-semibold [font-family:inherit] [transition:transform_0.18s_ease] motion-reduce:transition-none active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-hd-accent-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:active:scale-100";
-const BTN_PRIMARY = `${BTN_BASE} px-[22px] py-[11px] [background-image:linear-gradient(to_bottom_in_oklch,_#5460ff,_#261761)] text-white shadow-[0_10px_24px_-10px_rgba(109,123,255,0.6)] disabled:opacity-35 disabled:shadow-none`;
+const BTN_PRIMARY = `${BTN_BASE} px-[22px] py-[11px] [background-image:linear-gradient(to_bottom_in_oklch,_#434ed2,_#231666)] border-[1px] border-[#a9b1ff]/30 text-white shadow-[0_4px_12px_-6px_rgba(109,123,255,0.35)] disabled:opacity-35 disabled:shadow-none`;
 
 // New combo (no existing button-secondary in the codebase yet) - bordered/
 // unfilled, between BTN_GHOST (too weak) and BTN_PRIMARY (too heavy), for
@@ -134,7 +134,7 @@ const BTN_SECONDARY =
 const TOPIC_BASE_READONLY =
   "inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full border px-4 py-[9px] text-[13.5px] [font-family:inherit] motion-reduce:transition-none [transition:border-color_0.18s_ease,background_0.18s_ease,transform_0.18s_ease] focus-visible:outline focus-visible:outline-2 focus-visible:outline-hd-accent-2 focus-visible:outline-offset-2";
 const TOPIC_PICKED =
-  "border-hd-accent-2/50 bg-gradient-to-b from-hd-accent-2/22 to-hd-accent-2/[0.09] text-white";
+  "border-hd-accent-2/50 bg-gradient-to-b from-hd-accent-2/32 to-hd-accent-2/14 text-white";
 const TOPIC_READONLY_PICKED = `${TOPIC_BASE_READONLY} ${TOPIC_PICKED}`;
 
 const subscription = ref<Subscription | null>(null);

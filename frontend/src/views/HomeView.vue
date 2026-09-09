@@ -326,13 +326,13 @@ onBeforeUnmount(() => {
   gap: 10px;
   padding: 15px 30px;
   border-radius: 10px;
-  border: none;
+  border: 1px solid rgba(169, 177, 255, 0.3);
   font-size: 14.5px;
   font-weight: 600;
   font-family: inherit;
   color: #ffffff;
-  background: linear-gradient(180deg, #7b86ff, #5c68e8);
-  box-shadow: 0 14px 34px -12px rgba(109, 123, 255, 0.65);
+  background: linear-gradient(180deg in oklch, #434ed2, #231666);
+  box-shadow: 0 4px 12px -6px rgba(109, 123, 255, 0.35);
   cursor: pointer;
   transition:
     transform 0.2s ease,
@@ -340,7 +340,7 @@ onBeforeUnmount(() => {
 }
 .cta:hover {
   transform: translateY(-2px);
-  box-shadow: 0 18px 40px -12px rgba(109, 123, 255, 0.8);
+  box-shadow: 0 8px 20px -8px rgba(109, 123, 255, 0.5);
 }
 .cta:focus-visible {
   outline: 2px solid #6d7bff;

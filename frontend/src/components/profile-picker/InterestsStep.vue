@@ -66,7 +66,7 @@ const promptsLoading = ref(false);
 
 const BTN_BASE =
   "inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-[10px] border-0 text-[13.5px] font-semibold [font-family:inherit] [transition:transform_0.18s_ease] motion-reduce:transition-none active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-hd-accent-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:active:scale-100";
-const BTN_PRIMARY = `${BTN_BASE} px-[22px] py-[11px] [background-image:linear-gradient(to_bottom_in_oklch,_#5460ff,_#261761)] text-white shadow-[0_10px_24px_-10px_rgba(109,123,255,0.6)] disabled:opacity-35 disabled:shadow-none`;
+const BTN_PRIMARY = `${BTN_BASE} px-[22px] py-[11px] [background-image:linear-gradient(to_bottom_in_oklch,_#434ed2,_#231666)] border-[1px] border-[#a9b1ff]/30 text-white shadow-[0_4px_12px_-6px_rgba(109,123,255,0.35)] disabled:opacity-35 disabled:shadow-none`;
 const BTN_GHOST = `${BTN_BASE} px-2 py-[11px] bg-transparent text-hd-label [@media(hover:hover)]:[&:hover:not(:disabled)]:text-hd-chip disabled:opacity-35`;
 
 let initialText = "";

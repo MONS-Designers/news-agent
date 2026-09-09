@@ -9,12 +9,17 @@ colors:
   ink-body: '#eef1f8'
   ink-secondary: '#c4cadb'
   ink-tertiary: '#8b93a7'
-  ink-muted: '#6b7288'
-  ink-faint: '#565f74'
+  ink-muted: '#828a9e'    # raised 2026-09-09 from #6b7288 (4.05:1, failed WCAG AA) - see EXPERIENCE.md Accessibility Floor
+  ink-faint: '#767d92'    # raised 2026-09-09 from #565f74 (3.04:1, failed WCAG AA) - see EXPERIENCE.md Accessibility Floor
   accent: '#6d7bff'
   accent-strong: '#a9b1ff'
-  accent-gradient-start: '#7b86ff'
-  accent-gradient-end: '#5c68e8'
+  accent-gradient-start: '#434ed2'   # revised 2026-09-09, twice - see EXPERIENCE.md Accessibility Floor for the full history (original #7b86ff failed WCAG AA; two intermediate revisions read as flat, then as muddy/unprofessional, then as too-bright/industrial)
+  accent-gradient-end: '#231666'     # revised 2026-09-09 alongside accent-gradient-start
+  accent-gradient-border: 'rgba(169,177,255,0.3)'  # new 2026-09-09 - see EXPERIENCE.md; darkening the fill past a point needs a border to stay visible against bg-void
+  # IMPORTANT: must be interpolated `in oklch`, not the plain sRGB default - a
+  # plain `linear-gradient(accent-gradient-start, accent-gradient-end)` crosses
+  # a visibly desaturated/muddy band around the midpoint (measured). See the
+  # component implementations' `linear-gradient(to bottom in oklch, ...)`.
   accent-soft: 'rgba(109,123,255,0.14)'
   accent-glow: 'rgba(109,123,255,0.35)'
   orb-indigo: '#4b3fae'

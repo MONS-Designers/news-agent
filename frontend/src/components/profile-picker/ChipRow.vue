@@ -118,7 +118,7 @@ const CHIP_BASE =
 const CHIP_UNSELECTED =
   "border-white/[0.09] bg-white/[0.02] [@media(hover:hover)]:hover:border-white/[0.22] [@media(hover:hover)]:hover:bg-white/[0.05] motion-safe:[@media(hover:hover)]:hover:-translate-y-px";
 const CHIP_SELECTED =
-  "border-hd-accent-2/55 bg-gradient-to-b from-hd-accent-2/22 to-hd-accent-2/10 text-white shadow-[0_0_0_1px_rgba(109,123,255,0.25),0_8px_24px_-8px_rgba(109,123,255,0.45)]";
+  "border-hd-accent-2/55 bg-gradient-to-b from-hd-accent-2/32 to-hd-accent-2/14 text-white shadow-[0_0_0_1px_rgba(109,123,255,0.25),0_4px_14px_-6px_rgba(109,123,255,0.35)]";
 
 /** Shared chip styling; `dashed` marks the "Other" button's idle (not-yet-active) state. */
 function chipClasses(selected: boolean, opts: { dashed?: boolean } = {}): string {

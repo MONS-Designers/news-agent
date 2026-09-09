@@ -38,7 +38,9 @@
           :key="bucket.value"
           :class="[
             'relative flex min-h-[44px] flex-1 cursor-pointer items-center justify-center rounded-lg py-[9px] text-center text-[13px] motion-reduce:transition-none [transition:all_0.18s_ease] focus-within:outline focus-within:outline-2 focus-within:outline-hd-accent-2 focus-within:outline-offset-2',
-            experienceBucket === bucket.value ? 'bg-hd-accent-2/18 text-white' : 'text-hd-subtitle',
+            experienceBucket === bucket.value
+              ? 'border border-hd-accent-2/55 bg-gradient-to-b from-hd-accent-2/32 to-hd-accent-2/14 text-white'
+              : 'border border-transparent text-hd-subtitle',
           ]"
         >
           <input
@@ -59,7 +61,7 @@
       <p v-if="saveError" class="text-xs text-hd-subtitle">{{ saveError }}</p>
       <button
         type="button"
-        class="inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center gap-2 rounded-[10px] border-0 [background-image:linear-gradient(to_bottom_in_oklch,_#5460ff,_#261761)] px-[22px] py-[11px] text-[13.5px] font-semibold text-white [font-family:inherit] [transition:transform_0.18s_ease] motion-reduce:transition-none shadow-[0_10px_24px_-10px_rgba(109,123,255,0.6)] active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-hd-accent-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-35 disabled:shadow-none disabled:active:scale-100"
+        class="inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center gap-2 rounded-[10px] border-[1px] border-[#a9b1ff]/30 [background-image:linear-gradient(to_bottom_in_oklch,_#434ed2,_#231666)] px-[22px] py-[11px] text-[13.5px] font-semibold text-white [font-family:inherit] [transition:transform_0.18s_ease] motion-reduce:transition-none shadow-[0_4px_12px_-6px_rgba(109,123,255,0.35)] active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-hd-accent-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-35 disabled:shadow-none disabled:active:scale-100"
         :class="{ disabled: !canContinue }"
         :disabled="!canContinue || saving"
         @click="onContinue"

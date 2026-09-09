@@ -273,6 +273,12 @@
   summary: Migration `a06a39402215`'s `UPDATE log_entries SET pipeline_run_id = NULL` (line 85) runs unconditionally and unbatched against the whole table in one transaction.
   evidence: Surfaced by adversarial review. Harmless at today's row counts; the migration has no chunking strategy if `log_entries` grows substantially before it is next touched. Applied to the live Neon Postgres instance on 2026-08-29 with no issue (per the spec file's Review Findings checklist) - the no-chunking gap remains relevant for any future migration against this table once `log_entries` has grown, just no longer for this specific revision.
 
+## Deferred from: GH #60 topic source discovery (2026-09-07)
+
+- source_spec: none
+  summary: CAP-2 of `_bmad-output/specs/spec-topic-source-discovery/SPEC.md` - DB-assigned `Topic.color`: a nullable `Topic.color` column with a unique constraint plus a reversible migration backfilling the 3 existing approved Topics with their current hardcoded colors, an `assign_topic_color` routine (unique + >=4.5:1 contrast against `#0b1020`, capped retries, `IntegrityError` retry), removal of `pipeline/render.py`'s `_TOPIC_COLORS` dict in favour of reading `topic.color` with the existing `_DEFAULT_TOPIC_COLOR` fallback, and eager-loading the `article.source.topic` chain so the lookup does not become an N+1.
+  evidence: Split out during Quick Dev step-01 multi-goal check on 2026-09-07 (user chose "split, A first"). It is independently shippable: merged alone it gives every Topic a unique legible colour and breaks nothing; and the source-discovery goal merged without it simply leaves new Topics on `render.py`'s existing default colour. The only coupling is that `services/topic_sourcing.py::run_topic_bootstrap` is specified to call colour assignment first and unconditionally - a three-line call site to add when this is picked up. Its own DB migration also wants its own review pass, per the project's standing show-the-migration-first rule.
+
 ## Deferred from: GH #79 profile screen fixes (2026-09-07)
 
 - source_spec: none
