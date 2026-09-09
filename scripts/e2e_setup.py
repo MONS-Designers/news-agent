@@ -13,7 +13,6 @@ the real .env/Neon DB or the real session secret.
 
 import base64
 import json
-import os
 import sys
 
 import itsdangerous
@@ -33,11 +32,13 @@ def mint_cookie(identity: dict) -> str:
 
 
 def main() -> None:
-    db_path = settings.database_url.removeprefix("sqlite:///")
-    if db_path and os.path.exists(db_path):
-        os.remove(db_path)
-
     engine = create_engine(settings.database_url, connect_args={"check_same_thread": False})
+    # Drop-and-recreate rather than deleting the file: Playwright starts the
+    # webServers before globalSetup runs, so the E2E backend already holds
+    # this sqlite file open. Unlinking an open file is fine on Linux (CI) and
+    # raises PermissionError on Windows, which made the suite unrunnable
+    # locally there. This gives the same empty schema on both.
+    Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
 
     with Session(engine) as db:

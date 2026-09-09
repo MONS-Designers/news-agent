@@ -108,7 +108,7 @@
 
     <ProfilePickerShell
       v-else
-      :can-exit="hasSavedProfile"
+      :can-exit="canExitWizard"
       @topics-saved="refreshPreferencesQuietly"
       @back="editing = false"
     />
@@ -168,7 +168,17 @@ const errorMessage = ref("");
 // not the wizard - editing (and the suggestion-recompute logic it can
 // trigger) only happens when they explicitly choose to.
 const editing = ref(false);
-const showSummary = computed(() => !editing.value && !!profile.value?.field_name);
+
+// Latched by the first load when it finds no saved profile, and never
+// recomputed from one. Step 1 writes field_name the moment the user presses
+// Continue, so deriving "should the wizard be showing" from the stored
+// profile alone would swap the wizard out for the summary in the middle of
+// onboarding - between Step 1 and Step 2.
+const onboarding = ref(false);
+
+const showSummary = computed(
+  () => !editing.value && !onboarding.value && !!profile.value?.field_name,
+);
 const topicsStale = computed(() => !!profile.value?.topics_stale_at);
 
 // The wizard is the chain's last branch. Naming it lets the heading and the
@@ -176,9 +186,11 @@ const topicsStale = computed(() => !!profile.value?.topics_stale_at);
 // switching the title for the split second before the first fetch resolves.
 const showWizard = computed(() => !loading.value && !errorMessage.value && !showSummary.value);
 
-// Whether stepping back off the wizard's first step has anywhere to land - a
-// brand-new user has no summary behind it, so that step shows no Back.
-const hasSavedProfile = computed(() => !!profile.value?.field_name);
+// Stepping back off the wizard's first step only has somewhere to land when
+// the wizard was opened from the summary. A user still onboarding has no
+// summary behind it - not even after Step 1 saves - so that step shows no
+// Back for them.
+const canExitWizard = computed(() => editing.value);
 
 // One heading owns the screen, swapping text per state. ProfilePickerShell
 // used to carry its own title, which stacked two headings on top of each
@@ -227,6 +239,9 @@ async function loadPreferences() {
     ]);
     initProfileDraft(prof, prefs);
     subscription.value = sub;
+    // Only the first load decides this - see `onboarding`'s declaration for
+    // why it must not be recomputed once the wizard is running.
+    if (!alreadyKnown) onboarding.value = !prof.field_name;
   } catch (error) {
     // A background revalidation failure is silent - what's already shown is
     // still the last known-good state. Only a first-ever load surfaces this.

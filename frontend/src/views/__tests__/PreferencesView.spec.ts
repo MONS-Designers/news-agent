@@ -306,11 +306,25 @@ describe("PreferencesView - unhappy path / edge cases", () => {
     expect(wrapper.find(".stub-shell-saved").exists()).toBe(false);
   });
 
-  it("after first completing the wizard as a new user, does not switch to the summary view - profile is never re-fetched, only preferences", async () => {
-    // refreshPreferencesQuietly() only re-syncs `preferences`, not `profile`
-    // itself, so profile.value.field_name stays null client-side even though
-    // AboutYouStep already saved the real field_name server-side - the view
-    // stays on the wizard until a full reload re-fetches the profile.
+  it("keeps a new user in the wizard when Step 1 saves, instead of swapping in the summary mid-onboarding", async () => {
+    // Step 1 patches the draft with the field_name it just wrote, so a
+    // showSummary derived from the stored profile alone would flip true
+    // between Step 1 and Step 2 and yank the wizard out from under the user.
+    // Caught by the Playwright onboarding spec before this guard existed.
+    getMyProfile.mockResolvedValue(NEW_PROFILE);
+    const wrapper = mountView();
+    await flushPromises();
+    expect(wrapper.find(".stub-shell-saved").exists()).toBe(true);
+
+    profileDraft.value = { ...profileDraft.value!, field_name: "פיתוח", role_name: "מפתח" };
+    await flushPromises();
+
+    expect(wrapper.find(".stub-shell-saved").exists()).toBe(true);
+    expect(wrapper.text()).toContain("הגדרת הפרופיל שלך");
+    expect(wrapper.text()).not.toContain("עריכת פרופיל");
+  });
+
+  it("after first completing the wizard as a new user, does not switch to the summary view", async () => {
     getMyProfile.mockResolvedValue(NEW_PROFILE);
     const wrapper = mountView();
     await flushPromises();
