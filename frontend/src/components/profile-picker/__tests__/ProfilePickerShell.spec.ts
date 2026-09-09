@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
+import HybridDepthBackground from "@/components/HybridDepthBackground.vue";
 import ProfilePickerShell from "../ProfilePickerShell.vue";
 
 const AboutYouStepStub = {
@@ -106,8 +107,17 @@ describe("ProfilePickerShell - back navigation / edge cases", () => {
     expect(wrapper.find(".stub-topics").attributes("data-active")).toBe("false");
   });
 
-  it("mounts and unmounts cleanly (matchMedia/scroll/IntersectionObserver listeners attach and detach without throwing)", () => {
+  it("mounts and unmounts cleanly via its composed HybridDepthBackground (matchMedia/scroll/IntersectionObserver listeners attach and detach without throwing)", () => {
     const wrapper = mountShell();
     expect(() => wrapper.unmount()).not.toThrow();
+  });
+
+  it("renders its header/stepper/steps inside HybridDepthBackground", () => {
+    const wrapper = mountShell();
+    const background = wrapper.findComponent(HybridDepthBackground);
+    expect(background.exists()).toBe(true);
+    // The stepper and the step content are slotted into it, not siblings of it.
+    expect(background.find(".stub-about-continue").exists()).toBe(true);
+    expect(background.text()).toContain("הגדרת הפרופיל שלך");
   });
 });

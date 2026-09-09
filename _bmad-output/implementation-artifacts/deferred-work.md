@@ -308,3 +308,28 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-gh-79-profile-screen-fixes.md`
   summary: `PreferencesView.vue`'s loading/error state and its summary/wizard state are expressed as two independently-gated `v-if`/`v-else-if` chains rather than one unified state machine.
   evidence: Surfaced by adversarial review as a maintainability smell - two separately-maintained conditionals expressing what is really one state machine drift out of sync the next time a state is added. Not a defect today (this spec's own fix keeps both chains correctly gated on `!loading && !errorMessage`, verified by tests) and matches the spec's own literal Task 53 instructions plus the pre-existing two-chain architecture (present before this spec too) - a real simplification opportunity, not required for correctness.
+  resolution: Unified into one `v-if`/`v-else-if`/`v-else-if`/`v-else` chain as a side effect of `spec-gh-79-profile-summary-visual.md` (2026-09-09), which needed all three states wrapped consistently to introduce `HybridDepthBackground`. Not deleting this entry (append-only) - recording the resolution here instead.
+
+## Deferred from: code review of spec-gh-79-profile-summary-visual (2026-09-09)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-gh-79-profile-summary-visual.md`
+  summary: `BTN_BASE`/`BTN_PRIMARY` is now duplicated across 4 files (`InterestsStep.vue`, `TopicsStep.vue`, `AboutYouStep.vue`, `PreferencesView.vue`) with no shared constants module.
+  evidence: Surfaced by adversarial review. Matches the pre-existing copy-paste convention already present across 3 files before this diff - a real DRY opportunity (extract to e.g. `frontend/src/hybrid-depth-classes.ts`) once a 5th consumer makes the duplication actually painful, not urgent today.
+- source_spec: `_bmad-output/implementation-artifacts/spec-gh-79-profile-summary-visual.md`
+  summary: `HybridDepthBackground.vue`'s `mousemove`/`scroll` listeners attach to `window` with no instance scoping - safe today only because the summary and wizard are mutually exclusive (`v-if`/`v-else`), so exactly one instance ever mounts.
+  evidence: Surfaced by adversarial review as a reusability landmine, not a live bug. Nothing in the component's current design prevents or warns against two simultaneous instances, which would double-handle every scroll/mousemove event. Worth a mount-count guard or a shared singleton pattern only if/when a second concurrent consumer actually appears.
+- source_spec: `_bmad-output/implementation-artifacts/spec-gh-79-profile-summary-visual.md`
+  summary: Reduced-motion handling now lives in three uncoordinated places - `HybridDepthBackground`'s persistent `matchMedia` listener (orb freeze), `ProfilePickerShell.replayEntrance`'s ad-hoc one-off `matchMedia` read, and Tailwind's `motion-reduce:` CSS variant on `STAGGER`.
+  evidence: Surfaced by adversarial review. A conscious tradeoff, not an oversight (documented in `ProfilePickerShell.vue`'s own comment) - avoids prop/emit plumbing between the two components for what's already CSS-suppressed regardless. Worth consolidating only if a future change to the reduced-motion story needs all three to move in lockstep.
+- source_spec: `_bmad-output/implementation-artifacts/spec-gh-79-profile-summary-visual.md`
+  summary: Orb `<div>`s keep `will-change-transform` in their static class list even when frozen under `prefers-reduced-motion`, forcing an unnecessary GPU compositing layer for elements that will never animate again in that mode.
+  evidence: Surfaced by adversarial review. Trivial cost at 3 small blurred divs; not worth a conditional-class special case unless profiling ever shows it matters.
+- source_spec: `_bmad-output/implementation-artifacts/spec-gh-79-profile-summary-visual.md`
+  summary: Reduced-motion re-enable (`handleMotionChange` transitioning back to normal) doesn't recompute the orb transform until the next `mousemove`/`scroll` event, so orbs stay visually pinned at `translate(0,0)` briefly after the user turns motion back on.
+  evidence: Surfaced by edge-case review. Confirmed pre-existing - this exact code moved verbatim from `ProfilePickerShell.vue`'s original implementation, not introduced by the `HybridDepthBackground` extraction. Cheap fix when picked up: call `applyOrbTransforms()` once inside the `else` branch of `handleMotionChange`.
+- source_spec: `_bmad-output/implementation-artifacts/spec-gh-79-profile-summary-visual.md`
+  summary: `onMouseMove`'s `event.clientX / window.innerWidth` (and the `innerHeight` equivalent) has no zero-guard against a 0×0 viewport, which would produce an `Infinity`/`NaN` transform.
+  evidence: Surfaced by edge-case review. Confirmed pre-existing (moved verbatim), and not practically reachable in normal browser usage - a 0×0 viewport doesn't fire mouse events in any real environment. Worth a one-line guard only if it's ever actually observed.
+- source_spec: `_bmad-output/implementation-artifacts/spec-gh-79-profile-summary-visual.md`
+  summary: No automated test covers the summary `dl`'s `grid-cols-1 sm:grid-cols-2` collapse, the subscription row's `flex-col sm:flex-row` stacking, or `prefers-reduced-motion` from `PreferencesView`'s own component tree (only `HybridDepthBackground.spec.ts` covers reduced-motion, in isolation).
+  evidence: Surfaced by the Acceptance Auditor. The spec's own Verification section already assigns responsive/motion checks to manual browser-pane QA rather than automated coverage - acceptable as specified. Worth adding real assertions (e.g. via a jsdom viewport-width mock or a computed-style check) if this screen's responsive behavior needs to be regression-proof later.

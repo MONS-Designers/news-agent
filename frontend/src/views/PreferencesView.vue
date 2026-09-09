@@ -18,93 +18,83 @@
       {{ errorMessage }}
     </div>
 
-    <div v-else-if="showSummary" class="space-y-5">
-      <div
-        v-if="topicsStale"
-        class="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900"
-      >
-        <p class="font-medium">שינית את הפרופיל, אבל הנושאים נשארו כפי שהיו.</p>
-        <p class="mt-1 text-amber-800">
-          הנושאים שלמטה נבחרו לפי התשובות הקודמות שלך, ולכן {{ DIGEST_NOUN_WEEKLY }} עדיין נבנה
-          סביבן. אפשר לרענן אותם בהתאם לפרופיל החדש.
-        </p>
-        <button
-          type="button"
-          class="mt-3 rounded-lg bg-amber-900 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-800"
-          @click="editing = true"
+    <HybridDepthBackground v-else-if="showSummary">
+      <div class="flex flex-col gap-[18px]">
+        <div
+          v-if="topicsStale"
+          class="rounded-xl border border-hd-accent-2/40 bg-hd-accent-2/[0.14] px-5 py-[18px]"
         >
-          עדכון הנושאים שלי
-        </button>
-      </div>
+          <p class="mb-1.5 text-[13.5px] font-semibold leading-[1.55] text-hd-title">
+            שינית את הפרופיל, אבל הנושאים נשארו כפי שהיו.
+          </p>
+          <p class="text-[13.5px] leading-[1.55] text-hd-body">
+            הנושאים שלמטה נבחרו לפי התשובות הקודמות שלך, ולכן {{ DIGEST_NOUN_WEEKLY }} עדיין נבנה
+            סביבן. אפשר לרענן אותם בהתאם לפרופיל החדש.
+          </p>
+          <button type="button" :class="[BTN_PRIMARY, 'mt-3.5']" @click="editing = true">
+            עדכון הנושאים שלי
+          </button>
+        </div>
 
-      <div class="space-y-5 rounded-xl border border-neutral-200 p-5">
-      <dl class="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-        <div>
-          <dt class="text-neutral-500">תחום</dt>
-          <dd class="font-medium">{{ profile?.field_name }}</dd>
-        </div>
-        <div>
-          <dt class="text-neutral-500">תפקיד</dt>
-          <dd class="font-medium">{{ profile?.role_name }}</dd>
-        </div>
-        <div>
-          <dt class="text-neutral-500">ניסיון</dt>
-          <dd class="font-medium">{{ experienceLabel }}</dd>
-        </div>
-        <div v-if="profile?.interest_free_text" class="col-span-2">
-          <dt class="text-neutral-500">תחומי עניין</dt>
-          <dd class="font-medium">{{ profile.interest_free_text }}</dd>
-        </div>
-      </dl>
+        <div class="rounded-2xl border border-white/[0.09] bg-white/[0.035] p-4 backdrop-blur-[18px] sm:p-[30px]">
+          <dl class="mb-6 grid grid-cols-1 gap-x-6 gap-y-3.5 sm:grid-cols-2">
+            <div>
+              <dt class="mb-1 text-[11px] tracking-[1px] text-hd-subtitle">תחום</dt>
+              <dd class="text-sm font-semibold text-hd-fg">{{ profile?.field_name }}</dd>
+            </div>
+            <div>
+              <dt class="mb-1 text-[11px] tracking-[1px] text-hd-subtitle">תפקיד</dt>
+              <dd class="text-sm font-semibold text-hd-fg">{{ profile?.role_name }}</dd>
+            </div>
+            <div>
+              <dt class="mb-1 text-[11px] tracking-[1px] text-hd-subtitle">ניסיון</dt>
+              <dd class="text-sm font-semibold text-hd-fg">{{ experienceLabel }}</dd>
+            </div>
+            <div v-if="profile?.interest_free_text" class="sm:col-span-2">
+              <dt class="mb-1 text-[11px] tracking-[1px] text-hd-subtitle">תחומי עניין</dt>
+              <dd class="text-sm font-normal text-hd-body">{{ profile.interest_free_text }}</dd>
+            </div>
+          </dl>
 
-      <div>
-        <p class="mb-1.5 text-sm text-neutral-500">נושאים רשומים</p>
-        <div class="flex flex-wrap gap-2">
-          <span
-            v-for="topic in subscribedTopics"
-            :key="topic.topic_id"
-            class="rounded-full bg-neutral-100 px-3 py-1 text-xs font-medium text-neutral-700"
+          <div>
+            <p class="mb-2.5 text-[13px] text-hd-subtitle">נושאים רשומים</p>
+            <div class="mb-6 flex flex-wrap gap-2.5">
+              <span
+                v-for="topic in subscribedTopics"
+                :key="topic.topic_id"
+                :class="TOPIC_READONLY_PICKED"
+              >
+                {{ topic.name }}
+              </span>
+              <span v-if="subscribedTopics.length === 0" class="text-xs text-hd-muted">עדיין אין</span>
+            </div>
+          </div>
+
+          <button type="button" :class="BTN_PRIMARY" @click="editing = true">עריכת פרופיל</button>
+        </div>
+
+        <div
+          class="flex flex-col items-stretch gap-3.5 rounded-2xl border border-white/[0.09] bg-white/[0.035] px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-5"
+        >
+          <div>
+            <p class="mb-1 text-sm font-semibold text-hd-fg">מיילים שבועיים</p>
+            <p :class="['text-xs', subscription?.unsubscribed ? 'text-hd-accent' : 'text-hd-subtitle']">
+              {{ subscription?.unsubscribed ? `מושהה - ${DIGEST_NOUN_WEEKLY} לא יישלח.` : "פעיל" }}
+            </p>
+          </div>
+          <button
+            type="button"
+            :disabled="subscriptionSaving"
+            :class="[BTN_SECONDARY, 'self-start sm:self-auto']"
+            @click="toggleSubscription"
           >
-            {{ topic.name }}
-          </span>
-          <span v-if="subscribedTopics.length === 0" class="text-xs text-neutral-400">עדיין אין</span>
+            {{ subscription?.unsubscribed ? "המשך" : "השהיה" }}
+          </button>
         </div>
       </div>
+    </HybridDepthBackground>
 
-      <button
-        type="button"
-        class="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800"
-        @click="editing = true"
-      >
-        עריכת פרופיל
-      </button>
-      </div>
-    </div>
-
-    <div
-      v-if="!loading && !errorMessage && showSummary"
-      class="flex items-center justify-between rounded-xl border border-neutral-200 p-5"
-    >
-      <div>
-        <p class="text-sm font-medium">מיילים שבועיים</p>
-        <p class="text-xs text-neutral-500">
-          {{ subscription?.unsubscribed ? `מושהה - ${DIGEST_NOUN_WEEKLY} לא יישלח.` : "פעיל" }}
-        </p>
-      </div>
-      <button
-        type="button"
-        :disabled="subscriptionSaving"
-        class="rounded-lg border border-neutral-300 px-3 py-1.5 text-sm font-medium hover:bg-neutral-50 disabled:opacity-50"
-        @click="toggleSubscription"
-      >
-        {{ subscription?.unsubscribed ? "המשך" : "השהיה" }}
-      </button>
-    </div>
-
-    <ProfilePickerShell
-      v-else-if="!loading && !errorMessage"
-      @topics-saved="refreshPreferencesQuietly"
-    />
+    <ProfilePickerShell v-else @topics-saved="refreshPreferencesQuietly" />
   </div>
 </template>
 
@@ -120,9 +110,33 @@ import {
   type Subscription,
   type TopicPreference,
 } from "@/api/client";
+import HybridDepthBackground from "@/components/HybridDepthBackground.vue";
 import HybridSpinner from "@/components/HybridSpinner.vue";
 import ProfilePickerShell from "@/components/profile-picker/ProfilePickerShell.vue";
 import { DIGEST_NOUN_WEEKLY } from "@/branding";
+
+// Reused verbatim from TopicsStep.vue / AboutYouStep.vue (see those files) -
+// the edit-profile button and the topics-stale alert's action button.
+const BTN_BASE =
+  "inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-[10px] border-0 text-[13.5px] font-semibold [font-family:inherit] [transition:transform_0.18s_ease] motion-reduce:transition-none active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-hd-accent-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:active:scale-100";
+const BTN_PRIMARY = `${BTN_BASE} px-[22px] py-[11px] bg-gradient-to-b from-[#7b86ff] to-[#5c68e8] text-white shadow-[0_10px_24px_-10px_rgba(109,123,255,0.6)] disabled:opacity-35 disabled:shadow-none`;
+
+// New combo (no existing button-secondary in the codebase yet) - bordered/
+// unfilled, between BTN_GHOST (too weak) and BTN_PRIMARY (too heavy), for
+// the subscription-toggle button. Same sizing/focus-visible/motion-reduce
+// conventions as BTN_BASE, but with a visible border (BTN_BASE uses
+// border-0, since primary/ghost don't want one).
+const BTN_SECONDARY =
+  "inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-[10px] border border-white/[0.09] px-[18px] py-[9px] text-[13.5px] font-semibold [font-family:inherit] text-hd-subtitle bg-white/[0.02] [transition:transform_0.18s_ease,background-color_0.18s_ease,border-color_0.18s_ease] motion-reduce:transition-none active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-hd-accent-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:active:scale-100 disabled:opacity-35 [@media(hover:hover)]:hover:border-white/[0.22] [@media(hover:hover)]:hover:bg-white/[0.05]";
+
+// TOPIC_BASE/TOPIC_PICKED reused verbatim from TopicsStep.vue, minus
+// cursor-pointer/active:scale-[0.97] - these pills are read-only (no click
+// handler, no "✕").
+const TOPIC_BASE_READONLY =
+  "inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full border px-4 py-[9px] text-[13.5px] [font-family:inherit] motion-reduce:transition-none [transition:border-color_0.18s_ease,background_0.18s_ease,transform_0.18s_ease] focus-visible:outline focus-visible:outline-2 focus-visible:outline-hd-accent-2 focus-visible:outline-offset-2";
+const TOPIC_PICKED =
+  "border-hd-accent-2/50 bg-gradient-to-b from-hd-accent-2/22 to-hd-accent-2/[0.09] text-white";
+const TOPIC_READONLY_PICKED = `${TOPIC_BASE_READONLY} ${TOPIC_PICKED}`;
 
 const preferences = ref<TopicPreference[]>([]);
 const profile = ref<Profile | null>(null);

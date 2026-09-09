@@ -113,6 +113,41 @@ describe("PreferencesView - happy path", () => {
     expect(wrapper.text()).not.toContain("טוען");
   });
 
+  it("wraps the summary and subscription row in HybridDepthBackground's void/orb chrome", async () => {
+    getMyProfile.mockResolvedValue(RETURNING_PROFILE);
+    const wrapper = mount(PreferencesView, {
+      global: { stubs: { ProfilePickerShell: ProfilePickerShellStub } },
+    });
+    await flushPromises();
+
+    // HybridDepthBackground is not stubbed - its orb/grain aria-hidden
+    // markup renders for real, proving the summary is wrapped by it (rather
+    // than sitting in the old plain-Tailwind container).
+    expect(wrapper.findAll('[aria-hidden="true"]').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("renders the topics-stale warning with the alert-frame treatment, not the old amber Tailwind banner", async () => {
+    getMyProfile.mockResolvedValue({ ...RETURNING_PROFILE, topics_stale_at: "2026-09-01T00:00:00Z" });
+    const wrapper = mountView();
+    await flushPromises();
+
+    expect(wrapper.text()).toContain("שינית את הפרופיל");
+    expect(wrapper.find(".bg-amber-50").exists()).toBe(false);
+    expect(wrapper.find(".border-amber-300").exists()).toBe(false);
+    expect(wrapper.find('[class*="border-hd-accent-2/40"]').exists()).toBe(true);
+  });
+
+  it("renders subscribed topics as read-only pills - no '✕' and no click handler", async () => {
+    getMyProfile.mockResolvedValue(RETURNING_PROFILE);
+    const wrapper = mountView();
+    await flushPromises();
+
+    const pill = wrapper.findAll("span").find((s) => s.text() === "AI")!;
+    expect(pill.text()).not.toContain("✕");
+    // A read-only pill is a <span>, not a <button> - there is nothing to click.
+    expect(pill.element.tagName).toBe("SPAN");
+  });
+
   it("toggles the subscription pause/resume label and calls the API with the flipped value", async () => {
     getMyProfile.mockResolvedValue(RETURNING_PROFILE);
     updateMySubscription.mockResolvedValue({ unsubscribed: true });
@@ -168,13 +203,14 @@ describe("PreferencesView - unhappy path / edge cases", () => {
     expect(wrapper.find(".stub-shell-saved").exists()).toBe(false);
   });
 
-  it("no longer renders the profile wizard underneath the error banner (fixed - the second v-if chain is now gated on !loading && !errorMessage too)", async () => {
-    // Before this fix: showSummary requires a loaded profile with
-    // field_name, and on any load failure profile.value stays null, so the
-    // template's second, independent v-if/v-else block (subscription box vs.
+  it("no longer renders the profile wizard underneath the error banner (fixed - one loading/error/summary/wizard v-if chain now gates all four)", async () => {
+    // Before the original fix: showSummary requires a loaded profile with
+    // field_name, and on any load failure profile.value stays null, so a
+    // second, independent v-if/v-else block (subscription box vs.
     // ProfilePickerShell) picked its v-else branch and rendered the wizard
-    // alongside the error message. Now that block also checks
-    // !loading && !errorMessage, so neither branch renders on error.
+    // alongside the error message. That second chain was later merged into
+    // the single loading/error/summary/wizard chain above (GH #79 item 3),
+    // so ProfilePickerShell only ever renders via the chain's own v-else.
     getMyProfile.mockRejectedValue(new Error("network down"));
     const wrapper = mountView();
     await flushPromises();
