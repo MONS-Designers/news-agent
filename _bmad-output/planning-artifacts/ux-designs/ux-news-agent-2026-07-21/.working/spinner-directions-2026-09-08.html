@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>HybridSpinner - direction exploration (2026-09-08, round 2)</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; background: #0a0d16; color: #eef1f8;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Arial, sans-serif;
+    padding: 40px 24px 80px;
+  }
+  h1 { font-size: 20px; font-weight: 650; margin: 0 0 4px; }
+  .intro { color: #8b93a7; font-size: 13px; max-width: 640px; line-height: 1.6; margin-bottom: 36px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; max-width: 1100px; }
+  .card {
+    background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.09);
+    border-radius: 16px; padding: 22px 20px;
+  }
+  .card h2 { font-size: 13.5px; font-weight: 600; margin: 0 0 4px; color: #f4f6fb; }
+  .verdict { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; margin: 0 0 12px; }
+  .verdict.reject { color: #c9788a; }
+  .verdict.keep { color: #7fd8a0; }
+  .verdict.baseline { color: #8b93a7; }
+  .note { font-size: 12px; color: #8b93a7; line-height: 1.6; margin: 12px 0 0; }
+  .stage {
+    display: flex; align-items: center; justify-content: center; gap: 26px;
+    background: rgba(0,0,0,0.25); border-radius: 12px; padding: 24px 12px; min-height: 90px;
+  }
+  .size-label { font-size: 10px; color: #565f74; text-align: center; margin-top: 6px; }
+  .col { display: flex; flex-direction: column; align-items: center; }
+  .btn-demo {
+    display: inline-flex; align-items: center; gap: 8px; padding: 9px 18px;
+    border-radius: 10px; font-size: 13.5px; font-weight: 600; color: #fff;
+    background: linear-gradient(180deg, #7b86ff, #5c68e8); opacity: .75;
+  }
+  svg.icon { color: #a9b1ff; display: block; }
+  .reduced-toggle {
+    position: fixed; top: 16px; left: 16px; background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 8px 14px;
+    font-size: 12px; color: #c4cadb; cursor: pointer; z-index: 10;
+  }
+  body.reduced .motion { animation: none !important; }
+
+  /* ---- A: v3 baseline - single sparkle rotating around own true center ---- */
+  .sparkA { transform-origin: 32px 32px; animation: spinA 1.1s linear infinite; }
+  @keyframes spinA { to { transform: rotate(360deg); } }
+
+  /* ---- B: sparkle twinkle - scale+opacity pulse, no rotation at all ---- */
+  .sparkB { transform-origin: 32px 32px; animation: twinkleB 1.3s ease-in-out infinite; }
+  @keyframes twinkleB {
+    0%, 100% { transform: scale(0.82); opacity: 0.55; }
+    50% { transform: scale(1.08); opacity: 1; }
+  }
+
+  /* ---- C: three bars, sequential wave pulse (grounded in the mark's own bars) ---- */
+  .barC { animation: waveC 1.4s ease-in-out infinite; transform-origin: right center; }
+  .barC.b1 { animation-delay: 0s; }
+  .barC.b2 { animation-delay: 0.15s; }
+  .barC.b3 { animation-delay: 0.3s; }
+  @keyframes waveC {
+    0%, 100% { opacity: 0.3; transform: scaleX(0.7); }
+    50% { opacity: 1; transform: scaleX(1); }
+  }
+
+  /* ---- D: sparkle rotate + broken symmetry (uneven point opacity) + slight breathing ---- */
+  .sparkD-rot { transform-origin: 32px 32px; animation: spinD 1.6s linear infinite, breatheD 2.6s ease-in-out infinite; }
+  @keyframes spinD { to { transform: rotate(360deg); } }
+  @keyframes breatheD { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+</style>
+</head>
+<body>
+<button class="reduced-toggle" onclick="document.body.classList.toggle('reduced')">prefers-reduced-motion: toggle</button>
+
+<h1>HybridSpinner - direction exploration, round 2 (2026-09-08)</h1>
+<p class="intro">
+  v3 (single sparkle rotating around its own center) was the live-session baseline - user verdict "better but not
+  perfect, need to work on this seriously." Two real problems with rotating that shape: the sparkle is 4-fold
+  symmetric (top/right/bottom/left points are identical), so a full rotation repeats its own silhouette every 90&deg;
+  - at 14px inline size this reads less like a clean spin and more like a wobble, since intermediate angles (the
+  45&deg; "diamond" position) look like a shape change rather than continuous rotation. It's also a solid filled glyph
+  with no varying visual weight around the rotation axis, so it lacks the cue classic ring/arc spinners rely on to
+  read as "turning" at all. The candidates below try genuinely different motion primitives, not just re-tuned rotation.
+</p>
+
+<div class="grid">
+
+  <div class="card">
+    <h2>A - v3 baseline (for comparison)</h2>
+    <p class="verdict baseline">BASELINE - already shown, not resolved</p>
+    <div class="stage">
+      <div class="col">
+        <svg class="icon" width="44" height="44" viewBox="0 0 64 64">
+          <g class="sparkA motion">
+            <g transform="translate(32,32) scale(2.4) translate(-46,-17)">
+              <path d="M46,9 C46,13 42,17 38,17 C42,17 46,21 46,25 C46,21 50,17 54,17 C50,17 46,13 46,9 Z" fill="currentColor"/>
+            </g>
+          </g>
+        </svg>
+        <p class="size-label">standalone</p>
+      </div>
+      <div class="btn-demo">
+        <svg class="icon" width="14" height="14" viewBox="0 0 64 64">
+          <g class="sparkA motion">
+            <g transform="translate(32,32) scale(2.4) translate(-46,-17)">
+              <path d="M46,9 C46,13 42,17 38,17 C42,17 46,21 46,25 C46,21 50,17 54,17 C50,17 46,13 46,9 Z" fill="currentColor"/>
+            </g>
+          </g>
+        </svg>
+        טוען…
+      </div>
+    </div>
+    <p class="note">Single sparkle, own-center rotation, 2.4x scale. Same file as mockups/key-profile-summary.html right now.</p>
+  </div>
+
+  <div class="card">
+    <h2>B - sparkle twinkle (no rotation)</h2>
+    <p class="verdict keep">CONVERGED ON THIS</p>
+    <div class="stage">
+      <div class="col">
+        <svg class="icon" width="44" height="44" viewBox="0 0 64 64">
+          <g class="sparkB motion">
+            <g transform="translate(32,32) scale(2.4) translate(-46,-17)">
+              <path d="M46,9 C46,13 42,17 38,17 C42,17 46,21 46,25 C46,21 50,17 54,17 C50,17 46,13 46,9 Z" fill="currentColor"/>
+            </g>
+          </g>
+        </svg>
+        <p class="size-label">standalone</p>
+      </div>
+      <div class="btn-demo">
+        <svg class="icon" width="14" height="14" viewBox="0 0 64 64">
+          <g class="sparkB motion">
+            <g transform="translate(32,32) scale(2.4) translate(-46,-17)">
+              <path d="M46,9 C46,13 42,17 38,17 C42,17 46,21 46,25 C46,21 50,17 54,17 C50,17 46,13 46,9 Z" fill="currentColor"/>
+            </g>
+          </g>
+        </svg>
+        טוען…
+      </div>
+    </div>
+    <p class="note">
+      Scale 0.82&rarr;1.08 + opacity 0.55&rarr;1, ease-in-out, no rotation at all. Sidesteps the symmetry-wobble problem
+      entirely since there's nothing to look "wrong" mid-turn. Sparkles conventionally twinkle rather than spin in most
+      icon systems (Gemini's sparkle, Apple's "sparkles" SF Symbol) - this is arguably the more honest motion metaphor
+      for this specific glyph, not just a workaround. Reads clearly as "alive/busy" even at 14px. Single moving element,
+      matches the restrained-motion principle.
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>C - three bars, sequential wave</h2>
+    <p class="verdict reject">CONSIDERED, NOT CHOSEN</p>
+    <div class="stage">
+      <div class="col">
+        <svg class="icon" width="44" height="30" viewBox="0 0 44 30">
+          <rect class="barC b1 motion" x="0" y="0" width="44" height="8" rx="4" fill="currentColor"/>
+          <rect class="barC b2 motion" x="0" y="11" width="44" height="8" rx="4" fill="currentColor"/>
+          <rect class="barC b3 motion" x="0" y="22" width="26" height="8" rx="4" fill="currentColor"/>
+        </svg>
+        <p class="size-label">standalone</p>
+      </div>
+      <div class="btn-demo">
+        <svg class="icon" width="18" height="12" viewBox="0 0 44 30">
+          <rect class="barC b1 motion" x="0" y="0" width="44" height="8" rx="4" fill="currentColor"/>
+          <rect class="barC b2 motion" x="0" y="11" width="44" height="8" rx="4" fill="currentColor"/>
+          <rect class="barC b3 motion" x="0" y="22" width="26" height="8" rx="4" fill="currentColor"/>
+        </svg>
+        טוען…
+      </div>
+    </div>
+    <p class="note">
+      Reuses the mark's other element (the 3 descending bars) instead of the sparkle - each bar pulses opacity/scaleX
+      in a staggered wave. Clean, unambiguous "busy" read, zero rotation-symmetry risk. Rejected for this component:
+      at 14px inline the 3 stacked bars compress into a near-illegible smudge next to button text, and using the bars
+      here creates a second, competing "loading" motif alongside the sparkle (the real static mark still shows both
+      sparkle-pair + bars together) - splitting which element "means loading" is worse than picking one consistently.
+      Logged as worth revisiting only if a future direction retires the sparkle entirely.
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>D - rotation, symmetry deliberately broken</h2>
+    <p class="verdict reject">CONSIDERED, NOT CHOSEN</p>
+    <div class="stage">
+      <div class="col">
+        <svg class="icon" width="44" height="44" viewBox="0 0 64 64">
+          <g class="sparkD-rot motion">
+            <g transform="translate(32,32) scale(2.4) translate(-46,-17)">
+              <path d="M46,9 C46,13 42,17 38,17 C42,17 46,21 46,25 C46,21 50,17 54,17 C50,17 46,13 46,9 Z" fill="currentColor" fill-opacity="1"/>
+              <circle cx="46" cy="9" r="1.6" fill="currentColor"/>
+            </g>
+          </g>
+        </svg>
+        <p class="size-label">standalone</p>
+      </div>
+      <div class="btn-demo">
+        <svg class="icon" width="14" height="14" viewBox="0 0 64 64">
+          <g class="sparkD-rot motion">
+            <g transform="translate(32,32) scale(2.4) translate(-46,-17)">
+              <path d="M46,9 C46,13 42,17 38,17 C42,17 46,21 46,25 C46,21 50,17 54,17 C50,17 46,13 46,9 Z" fill="currentColor" fill-opacity="1"/>
+              <circle cx="46" cy="9" r="1.6" fill="currentColor"/>
+            </g>
+          </g>
+        </svg>
+        טוען…
+      </div>
+    </div>
+    <p class="note">
+      An attempt to repair v3 directly rather than replace it: a small dot marks one point of the sparkle (breaking the
+      4-fold symmetry so rotation has a visible "leading point" to track), rotation slowed to 1.6s, plus a slow
+      independent breathing scale so the motion never exactly repeats within a short window. Rejected: the marker dot
+      reads as visual noise/a stray artifact at 14px rather than a helpful cue, and two overlapping animation periods
+      (1.6s rotation + 2.6s breathing) is more moving parts than DESIGN.md's restrained-motion principle wants for one
+      small glyph. Fixing v3's actual problem (perceptual wobble) needs a bigger structural change than tuning knobs -
+      this candidate confirms rotation of this specific shape is the wrong primitive, not just under-tuned.
+    </p>
+  </div>
+
+</div>
+</body>
+</html>

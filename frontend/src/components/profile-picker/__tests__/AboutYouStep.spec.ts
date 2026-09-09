@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import AboutYouStep from "../AboutYouStep.vue";
+import { profileDraft } from "@/profile-draft";
 
 const listFields = vi.fn();
 const listRoles = vi.fn();
-const getMyProfile = vi.fn();
 const updateMyProfile = vi.fn();
 vi.mock("@/api/client", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/api/client")>();
@@ -12,7 +12,6 @@ vi.mock("@/api/client", async (importOriginal) => {
     ...actual,
     listFields: (...args: unknown[]) => listFields(...args),
     listRoles: (...args: unknown[]) => listRoles(...args),
-    getMyProfile: (...args: unknown[]) => getMyProfile(...args),
     updateMyProfile: (...args: unknown[]) => updateMyProfile(...args),
   };
 });
@@ -30,16 +29,16 @@ const BLANK_PROFILE = {
   role_name: null,
   experience_bucket: null,
   interest_free_text: null,
+  topics_stale_at: null,
 };
 
 beforeEach(() => {
   listFields.mockReset();
   listRoles.mockReset();
-  getMyProfile.mockReset();
   updateMyProfile.mockReset();
   listFields.mockResolvedValue(FIELDS);
   listRoles.mockResolvedValue(DEV_ROLES);
-  getMyProfile.mockResolvedValue(BLANK_PROFILE);
+  profileDraft.value = { ...BLANK_PROFILE };
 });
 
 function fieldChip(wrapper: ReturnType<typeof mount>, name: string) {
@@ -80,18 +79,87 @@ describe("AboutYouStep - happy path", () => {
   });
 
   it("prefills a curated Field and curated Role from an existing profile", async () => {
-    getMyProfile.mockResolvedValue({
+    profileDraft.value = {
       ...BLANK_PROFILE,
       field_name: "פיתוח",
       role_name: "מפתח",
       experience_bucket: "3-5",
-    });
+    };
     const wrapper = mount(AboutYouStep);
     await flushPromises();
     await flushPromises(); // second tick for the Field->Role watch chain
 
     expect(fieldChip(wrapper, "פיתוח").attributes("aria-pressed")).toBe("true");
     expect(roleChip(wrapper, "מפתח").attributes("aria-pressed")).toBe("true");
+    expect(continueButton(wrapper).attributes("disabled")).toBeUndefined();
+  });
+
+  it("does not gate Continue on the background Role-list refresh for an unchanged prefilled Field/Role (GH #79)", async () => {
+    profileDraft.value = {
+      ...BLANK_PROFILE,
+      field_name: "פיתוח",
+      role_name: "מפתח",
+      experience_bucket: "3-5",
+    };
+    let resolveRoles: (v: unknown) => void = () => {};
+    listRoles.mockImplementation(() => new Promise((resolve) => (resolveRoles = resolve)));
+    const wrapper = mount(AboutYouStep);
+    await flushPromises();
+
+    // The Role fetch is still in flight (never resolved yet), but this is a
+    // prefill, not a genuine user-initiated Field change - Continue must be
+    // available immediately, with no spinner and no "טעינה…" gate.
+    const btn = continueButton(wrapper);
+    expect(btn.attributes("disabled")).toBeUndefined();
+    expect(btn.text()).not.toContain("טעינה…");
+    expect(btn.find("svg").exists()).toBe(false);
+
+    resolveRoles(DEV_ROLES);
+    await flushPromises();
+    expect(continueButton(wrapper).attributes("disabled")).toBeUndefined();
+  });
+
+  it("shows the already-known Role as a selected chip immediately during a prefill, not a blank row, while the background refresh is in flight", async () => {
+    profileDraft.value = {
+      ...BLANK_PROFILE,
+      field_name: "פיתוח",
+      role_name: "מפתח",
+      experience_bucket: "3-5",
+    };
+    let resolveRoles: (v: unknown) => void = () => {};
+    listRoles.mockImplementation(() => new Promise((resolve) => (resolveRoles = resolve)));
+    const wrapper = mount(AboutYouStep);
+    await flushPromises();
+
+    // Before the fetch resolves: no "טעינת תפקידים…" placeholder (Continue
+    // isn't gated, so this text intentionally never shows for a prefill -
+    // see the previous test) - but the row must not be blank either. The
+    // already-known Role renders as a real, selected chip.
+    const roleChip = wrapper.findAll('[aria-pressed="true"]').find((b) => b.text() === "מפתח");
+    expect(roleChip).toBeTruthy();
+    expect(wrapper.text()).not.toContain("טעינת תפקידים…");
+
+    resolveRoles(DEV_ROLES);
+    await flushPromises();
+    // Still selected once the real curated list arrives (DEV_ROLES includes "מפתח").
+    expect(
+      wrapper.findAll('[aria-pressed="true"]').find((b) => b.text() === "מפתח"),
+    ).toBeTruthy();
+  });
+
+  it("a background Role-list refresh failure for a prefill is silent - no loadError, Continue stays available", async () => {
+    profileDraft.value = {
+      ...BLANK_PROFILE,
+      field_name: "פיתוח",
+      role_name: "מפתח",
+      experience_bucket: "3-5",
+    };
+    listRoles.mockRejectedValue(new Error("network down"));
+    const wrapper = mount(AboutYouStep);
+    await flushPromises();
+    await flushPromises();
+
+    expect(wrapper.text()).not.toContain("טעינת האפשרויות נכשלה");
     expect(continueButton(wrapper).attributes("disabled")).toBeUndefined();
   });
 
@@ -102,7 +170,7 @@ describe("AboutYouStep - happy path", () => {
     // requires selectedName === null) never becomes true here and the
     // free-text input stays hidden. The value still flows correctly into
     // canContinue and into the eventual save.
-    getMyProfile.mockResolvedValue({ ...BLANK_PROFILE, field_name: "ביולוגיה ימית" });
+    profileDraft.value = { ...BLANK_PROFILE, field_name: "ביולוגיה ימית" };
     const wrapper = mount(AboutYouStep);
     await flushPromises();
     await flushPromises();
@@ -130,12 +198,12 @@ describe("AboutYouStep - happy path", () => {
   });
 
   it("Continue emits without an API call when nothing changed since load", async () => {
-    getMyProfile.mockResolvedValue({
+    profileDraft.value = {
       ...BLANK_PROFILE,
       field_name: "פיתוח",
       role_name: "מפתח",
       experience_bucket: "3-5",
-    });
+    };
     const wrapper = mount(AboutYouStep);
     await flushPromises();
     await flushPromises();
@@ -145,6 +213,27 @@ describe("AboutYouStep - happy path", () => {
 
     expect(updateMyProfile).not.toHaveBeenCalled();
     expect(wrapper.emitted("continue")).toHaveLength(1);
+  });
+
+  it("patches profileDraft with the unchanged values on the no-op Continue path", async () => {
+    profileDraft.value = {
+      ...BLANK_PROFILE,
+      field_name: "פיתוח",
+      role_name: "מפתח",
+      experience_bucket: "3-5",
+    };
+    const wrapper = mount(AboutYouStep);
+    await flushPromises();
+    await flushPromises();
+
+    await continueButton(wrapper).trigger("click");
+    await flushPromises();
+
+    expect(profileDraft.value).toMatchObject({
+      field_name: "פיתוח",
+      role_name: "מפתח",
+      experience_bucket: "3-5",
+    });
   });
 
   it("saves and emits continue when a selection actually changed", async () => {
@@ -170,17 +259,63 @@ describe("AboutYouStep - happy path", () => {
     });
     expect(wrapper.emitted("continue")).toHaveLength(1);
   });
+
+  it("patches profileDraft with the saved values after a genuine change", async () => {
+    updateMyProfile.mockResolvedValue({});
+    const wrapper = mount(AboutYouStep);
+    await flushPromises();
+
+    await fieldChip(wrapper, "פיתוח").trigger("click");
+    await flushPromises();
+    await roleChip(wrapper, "מפתח").trigger("click");
+    await pickExperience(wrapper, "0-2");
+    await flushPromises();
+
+    await continueButton(wrapper).trigger("click");
+    await flushPromises();
+
+    expect(profileDraft.value).toMatchObject({
+      field_name: "פיתוח",
+      role_name: "מפתח",
+      experience_bucket: "0-2",
+    });
+  });
+});
+
+describe("AboutYouStep - leaving the step backwards", () => {
+  it("shows a Back control and emits back when the caller says there is somewhere to return to", async () => {
+    const wrapper = mount(AboutYouStep, { props: { showBack: true } });
+    await flushPromises();
+
+    const back = wrapper.findAll("button").find((b) => b.text().includes("חזרה"))!;
+    expect(back).toBeTruthy();
+    await back.trigger("click");
+    expect(wrapper.emitted("back")).toHaveLength(1);
+  });
+
+  it("shows no Back control by default - a brand-new user has no summary behind Step 1", async () => {
+    const wrapper = mount(AboutYouStep);
+    await flushPromises();
+    expect(wrapper.findAll("button").find((b) => b.text().includes("חזרה"))).toBeUndefined();
+  });
 });
 
 describe("AboutYouStep - unhappy path / edge cases", () => {
-  it("shows a load error when the initial fields/profile fetch fails", async () => {
-    getMyProfile.mockRejectedValue(new Error("network down"));
+  it("shows a load error when the initial fields fetch fails", async () => {
+    listFields.mockRejectedValue(new Error("network down"));
     const wrapper = mount(AboutYouStep);
     await flushPromises();
     expect(wrapper.text()).toContain("טעינת האפשרויות נכשלה");
   });
 
-  it("shows a load error when fetching Field-scoped roles fails", async () => {
+  it("shows a load error when profileDraft was never seeded", async () => {
+    profileDraft.value = null;
+    const wrapper = mount(AboutYouStep);
+    await flushPromises();
+    expect(wrapper.text()).toContain("טעינת האפשרויות נכשלה");
+  });
+
+  it("shows a load error when fetching Field-scoped roles fails for a genuine (non-prefill) Field change", async () => {
     listRoles.mockRejectedValue(new Error("network down"));
     const wrapper = mount(AboutYouStep);
     await flushPromises();
@@ -229,7 +364,32 @@ describe("AboutYouStep - unhappy path / edge cases", () => {
     await fieldChip(wrapper, "עיצוב").trigger("click");
     await flushPromises();
 
-    expect(wrapper.text()).not.toContain("טוען תפקידים");
+    expect(wrapper.text()).not.toContain("טעינת תפקידים");
+  });
+
+  it("disables Continue with a spinner and 'טעינה…' label while the Role fetch is in flight for a genuine Field change, and shows 'טעינת תפקידים…' in the Role row", async () => {
+    let resolveRoles: (v: unknown) => void = () => {};
+    listRoles.mockImplementation(() => new Promise((resolve) => (resolveRoles = resolve)));
+    const wrapper = mount(AboutYouStep);
+    await flushPromises();
+
+    await fieldChip(wrapper, "פיתוח").trigger("click");
+    await flushPromises();
+
+    // The Continue label switches away from "המשך" while loading, so it
+    // can't be found via the "המשך" text helper - it's still the last
+    // (only non-chip) button in the component.
+    const continueBtn = wrapper.findAll("button").at(-1)!;
+    expect(continueBtn.attributes("disabled")).toBeDefined();
+    expect(continueBtn.text()).toContain("טעינה…");
+    expect(continueBtn.find("svg").exists()).toBe(true);
+    expect(wrapper.text()).toContain("טעינת תפקידים…");
+
+    resolveRoles(DEV_ROLES);
+    await flushPromises();
+
+    expect(continueButton(wrapper).find("svg").exists()).toBe(false);
+    expect(wrapper.text()).not.toContain("טעינת תפקידים…");
   });
 
   it("shows a save error and does not emit continue when updateMyProfile fails", async () => {
@@ -277,7 +437,7 @@ describe("AboutYouStep - unhappy path / edge cases", () => {
   });
 
   it("documents current behavior: an uncurated Role prefill that doesn't match any fetched role is saved correctly but is not visibly reflected as a selected chip or visible Other text (ChipRow's otherButtonActive requires selectedName===null, which this prefill path violates)", async () => {
-    getMyProfile.mockResolvedValue({ ...BLANK_PROFILE, field_name: "פיתוח", role_name: "יזם" });
+    profileDraft.value = { ...BLANK_PROFILE, field_name: "פיתוח", role_name: "יזם" };
     const wrapper = mount(AboutYouStep);
     await flushPromises();
     await flushPromises();

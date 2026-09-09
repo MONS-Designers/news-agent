@@ -29,6 +29,7 @@ const routes: RouteRecordRaw[] = [
     path: "/preferences",
     name: "Preferences",
     component: PreferencesView,
+    meta: { requiresAuth: true },
   },
   {
     path: "/",
@@ -47,6 +48,15 @@ router.beforeEach(async (to) => {
     const identity = await ensureMe();
     if (!identity?.is_admin) {
       return { path: "/preferences" };
+    }
+  }
+  if (to.meta.requiresAuth) {
+    const identity = await ensureMe();
+    if (!identity) {
+      // An anonymous visitor's home is the landing page. The flag is what
+      // lets HomeView say why they ended up there - without it the guard
+      // silently swallows the navigation and the click reads as broken.
+      return { path: "/", query: { signin: "required" } };
     }
   }
 });

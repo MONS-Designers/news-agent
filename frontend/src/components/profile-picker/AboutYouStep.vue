@@ -38,7 +38,9 @@
           :key="bucket.value"
           :class="[
             'relative flex min-h-[44px] flex-1 cursor-pointer items-center justify-center rounded-lg py-[9px] text-center text-[13px] motion-reduce:transition-none [transition:all_0.18s_ease] focus-within:outline focus-within:outline-2 focus-within:outline-hd-accent-2 focus-within:outline-offset-2',
-            experienceBucket === bucket.value ? 'bg-hd-accent-2/18 text-white' : 'text-hd-subtitle',
+            experienceBucket === bucket.value
+              ? 'border border-hd-accent-2/55 bg-gradient-to-b from-hd-accent-2/32 to-hd-accent-2/14 text-white'
+              : 'border border-transparent text-hd-subtitle',
           ]"
         >
           <input
@@ -55,34 +57,50 @@
 
     <p v-if="loadError" class="mt-3 text-xs text-hd-subtitle">טעינת האפשרויות נכשלה. אפשר לרענן את הדף.</p>
 
-    <div class="mt-7 flex items-center justify-end gap-3.5">
-      <p v-if="saveError" class="text-xs text-hd-subtitle">{{ saveError }}</p>
-      <button
-        type="button"
-        class="inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-[10px] border-0 bg-gradient-to-b from-[#7b86ff] to-[#5c68e8] px-[22px] py-[11px] text-[13.5px] font-semibold text-white [font-family:inherit] [transition:transform_0.18s_ease] motion-reduce:transition-none shadow-[0_10px_24px_-10px_rgba(109,123,255,0.6)] active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-hd-accent-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-35 disabled:shadow-none disabled:active:scale-100"
-        :class="{ disabled: !canContinue }"
-        :disabled="!canContinue || saving"
-        @click="onContinue"
-      >
-        {{ saving ? "שומר…" : "המשך" }}
+    <div class="mt-7 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3.5">
+      <!--
+        Back on Step 1 leaves the wizard rather than moving between steps -
+        ProfilePickerShell forwards it to whoever opened the wizard. Rendered
+        only when there is something behind it: a brand-new user has no saved
+        profile to return to.
+      -->
+      <button v-if="showBack" type="button" :class="BTN_GHOST" :disabled="saving" @click="emit('back')">
+        חזרה →
       </button>
+      <span v-else></span>
+      <div class="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:gap-3.5">
+        <p v-if="saveError" class="text-xs text-hd-subtitle">{{ saveError }}</p>
+        <button
+          type="button"
+          class="inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center gap-2 rounded-[10px] border-[1px] border-[#a9b1ff]/30 [background-image:linear-gradient(to_bottom_in_oklch,_#434ed2,_#231666)] px-[22px] py-[11px] text-[13.5px] font-semibold text-white [font-family:inherit] [transition:transform_0.18s_ease] motion-reduce:transition-none shadow-[0_4px_12px_-6px_rgba(109,123,255,0.35)] active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-hd-accent-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-35 disabled:shadow-none disabled:active:scale-100"
+          :class="{ disabled: !canContinue }"
+          :disabled="!canContinue || saving"
+          @click="onContinue"
+        >
+          <HybridSpinner v-if="rolesLoading" size="inline" />
+          {{ rolesLoading ? "טעינה…" : saving ? "שמירה…" : "המשך" }}
+        </button>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
+import HybridSpinner from "@/components/HybridSpinner.vue";
 import ChipRow from "./ChipRow.vue";
-import {
-  getMyProfile,
-  listFields,
-  listRoles,
-  updateMyProfile,
-  type FieldOption,
-  type RoleOption,
-} from "@/api/client";
+import { listFields, listRoles, updateMyProfile, type FieldOption, type RoleOption } from "@/api/client";
+import { profileDraft, patchProfileDraft } from "@/profile-draft";
 
-const emit = defineEmits<{ continue: [] }>();
+defineProps<{ showBack?: boolean }>();
+const emit = defineEmits<{ continue: []; back: [] }>();
+
+// Copied verbatim from InterestsStep.vue / TopicsStep.vue, matching this
+// folder's existing convention - the Back control has to be the same ghost
+// button on every step, Step 1 included.
+const BTN_BASE =
+  "inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-[10px] border-0 text-[13.5px] font-semibold [font-family:inherit] [transition:transform_0.18s_ease] motion-reduce:transition-none active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-hd-accent-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:active:scale-100";
+const BTN_GHOST = `${BTN_BASE} px-2 py-[11px] bg-transparent text-hd-label [@media(hover:hover)]:[&:hover:not(:disabled)]:text-hd-chip disabled:opacity-35`;
 
 // Storage values must match services/profile.py:EXPERIENCE_BUCKETS exactly;
 // display labels (en dash) are presentation-only and never sent to the API.
@@ -144,7 +162,11 @@ const roleSatisfied = computed(() =>
   satisfied(roleName.value, roleIsOther.value, roleOtherText.value),
 );
 const canContinue = computed(
-  () => fieldSatisfied.value && roleSatisfied.value && experienceBucket.value !== null,
+  () =>
+    fieldSatisfied.value &&
+    roleSatisfied.value &&
+    experienceBucket.value !== null &&
+    !rolesLoading.value,
 );
 
 /** The curated Field behind the current pick, or null when it's "Other" text. */
@@ -156,7 +178,7 @@ const rolesLoading = ref(false);
 
 const rolePlaceholder = computed(() => {
   if (!fieldSatisfied.value) return "יש לבחור תחום קודם";
-  if (rolesLoading.value) return "טוען תפקידים…";
+  if (rolesLoading.value) return "טעינת תפקידים…";
   return null;
 });
 
@@ -170,11 +192,28 @@ watch([fieldName, fieldIsOther], async () => {
   const token = ++rolesFetchToken;
   const rolePrefill = pendingRolePrefill.value;
   pendingRolePrefill.value = null;
+  const isPrefill = rolePrefill !== null;
 
-  roleName.value = null;
+  // A prefill already knows its Role from the saved profile - show it right
+  // away rather than blanking the row while the (Field-scoped) Role list
+  // reloads. A genuine user-initiated Field change still clears it, since the
+  // previous Field's Role no longer belongs to anything.
+  roleName.value = isPrefill ? rolePrefill : null;
   roleIsOther.value = false;
   roleOtherText.value = "";
-  roles.value = [];
+  // ChipRow only renders a selected state for a name present in `options` -
+  // an empty array here would show a genuinely blank row (no chip, no
+  // placeholder, since rolesLoading/rolePlaceholder are also skipped for a
+  // prefill) for the whole background-refresh window. Seed a single
+  // synthetic entry for the already-known role so it renders instantly;
+  // the real fetch below replaces this with the full curated list once it
+  // resolves (matching or not - either way this placeholder is temporary).
+  roles.value = isPrefill ? [{ name: rolePrefill, isCurated: true }] : [];
+  // Snapshot-able immediately: the Role shown above is already valid, so
+  // Continue must not wait on the background refresh below to know "nothing
+  // changed" (see the hard-gate below, which only applies to a genuine
+  // change).
+  if (isPrefill) captureSnapshot();
 
   const field = selectedField.value;
   if (!field) {
@@ -182,35 +221,35 @@ watch([fieldName, fieldIsOther], async () => {
     // otherwise never reach its own `finally` (its token no longer matches),
     // leaving the "טוען תפקידים…" placeholder stuck on forever.
     rolesLoading.value = false;
-    if (rolePrefill !== null) captureSnapshot(); // "Other" Field pre-fill, no Role row to resolve
     return; // an "Other" Field has no curated roles by definition
   }
 
   // The Role fetch now merges in an LLM call (Role and Prompt Suggestions
   // story), so it can take noticeably longer than the old DB-only read -
-  // without this, the row just looks empty/broken for that stretch.
-  rolesLoading.value = true;
+  // without this, the row just looks empty/broken for that stretch. A
+  // prefill's Role is already shown and snapshotted above, so only a genuine
+  // user-initiated Field change hard-gates Continue on this fetch.
+  if (!isPrefill) rolesLoading.value = true;
   try {
     const fetched = await listRoles(field.id);
     if (token === rolesFetchToken) {
       roles.value = fetched;
-      if (rolePrefill !== null) {
+      if (isPrefill) {
         const match = fetched.find((r) => r.name === rolePrefill);
-        if (match) {
-          roleName.value = match.name;
-          roleIsOther.value = false;
-        } else {
+        if (!match) {
           roleName.value = rolePrefill;
           roleIsOther.value = true;
           roleOtherText.value = rolePrefill;
         }
-        captureSnapshot();
       }
     }
   } catch {
-    if (token === rolesFetchToken) loadError.value = true;
+    // A prefill's background-refresh failure is silent - the Role shown
+    // (already snapshotted above) is already valid. Only a genuine change's
+    // fetch failure surfaces loadError.
+    if (!isPrefill && token === rolesFetchToken) loadError.value = true;
   } finally {
-    if (token === rolesFetchToken) rolesLoading.value = false;
+    if (!isPrefill && token === rolesFetchToken) rolesLoading.value = false;
   }
 });
 
@@ -223,6 +262,11 @@ async function onContinue() {
     initialSnapshot.value.role === effectiveRole() &&
     initialSnapshot.value.experienceBucket === experienceBucket.value
   ) {
+    patchProfileDraft({
+      field_name: effectiveField(),
+      role_name: effectiveRole(),
+      experience_bucket: experienceBucket.value,
+    });
     emit("continue");
     return;
   }
@@ -238,6 +282,11 @@ async function onContinue() {
       experienceBucket: experienceBucket.value,
     });
     captureSnapshot();
+    patchProfileDraft({
+      field_name: effectiveField(),
+      role_name: effectiveRole(),
+      experience_bucket: experienceBucket.value,
+    });
     emit("continue");
   } catch {
     saveError.value = "השמירה נכשלה. ניתן לבדוק את החיבור ולנסות שוב.";
@@ -248,8 +297,17 @@ async function onContinue() {
 
 onMounted(async () => {
   try {
-    const [fetchedFields, profile] = await Promise.all([listFields(), getMyProfile()]);
+    const fetchedFields = await listFields();
     fields.value = fetchedFields;
+
+    const profile = profileDraft.value;
+    if (!profile) {
+      // Shouldn't happen in practice - PreferencesView seeds profileDraft
+      // before this step ever mounts - but keeps this typed as Profile|null
+      // honestly rather than asserting it away.
+      loadError.value = true;
+      return;
+    }
     experienceBucket.value = profile.experience_bucket;
 
     if (profile.field_name === null) {

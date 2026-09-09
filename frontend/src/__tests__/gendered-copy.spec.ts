@@ -62,6 +62,10 @@ const SENTENCE_START_OFFENDERS = [
   "טען",
   "נסה",
   "בדוק",
+  // Slipped past the scan as a textarea placeholder ("כתוב בחופשיות...") until
+  // a 2026-09-09 copy audit - the list only ever grows by what actually got
+  // through, so add rather than rewrite when the next one turns up.
+  "כתוב",
 ];
 
 function findAnywhereOffenders(text: string): string[] {
