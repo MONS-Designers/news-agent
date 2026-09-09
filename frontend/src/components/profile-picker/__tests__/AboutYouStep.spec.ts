@@ -119,6 +119,34 @@ describe("AboutYouStep - happy path", () => {
     expect(continueButton(wrapper).attributes("disabled")).toBeUndefined();
   });
 
+  it("shows the already-known Role as a selected chip immediately during a prefill, not a blank row, while the background refresh is in flight", async () => {
+    profileDraft.value = {
+      ...BLANK_PROFILE,
+      field_name: "פיתוח",
+      role_name: "מפתח",
+      experience_bucket: "3-5",
+    };
+    let resolveRoles: (v: unknown) => void = () => {};
+    listRoles.mockImplementation(() => new Promise((resolve) => (resolveRoles = resolve)));
+    const wrapper = mount(AboutYouStep);
+    await flushPromises();
+
+    // Before the fetch resolves: no "טעינת תפקידים…" placeholder (Continue
+    // isn't gated, so this text intentionally never shows for a prefill -
+    // see the previous test) - but the row must not be blank either. The
+    // already-known Role renders as a real, selected chip.
+    const roleChip = wrapper.findAll('[aria-pressed="true"]').find((b) => b.text() === "מפתח");
+    expect(roleChip).toBeTruthy();
+    expect(wrapper.text()).not.toContain("טעינת תפקידים…");
+
+    resolveRoles(DEV_ROLES);
+    await flushPromises();
+    // Still selected once the real curated list arrives (DEV_ROLES includes "מפתח").
+    expect(
+      wrapper.findAll('[aria-pressed="true"]').find((b) => b.text() === "מפתח"),
+    ).toBeTruthy();
+  });
+
   it("a background Role-list refresh failure for a prefill is silent - no loadError, Continue stays available", async () => {
     profileDraft.value = {
       ...BLANK_PROFILE,

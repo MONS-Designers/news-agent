@@ -48,6 +48,12 @@ function mountView() {
 }
 
 beforeEach(() => {
+  // profileDraft/preferencesDraft are module-level singletons (survive SPA
+  // navigation by design - see loadPreferences()'s `alreadyKnown` check) -
+  // reset between tests so one test populating the store doesn't change
+  // whether the next test's mount starts in the "already known" state.
+  profileDraft.value = null;
+  preferencesDraft.value = [];
   listMyPreferences.mockReset();
   getMyProfile.mockReset();
   getMySubscription.mockReset();
@@ -77,6 +83,21 @@ describe("PreferencesView - happy path", () => {
 
     expect(profileDraft.value).toEqual(RETURNING_PROFILE);
     expect(preferencesDraft.value).toEqual(PREFS);
+  });
+
+  it("shows the summary instantly with no loading flash on a revisit (profileDraft already populated from an earlier mount in this tab)", async () => {
+    // Simulates navigating away (e.g. to Home) and back within the same SPA
+    // session, without a full page reload - profileDraft survives that.
+    profileDraft.value = { ...RETURNING_PROFILE, topics_stale_at: null };
+    preferencesDraft.value = [...PREFS];
+    getMyProfile.mockResolvedValue(RETURNING_PROFILE);
+
+    const wrapper = mountView();
+    // No await flushPromises() first - checking the very first synchronous
+    // render, before the background revalidation fetch has any chance to
+    // resolve, is the whole point.
+    expect(wrapper.text()).not.toContain("טעינה…");
+    expect(wrapper.text()).toContain("פיתוח");
   });
 
   it("shows the returning-user summary with subscribed topics and profile fields", async () => {

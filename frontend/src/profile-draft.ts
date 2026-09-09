@@ -20,3 +20,13 @@ export function patchProfileDraft(patch: Partial<Profile>): void {
     Object.assign(profileDraft.value, patch);
   }
 }
+
+// Module-level refs survive SPA navigation (no page reload) - PreferencesView
+// relies on that to skip re-fetching/re-blocking on data it already has. But
+// that means they'd also survive a sign-out with no reload, so a second user
+// signing in in the same tab could briefly see the first user's cached
+// profile. auth.ts's signOut() calls this to invalidate the cache.
+export function clearProfileDraft(): void {
+  profileDraft.value = null;
+  preferencesDraft.value = [];
+}

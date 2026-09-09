@@ -139,7 +139,12 @@ const TOPIC_READONLY_PICKED = `${TOPIC_BASE_READONLY} ${TOPIC_PICKED}`;
 
 const subscription = ref<Subscription | null>(null);
 const subscriptionSaving = ref(false);
-const loading = ref(true);
+// `loading` is component-local, so it would reset to true on every fresh
+// mount (every SPA navigation back to this route) regardless of what
+// profileDraft already knows - initialize it from the store's current state,
+// not a hardcoded true, so a revisit with already-known data never flashes
+// the spinner at all (see loadPreferences()'s matching `alreadyKnown` check).
+const loading = ref(profile.value === null);
 const errorMessage = ref("");
 
 // A returning user with a completed profile sees a read-only summary first,
@@ -164,7 +169,14 @@ const experienceLabel = computed(() => {
 const subscribedTopics = computed(() => preferences.value.filter((topic) => topic.subscribed));
 
 async function loadPreferences() {
-  loading.value = true;
+  // profileDraft survives SPA navigation (it's a module-level ref, not
+  // component state) - so returning to /preferences after visiting another
+  // route within the same tab already has valid data sitting in the store.
+  // Only block on a real loading state for the first-ever fetch this tab has
+  // done; a revisit re-validates quietly in the background instead of
+  // flashing the loading spinner over data that's already on screen.
+  const alreadyKnown = profile.value !== null;
+  if (!alreadyKnown) loading.value = true;
   errorMessage.value = "";
   try {
     const [prefs, prof, sub] = await Promise.all([
@@ -175,15 +187,19 @@ async function loadPreferences() {
     initProfileDraft(prof, prefs);
     subscription.value = sub;
   } catch (error) {
-    if (error instanceof ApiError && error.status === 401) {
-      errorMessage.value = "יש להתחבר עם Google כדי לצפות בהעדפות שלך.";
-    } else if (error instanceof ApiError && error.status === 403) {
-      errorMessage.value = "לחשבון הזה אין פרופיל משתמש. ניתן לפנות למנהל המערכת.";
-    } else {
-      errorMessage.value = "טעינת ההעדפות נכשלה.";
+    // A background revalidation failure is silent - what's already shown is
+    // still the last known-good state. Only a first-ever load surfaces this.
+    if (!alreadyKnown) {
+      if (error instanceof ApiError && error.status === 401) {
+        errorMessage.value = "יש להתחבר עם Google כדי לצפות בהעדפות שלך.";
+      } else if (error instanceof ApiError && error.status === 403) {
+        errorMessage.value = "לחשבון הזה אין פרופיל משתמש. ניתן לפנות למנהל המערכת.";
+      } else {
+        errorMessage.value = "טעינת ההעדפות נכשלה.";
+      }
     }
   } finally {
-    loading.value = false;
+    if (!alreadyKnown) loading.value = false;
   }
 }
 

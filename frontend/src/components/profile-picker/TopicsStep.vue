@@ -42,7 +42,7 @@
       <div class="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:gap-3.5">
         <p v-if="saveMessage" class="text-xs text-hd-subtitle">{{ saveMessage }}</p>
         <button type="button" :class="BTN_PRIMARY" :disabled="saving" @click="onSave">
-          {{ saving ? "שומר…" : "אני רוצה לקבל את זה" }}
+          {{ saving ? "שמירה…" : "אני רוצה לקבל את זה" }}
         </button>
       </div>
     </div>

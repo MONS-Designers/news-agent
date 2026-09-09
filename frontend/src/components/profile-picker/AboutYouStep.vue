@@ -67,7 +67,7 @@
         @click="onContinue"
       >
         <HybridSpinner v-if="rolesLoading" size="inline" />
-        {{ rolesLoading ? "טעינה…" : saving ? "שומר…" : "המשך" }}
+        {{ rolesLoading ? "טעינה…" : saving ? "שמירה…" : "המשך" }}
       </button>
     </div>
   </div>
@@ -181,7 +181,14 @@ watch([fieldName, fieldIsOther], async () => {
   roleName.value = isPrefill ? rolePrefill : null;
   roleIsOther.value = false;
   roleOtherText.value = "";
-  roles.value = [];
+  // ChipRow only renders a selected state for a name present in `options` -
+  // an empty array here would show a genuinely blank row (no chip, no
+  // placeholder, since rolesLoading/rolePlaceholder are also skipped for a
+  // prefill) for the whole background-refresh window. Seed a single
+  // synthetic entry for the already-known role so it renders instantly;
+  // the real fetch below replaces this with the full curated list once it
+  // resolves (matching or not - either way this placeholder is temporary).
+  roles.value = isPrefill ? [{ name: rolePrefill, isCurated: true }] : [];
   // Snapshot-able immediately: the Role shown above is already valid, so
   // Continue must not wait on the background refresh below to know "nothing
   // changed" (see the hard-gate below, which only applies to a genuine

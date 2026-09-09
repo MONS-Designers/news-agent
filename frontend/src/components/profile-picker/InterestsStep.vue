@@ -42,7 +42,7 @@
         <p v-if="saveError" class="text-xs text-hd-subtitle">{{ saveError }}</p>
         <button type="button" :class="BTN_GHOST" :disabled="saving" @click="advance">אגדיר מאוחר יותר ←</button>
         <button type="button" :class="BTN_PRIMARY" :disabled="saving" @click="advance">
-          {{ saving ? "שומר…" : "המשך" }}
+          {{ saving ? "שמירה…" : "המשך" }}
         </button>
       </div>
     </div>
