@@ -76,6 +76,22 @@ onMounted(async () => {
   }
 });
 
+// Prompts are generated server-side from Field/Role/Experience Bucket
+// (services/profile.py::suggest_prompts_for_user), not from anything on this
+// step - so re-fetching only matters when one of those actually changed
+// since the last fetch. Tracking that key here (rather than clearing on
+// every activation) avoids a visible chip flicker on a plain Back/Continue
+// between Step 1 and Step 2 where nothing was edited (Review Finding,
+// 2026-09-08).
+let lastPromptsProfileKey: string | null = null;
+function profileKey(p: {
+  field_name: string | null;
+  role_name: string | null;
+  experience_bucket: string | null;
+}): string {
+  return `${p.field_name ?? ""}|${p.role_name ?? ""}|${p.experience_bucket ?? ""}`;
+}
+
 // Illustrative only (FR-5) - clicking one just fills the textarea, still
 // freely editable; a fetch failure just means no hints show, same as the
 // pre-LLM behavior, so there's no error branch here. Prompts are fetched
@@ -85,8 +101,20 @@ watch(
   () => props.active,
   async (newActive: boolean) => {
     if (!newActive) return;
+    let profile;
+    try {
+      profile = await getMyProfile();
+    } catch {
+      // Can't tell whether Field/Role changed - leave existing prompts (if
+      // any) as-is rather than clearing on an inconclusive check.
+      return;
+    }
+    const key = profileKey(profile);
+    if (key === lastPromptsProfileKey) return; // unchanged - keep current chips, skip the fetch entirely
+    promptSuggestions.value = [];
     try {
       promptSuggestions.value = (await getPromptSuggestions()).slice(0, 3);
+      lastPromptsProfileKey = key;
     } catch {
       promptSuggestions.value = [];
     }

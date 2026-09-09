@@ -59,12 +59,13 @@
       <p v-if="saveError" class="text-xs text-hd-subtitle">{{ saveError }}</p>
       <button
         type="button"
-        class="inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-[10px] border-0 bg-gradient-to-b from-[#7b86ff] to-[#5c68e8] px-[22px] py-[11px] text-[13.5px] font-semibold text-white [font-family:inherit] [transition:transform_0.18s_ease] motion-reduce:transition-none shadow-[0_10px_24px_-10px_rgba(109,123,255,0.6)] active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-hd-accent-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-35 disabled:shadow-none disabled:active:scale-100"
+        class="inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center gap-2 rounded-[10px] border-0 bg-gradient-to-b from-[#7b86ff] to-[#5c68e8] px-[22px] py-[11px] text-[13.5px] font-semibold text-white [font-family:inherit] [transition:transform_0.18s_ease] motion-reduce:transition-none shadow-[0_10px_24px_-10px_rgba(109,123,255,0.6)] active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-hd-accent-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-35 disabled:shadow-none disabled:active:scale-100"
         :class="{ disabled: !canContinue }"
         :disabled="!canContinue || saving"
         @click="onContinue"
       >
-        {{ saving ? "שומר…" : "המשך" }}
+        <HybridSpinner v-if="rolesLoading" size="inline" />
+        {{ rolesLoading ? "טעינה…" : saving ? "שמירה..." : "המשך" }}
       </button>
     </div>
   </div>
@@ -72,6 +73,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
+import HybridSpinner from "@/components/HybridSpinner.vue";
 import ChipRow from "./ChipRow.vue";
 import {
   getMyProfile,
@@ -144,7 +146,11 @@ const roleSatisfied = computed(() =>
   satisfied(roleName.value, roleIsOther.value, roleOtherText.value),
 );
 const canContinue = computed(
-  () => fieldSatisfied.value && roleSatisfied.value && experienceBucket.value !== null,
+  () =>
+    fieldSatisfied.value &&
+    roleSatisfied.value &&
+    experienceBucket.value !== null &&
+    !rolesLoading.value,
 );
 
 /** The curated Field behind the current pick, or null when it's "Other" text. */
@@ -156,7 +162,7 @@ const rolesLoading = ref(false);
 
 const rolePlaceholder = computed(() => {
   if (!fieldSatisfied.value) return "יש לבחור תחום קודם";
-  if (rolesLoading.value) return "טוען תפקידים…";
+  if (rolesLoading.value) return "טעינת תפקידים…";
   return null;
 });
 

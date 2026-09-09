@@ -7,7 +7,9 @@
       </p>
     </div>
 
-    <div v-if="loading" class="text-sm text-neutral-500">טוען…</div>
+    <div v-if="loading" class="flex items-center gap-2 text-sm text-neutral-500">
+      <HybridSpinner size="standalone" /> טעינה…
+    </div>
 
     <div
       v-else-if="errorMessage"
@@ -80,7 +82,7 @@
     </div>
 
     <div
-      v-if="showSummary"
+      v-if="!loading && !errorMessage && showSummary"
       class="flex items-center justify-between rounded-xl border border-neutral-200 p-5"
     >
       <div>
@@ -99,7 +101,10 @@
       </button>
     </div>
 
-    <ProfilePickerShell v-else @topics-saved="refreshPreferencesQuietly" />
+    <ProfilePickerShell
+      v-else-if="!loading && !errorMessage"
+      @topics-saved="refreshPreferencesQuietly"
+    />
   </div>
 </template>
 
@@ -115,6 +120,7 @@ import {
   type Subscription,
   type TopicPreference,
 } from "@/api/client";
+import HybridSpinner from "@/components/HybridSpinner.vue";
 import ProfilePickerShell from "@/components/profile-picker/ProfilePickerShell.vue";
 import { DIGEST_NOUN_WEEKLY } from "@/branding";
 
@@ -122,7 +128,7 @@ const preferences = ref<TopicPreference[]>([]);
 const profile = ref<Profile | null>(null);
 const subscription = ref<Subscription | null>(null);
 const subscriptionSaving = ref(false);
-const loading = ref(false);
+const loading = ref(true);
 const errorMessage = ref("");
 
 // A returning user with a completed profile sees a read-only summary first,

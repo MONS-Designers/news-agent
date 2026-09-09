@@ -229,7 +229,32 @@ describe("AboutYouStep - unhappy path / edge cases", () => {
     await fieldChip(wrapper, "עיצוב").trigger("click");
     await flushPromises();
 
-    expect(wrapper.text()).not.toContain("טוען תפקידים");
+    expect(wrapper.text()).not.toContain("טעינת תפקידים");
+  });
+
+  it("disables Continue with a spinner and 'טעינה…' label while the Role fetch is in flight, and shows 'טעינת תפקידים…' in the Role row", async () => {
+    let resolveRoles: (v: unknown) => void = () => {};
+    listRoles.mockImplementation(() => new Promise((resolve) => (resolveRoles = resolve)));
+    const wrapper = mount(AboutYouStep);
+    await flushPromises();
+
+    await fieldChip(wrapper, "פיתוח").trigger("click");
+    await flushPromises();
+
+    // The Continue label switches away from "המשך" while loading, so it
+    // can't be found via the "המשך" text helper - it's still the last
+    // (only non-chip) button in the component.
+    const continueBtn = wrapper.findAll("button").at(-1)!;
+    expect(continueBtn.attributes("disabled")).toBeDefined();
+    expect(continueBtn.text()).toContain("טעינה…");
+    expect(continueBtn.find("svg").exists()).toBe(true);
+    expect(wrapper.text()).toContain("טעינת תפקידים…");
+
+    resolveRoles(DEV_ROLES);
+    await flushPromises();
+
+    expect(continueButton(wrapper).find("svg").exists()).toBe(false);
+    expect(wrapper.text()).not.toContain("טעינת תפקידים…");
   });
 
   it("shows a save error and does not emit continue when updateMyProfile fails", async () => {

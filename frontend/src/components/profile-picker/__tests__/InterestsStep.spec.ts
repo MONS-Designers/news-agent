@@ -60,6 +60,51 @@ describe("InterestsStep - happy path", () => {
     expect(prompts).toHaveLength(3);
   });
 
+  it("keeps existing prompt chips across a re-entry when Field/Role/Experience are unchanged (no flicker, no re-fetch)", async () => {
+    getPromptSuggestions.mockResolvedValue(["רעיון א", "רעיון ב"]);
+    const wrapper = mount(InterestsStep, { props: { active: false } });
+    await flushPromises();
+
+    await wrapper.setProps({ active: true });
+    await flushPromises();
+    expect(getPromptSuggestions).toHaveBeenCalledTimes(1);
+    expect(wrapper.findAll('[role="group"] button')).toHaveLength(2);
+
+    // Leave and return to Step 2 with the identical saved profile.
+    await wrapper.setProps({ active: false });
+    await wrapper.setProps({ active: true });
+    await flushPromises();
+
+    expect(getPromptSuggestions).toHaveBeenCalledTimes(1); // not re-fetched
+    expect(wrapper.findAll('[role="group"] button')).toHaveLength(2); // chips never cleared
+  });
+
+  it("re-fetches prompt suggestions when Field/Role changed since the last fetch", async () => {
+    getPromptSuggestions
+      .mockResolvedValueOnce(["רעיון א"])
+      .mockResolvedValueOnce(["רעיון חדש"]);
+    const wrapper = mount(InterestsStep, { props: { active: false } });
+    await flushPromises();
+
+    await wrapper.setProps({ active: true });
+    await flushPromises();
+    expect(wrapper.text()).toContain("רעיון א");
+
+    getMyProfile.mockResolvedValue({
+      field_name: "עיצוב",
+      role_name: "מעצב",
+      experience_bucket: "junior",
+      interest_free_text: null,
+    });
+    await wrapper.setProps({ active: false });
+    await wrapper.setProps({ active: true });
+    await flushPromises();
+
+    expect(getPromptSuggestions).toHaveBeenCalledTimes(2);
+    expect(wrapper.text()).toContain("רעיון חדש");
+    expect(wrapper.text()).not.toContain("רעיון א");
+  });
+
   it("clicking a prompt suggestion fills the textarea", async () => {
     getPromptSuggestions.mockResolvedValue(["חדשות בינה מלאכותית"]);
     const wrapper = mount(InterestsStep, { props: { active: false } });

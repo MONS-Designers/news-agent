@@ -29,6 +29,7 @@ const routes: RouteRecordRaw[] = [
     path: "/preferences",
     name: "Preferences",
     component: PreferencesView,
+    meta: { requiresAuth: true },
   },
   {
     path: "/",
@@ -47,6 +48,12 @@ router.beforeEach(async (to) => {
     const identity = await ensureMe();
     if (!identity?.is_admin) {
       return { path: "/preferences" };
+    }
+  }
+  if (to.meta.requiresAuth) {
+    const identity = await ensureMe();
+    if (!identity) {
+      return { path: "/" };
     }
   }
 });

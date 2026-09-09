@@ -56,6 +56,19 @@ beforeEach(() => {
 });
 
 describe("PreferencesView - happy path", () => {
+  it("shows a spinner beside the loading text before the initial fetch resolves, with neither summary nor wizard rendered underneath it", async () => {
+    getMyProfile.mockResolvedValue(RETURNING_PROFILE);
+    const wrapper = mountView();
+
+    expect(wrapper.text()).toContain("טעינה…");
+    expect(wrapper.find("svg").exists()).toBe(true);
+    expect(wrapper.find(".stub-shell-saved").exists()).toBe(false);
+    expect(wrapper.text()).not.toContain("פיתוח");
+
+    await flushPromises();
+    expect(wrapper.text()).not.toContain("טעינה…");
+  });
+
   it("shows the returning-user summary with subscribed topics and profile fields", async () => {
     getMyProfile.mockResolvedValue(RETURNING_PROFILE);
     const wrapper = mountView();
@@ -131,38 +144,43 @@ describe("PreferencesView - happy path", () => {
 });
 
 describe("PreferencesView - unhappy path / edge cases", () => {
-  it("shows a sign-in message on a 401", async () => {
+  it("shows a sign-in message on a 401, with no wizard rendered underneath it", async () => {
     getMyProfile.mockRejectedValue(new ApiError(401, "unauthorized"));
     const wrapper = mountView();
     await flushPromises();
     expect(wrapper.text()).toContain("התחבר עם Google");
+    expect(wrapper.find(".stub-shell-saved").exists()).toBe(false);
   });
 
-  it("shows a no-profile message on a 403", async () => {
+  it("shows a no-profile message on a 403, with no wizard rendered underneath it", async () => {
     getMyProfile.mockRejectedValue(new ApiError(403, "forbidden"));
     const wrapper = mountView();
     await flushPromises();
     expect(wrapper.text()).toContain("אין פרופיל משתמש");
+    expect(wrapper.find(".stub-shell-saved").exists()).toBe(false);
   });
 
-  it("shows a generic error message on any other load failure", async () => {
+  it("shows a generic error message on any other load failure, with no wizard rendered underneath it", async () => {
     getMyProfile.mockRejectedValue(new Error("network down"));
     const wrapper = mountView();
     await flushPromises();
     expect(wrapper.text()).toContain("טעינת ההעדפות נכשלה");
+    expect(wrapper.find(".stub-shell-saved").exists()).toBe(false);
   });
 
-  it("documents current behavior: the profile wizard also renders underneath an error banner, since showSummary is false whenever profile failed to load", async () => {
-    // showSummary requires a loaded profile with field_name - on any load
-    // failure profile.value stays null, so the template's second, independent
-    // v-if/v-else block (subscription box vs. ProfilePickerShell) still picks
-    // its v-else branch and renders the wizard alongside the error message.
+  it("no longer renders the profile wizard underneath the error banner (fixed - the second v-if chain is now gated on !loading && !errorMessage too)", async () => {
+    // Before this fix: showSummary requires a loaded profile with
+    // field_name, and on any load failure profile.value stays null, so the
+    // template's second, independent v-if/v-else block (subscription box vs.
+    // ProfilePickerShell) picked its v-else branch and rendered the wizard
+    // alongside the error message. Now that block also checks
+    // !loading && !errorMessage, so neither branch renders on error.
     getMyProfile.mockRejectedValue(new Error("network down"));
     const wrapper = mountView();
     await flushPromises();
 
     expect(wrapper.text()).toContain("טעינת ההעדפות נכשלה");
-    expect(wrapper.find(".stub-shell-saved").exists()).toBe(true);
+    expect(wrapper.find(".stub-shell-saved").exists()).toBe(false);
   });
 
   it("after first completing the wizard as a new user, does not switch to the summary view - profile is never re-fetched, only preferences", async () => {
