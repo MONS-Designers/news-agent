@@ -250,3 +250,29 @@ def test_absent_given_name_falls_back_to_name_split(db: Session):
     _, subject, html = sender.sent[0]
     assert subject == "דנה, הדייג'סט הראשון שלך מוכן."
     assert "שלום דנה," in html
+
+
+def test_subject_strips_markdown_emphasis_from_the_headline(db: Session):
+    """The renderer turns **markers** into <strong> for the body; a subject
+    line is plain text, so the markers have to be dropped rather than shown."""
+    db.get(User, 1).welcomed_at = datetime(2026, 7, 1)
+    db.scalar(select(Article)).title_he = "**OpenAI** משיקה מודל חדש"
+    db.commit()
+
+    sender = RecordingSender()
+    send_pending_digests(db, sender)
+
+    assert sender.sent[0][1] == "OpenAI משיקה מודל חדש"
+
+
+def test_subject_length_budget_counts_the_stripped_headline(db: Session):
+    """Markers go before the length check, so a headline the reader sees as
+    short enough isn't truncated for characters they never see."""
+    db.get(User, 1).welcomed_at = datetime(2026, 7, 1)
+    db.scalar(select(Article)).title_he = "**בינה** " + "א" * 44
+    db.commit()
+
+    sender = RecordingSender()
+    send_pending_digests(db, sender)
+
+    assert sender.sent[0][1] == "בינה " + "א" * 44

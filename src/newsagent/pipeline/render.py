@@ -89,6 +89,13 @@ def _emphasize(text: str) -> Markup:
     return Markup(_BOLD.sub(lambda m: f"<strong>{m.group(1)}</strong>", bidi_safe))
 
 
+def strip_emphasis(text: str) -> str:
+    """Drop **markdown** markers, keeping the text they wrap. For plain-text
+    destinations - a subject line, a preview snippet - where there is no
+    <strong> to render the emphasis into."""
+    return _BOLD.sub(lambda m: m.group(1), text)
+
+
 def _truncate_punchline(text: str) -> str:
     if len(text) <= _MAX_PUNCHLINE_CHARS:
         return text
@@ -262,9 +269,9 @@ def render_digest_html(digest: Digest, db: Session) -> str:
         top = articles[0]
         lead_paragraph = (top.paragraphs_he or [None])[0] or top.summary_he
         preheader_text = (
-            # **markdown** stripped to plain text rather than run through
-            # _emphasize: a preview snippet has no <strong> to render into.
-            _truncate_preheader(_BOLD.sub(lambda m: m.group(1), lead_paragraph))
+            # Stripped to plain text rather than run through _emphasize:
+            # a preview snippet has no <strong> to render into.
+            _truncate_preheader(strip_emphasis(lead_paragraph))
             if lead_paragraph
             else f"{DIGEST_NOUN_WEEKLY} שלך מוכן"
         )

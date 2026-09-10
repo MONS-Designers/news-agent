@@ -23,7 +23,11 @@ from newsagent.branding import DIGEST_NOUN_WEEKLY
 from newsagent.mail.base import EmailSendError, EmailSender
 from newsagent.models import Digest, User
 from newsagent.models.user import first_name
-from newsagent.pipeline.render import render_digest_html, render_welcome_html
+from newsagent.pipeline.render import (
+    render_digest_html,
+    render_welcome_html,
+    strip_emphasis,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +60,11 @@ def _subject(digest: Digest) -> str:
     if not digest.articles:
         return f"{DIGEST_NOUN_WEEKLY} שלך"
     top = digest.articles[0].article
-    headline = (top.title_he or top.title).strip()
+    # The **markdown** emphasis markers the renderer turns into <strong> in
+    # the body have nothing to render into here - a subject line is plain
+    # text. Stripped before the length check so the budget below reflects
+    # what the reader actually sees.
+    headline = strip_emphasis((top.title_he or top.title).strip())
     if len(headline) > _MAX_SUBJECT_HEADLINE_CHARS:
         headline = headline[:_MAX_SUBJECT_HEADLINE_CHARS].rsplit(" ", 1)[0] + "…"
     return headline
