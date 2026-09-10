@@ -51,8 +51,9 @@ _HEBREW_MONTHS = [
 _TOPIC_COLORS = {"בינה מלאכותית": "#4ade80", "סייבר": "#f87171", "חלל": "#818cf8"}
 _DEFAULT_TOPIC_COLOR = "#94a3b8"
 
-# Punchline legibility cap (DESIGN.md: Gveret Levin is a connected handwriting
-# face - keep it short so it stays charming instead of straining to read).
+# Punchline legibility cap: the joke corner is set larger than body copy in a
+# narrow column, so a long line wraps into a block that stops reading as an
+# aside. (Was tuned for a handwriting webfont that webmail never loaded.)
 _MAX_PUNCHLINE_CHARS = 60
 
 _BOLD = re.compile(r"\*\*(.+?)\*\*")

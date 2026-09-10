@@ -1,3 +1,4 @@
+import re
 from datetime import date
 
 import pytest
@@ -279,3 +280,23 @@ def test_absent_given_name_falls_back_to_name_split_in_greeting(db: Session):
     html = render_digest_html(digest, db)
 
     assert "שלום <bdi>Nomi,</bdi>" in html
+
+
+def test_no_external_webfont_is_relied_on(db: Session):
+    """Webmail clients strip external stylesheet links, so a font requested
+    that way renders for nobody who reads this in an inbox. Every family in
+    the template has to be one the reader's OS already has."""
+    html = render_digest_html(build_digest(db, [add_article(db, url_suffix="a")]), db)
+    assert "fonts.googleapis.com" not in html
+    assert "<link" not in html
+    for absent in ("Rubik", "Gveret Levin", "cursive"):
+        assert absent not in html
+
+
+def test_every_font_stack_covers_hebrew_on_every_platform(db: Session):
+    """Segoe UI exists only on Windows, so it put Hebrew on a different face
+    per device. Tahoma leads for Windows readers, Arial covers macOS/iOS, and
+    the generic catches Android."""
+    html = render_digest_html(build_digest(db, [add_article(db, url_suffix="a")], joke="בדיחה"), db)
+    stacks = set(re.findall(r"font-family:([^;\"]+)", html))
+    assert stacks == {"Tahoma,Arial,sans-serif"}, stacks
