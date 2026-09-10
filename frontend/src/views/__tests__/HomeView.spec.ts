@@ -130,9 +130,9 @@ describe("HomeView - happy path", () => {
   it("explains the sign-in requirement when the /preferences guard turned the visitor away", async () => {
     const { wrapper } = await mountHome({ signin: "required" });
     expect(wrapper.text()).toContain("יש להתחבר עם");
-    // The brand name itself is the Google mark, not a word - so it carries
-    // its name on the <svg> instead of in the sentence's text.
-    expect(wrapper.find(".signin-note svg").attributes("aria-label")).toBe("Google");
+    // The brand name is the Google wordmark, not a word - so it carries its
+    // name in the image's alt text instead of in the sentence's text.
+    expect(wrapper.find(".signin-note img").attributes("alt")).toBe("Google");
   });
 
   it("shows no sign-in notice on an ordinary visit", async () => {
