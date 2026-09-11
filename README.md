@@ -10,13 +10,15 @@ relevance per topic, summarizes and translates to Hebrew, and delivers a weekly 
   overflow visitors are captured to a waitlist
 - Admin curates RSS sources and the Field/Role taxonomy; users set preferences via a guided
   profile picker (Field/Role/Experience/Interests -> suggested Topics) or the classic Topic grid
+- The digest is text-only: images are dropped entirely in V1 per the content policy in
+  `CLAUDE.md` ([#57](https://github.com/MONS-Designers/news-agent/issues/57))
 - WhatsApp delivery is explicitly out of scope for this stage
 
 ## Architecture
 
 - **Backend** - FastAPI + SQLAlchemy, Postgres (Neon)
-- **Frontend** - Vue, three surfaces: admin source approval, admin taxonomy queue, and the user
-  profile picker + topic preferences
+- **Frontend** - Vue, four surfaces: admin source approval, admin taxonomy queue, admin send
+  engagement, and the user profile picker + topic preferences
 - **Auth** - Google OAuth (admin email allowlist / matched seeded user email), no separate
   login/password system
 - **Pipeline** - scheduled process (fetch → filter → extract → summarize/translate → build
@@ -118,8 +120,9 @@ npm run dev         # start dev server
 
 - Frontend: http://127.0.0.1:5173/
 - The dev server proxies `/api/*` to http://localhost:8000 (the backend) by default.
-- Four routes: `/` (landing page), `/admin` (source approval), `/admin/taxonomy` (pending
-  Field/Role curation queue) and `/preferences` (guided profile picker + topic subscriptions).
+- Five routes: `/` (landing page), `/admin` (source approval), `/admin/taxonomy` (pending
+  Field/Role curation queue), `/admin/engagement` (per-send opens and clicks) and
+  `/preferences` (guided profile picker + topic subscriptions).
 
 Run both servers in separate terminals to test end-to-end.
 
@@ -144,35 +147,55 @@ See [Status](#status) for the current gap list.
 
 ## Development
 
+Backend and pipeline, from the project root:
+
 ```bash
 pytest          # run tests
 mypy            # type-check src/newsagent
 ```
 
+Frontend, from `frontend/`:
+
+```bash
+npm run test        # unit/component tests (vitest)
+npm run type-check  # vue-tsc, strict
+npm run test:e2e    # Playwright end-to-end tests
+```
+
 Backend, frontend, and pipeline are kept as separate layers, with the API as the only contract
 between backend and frontend.
+
+The gender-neutral Hebrew copy policy in `CLAUDE.md` is enforced by regression guards, not
+just review: `frontend/src/__tests__/gendered-copy.spec.ts` scans the Vue components and
+`tests/test_gendered_digest_copy.py` scans the digest template. Both are word-boundary scans,
+so a genuinely new phrasing may need the denylist extended rather than the check silenced.
+
+## Documentation
+
+[docs/index.md](docs/index.md) is the entry point to the generated documentation set: per-part
+architecture, the API contract, the data model, development guides, and the deployment guide.
+`CLAUDE.md` holds the cross-repo context and the locked product decisions.
 
 ## Status
 
 The self-registration -> profile -> weekly-digest loop is built and shippable end to end,
 including real SMTP delivery, full-text extraction, click/open tracking, and per-run LLM usage
 accounting (the 2026-08-07 launch-readiness epics - see
-`_bmad-output/planning-artifacts/epics-launch-readiness.md`). Known remaining gaps:
+`_bmad-output/planning-artifacts/epics-launch-readiness.md`). Hosting, the scheduler and
+secrets management are now live in `news-agent-infra` (Azure App Service, Terraform, Key
+Vault) - see [docs/deployment-guide.md](docs/deployment-guide.md) for the deployed shape and
+the discrepancies still flagged there. Known remaining gaps:
 
 - **Never run end to end** against real users
   ([#23](https://github.com/MONS-Designers/news-agent/issues/23)).
 - **Silent empty digest** if a user subscribes to a Topic with zero admin-approved Sources
   ([#48](https://github.com/MONS-Designers/news-agent/issues/48)).
-- **Accessibility remediation incomplete** on the profile picker, despite being scoped as a
-  baseline requirement ([#31](https://github.com/MONS-Designers/news-agent/issues/31)).
-- **No scheduler, hosting target, or secrets management** - tracked in `news-agent-infra`
-  (issues [#15](https://github.com/MONS-Designers/news-agent/issues/15),
-  [#17](https://github.com/MONS-Designers/news-agent/issues/17),
-  [#18](https://github.com/MONS-Designers/news-agent/issues/18)).
-- Minor polish: digest email font/positioning
-  ([#50](https://github.com/MONS-Designers/news-agent/issues/50)), missing lead-image fallback
-  ([#49](https://github.com/MONS-Designers/news-agent/issues/49)), and test-coverage gaps
-  ([#42](https://github.com/MONS-Designers/news-agent/issues/42),
-  [#43](https://github.com/MONS-Designers/news-agent/issues/43)).
+- **Only three seeded topics**, too narrow a pool for real reader profiles
+  ([#60](https://github.com/MONS-Designers/news-agent/issues/60)).
+- **CLI test-coverage gap** on `filter`/`summarize`
+  ([#43](https://github.com/MONS-Designers/news-agent/issues/43)).
+- Deferred to V2, not a V1 gap: lead-image fallback
+  ([#49](https://github.com/MONS-Designers/news-agent/issues/49)) is on hold while the digest
+  stays text-only.
 
 See open issues for the rest.
