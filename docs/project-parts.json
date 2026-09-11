@@ -1,0 +1,185 @@
+{
+  "repository_type": "multi-part",
+  "generated": "2026-09-10",
+  "scan_level": "deep",
+  "parts": [
+    {
+      "part_id": "backend",
+      "part_name": "Backend API",
+      "project_type_id": "backend",
+      "root_path": "src/newsagent",
+      "purpose": "HTTP API: Google OAuth sign-in, admin source and taxonomy curation, reader profile and topic preferences, digest open and click tracking.",
+      "primary_language": "Python",
+      "language_version": ">=3.12",
+      "framework": "FastAPI 0.139.2",
+      "entry_point": "newsagent.api.main:app",
+      "database": "PostgreSQL (Neon) via SQLAlchemy 2.0.51",
+      "tech_stack": [
+        "FastAPI 0.139.2",
+        "uvicorn 0.51.0",
+        "SQLAlchemy 2.0.51",
+        "psycopg 3.3.4",
+        "Alembic 1.18.5",
+        "Authlib 1.7.2",
+        "itsdangerous 2.2.0",
+        "pydantic-settings 2.14.2",
+        "Jinja2 3.1.6",
+        "httpx 0.28.1"
+      ],
+      "architecture_pattern": "layered service with swappable adapters",
+      "install_command": "pip install -r requirements-dev.txt && pip install -e .",
+      "dev_command": "uvicorn newsagent.api.main:app --reload",
+      "test_command": "pytest",
+      "docs": [
+        "architecture-backend.md",
+        "api-contracts-backend.md",
+        "data-models-backend.md",
+        "development-guide-backend.md"
+      ],
+      "stats": {
+        "python_files": 96,
+        "lines_of_code": 7940,
+        "http_endpoints": 23,
+        "routers": 6,
+        "tables": 20,
+        "alembic_revisions": 33,
+        "alembic_head": "b7e4a1c9d3f2"
+      }
+    },
+    {
+      "part_id": "web",
+      "part_name": "Vue SPA",
+      "project_type_id": "web",
+      "root_path": "frontend",
+      "purpose": "Five-route single-page app. Admin source approval, taxonomy curation queue and engagement report; reader guided profile picker and topic subscriptions. Hebrew, right to left.",
+      "primary_language": "TypeScript",
+      "language_version": "^5.6.3",
+      "framework": "Vue 3.5 (Composition API)",
+      "entry_point": "frontend/src/main.ts",
+      "database": null,
+      "tech_stack": [
+        "Vue ^3.5.11",
+        "vue-router ^4.4.0",
+        "TypeScript ^5.6.3 (strict)",
+        "Tailwind CSS ^4.3.3",
+        "Vite ^5.4.10",
+        "Vitest ^4.1.10",
+        "Playwright ^1.62.1"
+      ],
+      "architecture_pattern": "component-based SPA with module-level reactive stores",
+      "install_command": "npm install",
+      "dev_command": "npm run dev",
+      "test_command": "npm run test",
+      "docs": [
+        "architecture-web.md",
+        "component-inventory-web.md",
+        "development-guide-web.md"
+      ],
+      "stats": {
+        "routes": 5,
+        "views": 5,
+        "components": 8,
+        "vitest_specs": 13,
+        "playwright_specs": 3,
+        "state_management": "module-level refs (auth.ts, profile-draft.ts) - no store library"
+      }
+    },
+    {
+      "part_id": "cli",
+      "part_name": "Operator CLI and pipeline",
+      "project_type_id": "cli",
+      "root_path": "src/newsagent/cli.py",
+      "purpose": "Operator commands plus the six content stages, and a long-lived delivery loop that owns the send schedule in code rather than in an external cron.",
+      "primary_language": "Python",
+      "language_version": ">=3.12",
+      "framework": "argparse (stdlib)",
+      "entry_point": "python -m newsagent.cli",
+      "additional_entry_points": ["python -m newsagent.scheduler"],
+      "database": "PostgreSQL (Neon), shared with backend",
+      "tech_stack": [
+        "argparse (stdlib)",
+        "feedparser 6.0.12",
+        "trafilatura 2.2.0",
+        "httpx 0.28.1",
+        "Jinja2 3.1.6",
+        "smtplib (stdlib)",
+        "concurrent.futures (stdlib)"
+      ],
+      "architecture_pattern": "pipeline of stages over a shared database, plus a delivery loop",
+      "install_command": "pip install -r requirements-dev.txt && pip install -e .",
+      "dev_command": "python -m newsagent.cli --help",
+      "test_command": "pytest tests/pipeline tests/test_cli.py tests/test_scheduler.py",
+      "docs": [
+        "architecture-cli.md",
+        "development-guide-cli.md"
+      ],
+      "stats": {
+        "subcommands": 15,
+        "pipeline_stages": 6,
+        "scheduler_tick_seconds": 120,
+        "daily_stages": ["fetch", "filter", "extract", "summarize"],
+        "weekly_stages": ["build-digests", "send-digests"]
+      }
+    }
+  ],
+  "integration_points": [
+    {
+      "from": "web",
+      "to": "backend",
+      "type": "REST/JSON over HTTP",
+      "location": "frontend/src/api/client.ts",
+      "auth": "signed session cookie (Starlette SessionMiddleware + itsdangerous)",
+      "details": "API_BASE resolves to import.meta.env.VITE_API_BASE, falling back to the relative path /api. Vite's dev proxy and nginx.frontend.conf.template both strip the prefix before forwarding. Dockerfile.frontend deliberately refuses a VITE_API_BASE build arg so no absolute backend hostname is ever baked into the image.",
+      "fragility": "high - this assumption silently broke OAuth login once when infra deployed frontend and backend on split subdomains"
+    },
+    {
+      "from": "cli",
+      "to": "backend domain layer",
+      "type": "direct in-process function calls",
+      "location": "src/newsagent/cli.py imports",
+      "auth": null,
+      "details": "The CLI opens one SessionLocal() for the whole run and calls services.* and pipeline.* directly. It never issues an HTTP request to the API. Both processes talk to the same database."
+    },
+    {
+      "from": "cli",
+      "to": "PostgreSQL",
+      "type": "SQLAlchemy, separate process",
+      "location": "src/newsagent/db.py",
+      "auth": "NEWSAGENT_DATABASE_URL",
+      "details": "engine and SessionLocal are built at import time. pool_pre_ping=True is required on Neon, where an idle connection closed by the server otherwise surfaces as an SSL error on the next request."
+    },
+    {
+      "from": "cli",
+      "to": "external services",
+      "type": "outbound HTTP and SMTP",
+      "location": "pipeline/fetcher.py, pipeline/extract.py, llm/external.py, suggestions/llm.py, mail/smtp.py",
+      "auth": "EXTERNAL_LLM_AUTH_TOKEN, LOCAL_LLM_AUTH_TOKEN, NEWSAGENT_SMTP_*",
+      "details": "All third-party calls leave from the CLI and scheduler processes, never from the API. Every attempt is recorded as one outbound_calls row. The two LLM config families are deliberately independent."
+    },
+    {
+      "from": "news-agent CI",
+      "to": "news-agent-infra",
+      "type": "GitHub repository_dispatch",
+      "location": ".github/workflows/trigger-deploy.yml",
+      "auth": "INFRA_DISPATCH_TOKEN",
+      "details": "Push to dev maps to stage, push to main maps to prod. Sends event_type deploy with the environment and commit SHA. No docker build, no Azure login, no registry push happens in this repository."
+    }
+  ],
+  "shared_state_ownership": {
+    "articles lifecycle columns": "pipeline stages",
+    "digests, digest_articles": "pipeline/digest.py",
+    "digests.sent_at": "pipeline/send.py",
+    "digests.opened_at, digest_links.clicked_at": "api/routers/tracking.py",
+    "users profile and suggestion columns": "services/profile.py",
+    "outbound_runs, outbound_calls": "services/telemetry.py (sole writer)",
+    "log_entries": "services/log_entries.py (sole writer)"
+  },
+  "existing_docs": [
+    { "path": "../README.md", "type": "readme" },
+    { "path": "../CLAUDE.md", "type": "project-context" },
+    { "path": "../_bmad-output/project-context.md", "type": "agent-rules" },
+    { "path": "./user-management.md", "type": "operations" },
+    { "path": "./v1-manual-test-plan.md", "type": "test-plan" },
+    { "path": "./v1-urgent-fixes-2026-08-24.md", "type": "changelog" }
+  ]
+}
