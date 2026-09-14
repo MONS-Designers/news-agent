@@ -76,17 +76,9 @@ They are deliberately independent.
 
 ## Environment safety
 
-Read this before running anything locally.
-
-- **`.env` points at the TEST Neon branch. `.env.prod` holds the PRODUCTION database URL and
-  nothing else.** Both are gitignored. Never print, log or commit either.
-- **`.env` also carries real SMTP credentials and a real external LLM token.** A careless
-  local pipeline run therefore sends real email and spends real money, even though its
-  database is the test branch.
-- **Never point a local run at `.env.prod`.**
-- `db.py` builds `engine` and `SessionLocal` at **import time** from `settings.database_url`.
-  Any code that opens its own `SessionLocal()` talks to whatever the resolved configuration
-  pointed at.
+Read this before running anything locally: a local run can send real email and spend real
+money. The rules are in
+[Project Context: Secrets and the environment](../_bmad-output/project-context.md#secrets-and-the-environment).
 
 ## Running locally
 
@@ -140,9 +132,9 @@ Create a migration after changing a model:
 alembic revision --autogenerate -m "short description"
 ```
 
-Then read the generated file before applying it. Migrations in this project use
-`op.batch_alter_table` even though production is Postgres; eight existing migrations rely on
-it, so keep the pattern rather than simplifying it away.
+Then read the generated file before applying it. Column changes use `op.batch_alter_table`
+even though production is Postgres; see [Project Context for AI Agents](../_bmad-output/project-context.md) before
+simplifying it.
 
 Capture a verbose pipeline run for debugging, in PowerShell:
 
@@ -175,34 +167,15 @@ prints to stderr, rather than raising into application code.
 
 ## Testing notes
 
-`tests/conftest.py` declares **two `autouse` fixtures**. One resets `settings` to the
-`Settings` class defaults, so a developer's `.env` cannot leak into a test run. The other
-redirects telemetry and logging to in-memory SQLite.
-
-A new test that touches the database must **bring its own in-memory engine**. Do not assume
-the autouse fixtures cover you.
-
-In-memory SQLite shared across threads needs `StaticPool`; the existing fixtures show the
-pattern.
-
-`mypy` checks `packages = ["newsagent"]` only. `tests/` and the frontend are outside it, so
-a type error in a test would not have been caught.
+`tests/conftest.py` declares two `autouse` fixtures: one resets `settings` to the `Settings`
+class defaults, the other redirects telemetry and logging to in-memory SQLite. What they do not
+cover, and the traps around threads and type checking, are in
+[Project Context: Testing](../_bmad-output/project-context.md#testing).
 
 ## Conventions to respect
 
-- **SQLAlchemy 2.0 only.** `Mapped[...]` with `mapped_column(...)`, and `select()`. Never the
-  legacy `Query` API or bare `Column(...)` class attributes.
-- **Never widen the ruff rule set.** `pyproject.toml` pins `select = ["E4", "E7", "E9", "F"]`
-  deliberately. Version 0.16.0 widened ruff's own default and turned a linter release into
-  red CI on untouched files.
-- **Backend pins are exact and deliberate.** Bumping one is an approved change, never a side
-  effect of other work.
-- **Comments default to absent.** A comment that restates what the line already says is
-  noise. What survives: why a non-obvious choice was made, a trap the next reader would
-  otherwise walk into, or a pointer that is not derivable from code such as an architecture
-  decision id or an issue number. Naming and structure carry the what.
-- **Status columns are plain strings** with module-level constants, never database enums.
-  "Has this happened, and when" is a nullable timestamp, never a boolean.
+The conventions an agent must follow, including the comment policy, are kept in
+[Project Context for AI Agents](../_bmad-output/project-context.md), the single source for them.
 
 ## Continuous integration
 

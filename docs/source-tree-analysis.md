@@ -135,7 +135,7 @@ news-agent/
 ├── scripts/e2e_setup.py                # Seeds the isolated Playwright backend
 ├── docs/                               # This documentation set
 ├── _bmad-output/                       # BMad planning and implementation artifacts
-│   ├── project-context.md              # Stack rules and DB-safety rules for AI agents
+│   ├── project-context.md              # Single source of agent rules
 │   ├── planning-artifacts/             # Epics, PRDs, architecture, UX designs
 │   ├── implementation-artifacts/       # Per-story specs and deferred-work.md
 │   └── specs/, brainstorming/
@@ -210,10 +210,8 @@ into suggested Topics. The largest cluster of UI logic in the app.
 
 **Purpose:** 64 pytest modules mirroring the package layout.
 
-**Trap:** `conftest.py` declares two `autouse` fixtures that reset `settings` to the code
-defaults and redirect telemetry and logging to in-memory SQLite. A new test that touches
-the database must bring its own in-memory engine. Do not assume the autouse fixtures cover
-you.
+**Trap:** `conftest.py`'s two `autouse` fixtures do not isolate every table. See
+[Project Context: Testing](../_bmad-output/project-context.md#testing).
 
 ## Part-Specific Trees
 
@@ -370,7 +368,8 @@ src/newsagent/
   and the vitest block that excludes `e2e/`.
 - **`frontend/tsconfig.json`**: strict mode with `noUnusedLocals` and `noUnusedParameters`.
 - **`nginx.frontend.conf.template`**: substituted at container start from `BACKEND_HOST`.
-- **`.env`** and **`.env.prod`**: both gitignored, both dangerous. See the development guide.
+- **`.env`** and **`.env.prod`**: both gitignored, both dangerous. See
+  [Project Context: Secrets and the environment](../_bmad-output/project-context.md#secrets-and-the-environment).
 
 ## Notes for Development
 

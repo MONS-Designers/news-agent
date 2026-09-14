@@ -103,10 +103,10 @@ const API_BASE = import.meta.env.VITE_API_BASE ?? "/api";
 ```
 
 The relative fallback is the intended production behavior. Vite's dev proxy and nginx both
-strip the `/api` prefix before forwarding, and `Dockerfile.frontend` deliberately refuses a
-`VITE_API_BASE` build argument. Baking an absolute backend hostname anywhere freezes one
-environment into the image, and has already broken OAuth login once after a deploy. See
-[integration-architecture.md](./integration-architecture.md).
+strip the `/api` prefix before forwarding. See
+[integration-architecture.md](./integration-architecture.md) for the routing, and
+[Project Context: Deployment shape](../_bmad-output/project-context.md#deployment-shape-is-not-this-repos-to-assume) for the
+rule that follows from it.
 
 One private `request<T>()` helper wraps every call and throws a typed `ApiError` carrying the
 HTTP status. `getMe()` is the only caller that catches it, turning a 401 into `null` because
@@ -143,25 +143,10 @@ and failed.
 
 ## Content Rules
 
-Two project-wide content policies land almost entirely in this part.
-
-**Gender-neutral Hebrew.** No user-facing Hebrew string may address the reader in a way that
-assumes their gender. Hebrew has no gender-neutral second-person present tense, so the trap
-is a present-tense verb or an imperative aimed at "you", not the pronouns in isolation. The
-technique is to rewrite around the problem rather than use slashed forms in prose: prefer
-second-person past tense, which is spelled identically for both genders; use possessive and
-object forms, which are already neutral in writing; replace bare imperatives with an
-infinitive construction or a noun phrase. Slashed forms remain acceptable only in taxonomy
-role names the reader picks for themselves.
-
-A regression guard scans `.vue` files for the most common offenders in
-`frontend/src/__tests__/gendered-copy.spec.ts`. It is a targeted word-boundary scan rather
-than a parser, so a genuinely new phrasing may need the denylist extended rather than the
-check silenced.
-
-**No images of women in the digest.** Currently satisfied by dropping images from the digest
-entirely, which is a backend rendering decision. It constrains this part only in that the
-frontend must not reintroduce them.
+Two project-wide content policies land almost entirely in this part: gender-neutral Hebrew
+copy, guarded by `frontend/src/__tests__/gendered-copy.spec.ts`, and no images of women in the
+digest. Both are stated once, with the technique and the guard's limits, in
+[Project Context: Rules you must not miss](../_bmad-output/project-context.md#rules-you-must-not-miss).
 
 ## Testing Strategy
 

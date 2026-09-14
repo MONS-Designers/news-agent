@@ -242,17 +242,9 @@ cadence so a Monday article still competes with a Sunday one.
 `pipeline/`, `llm/`, `suggestions/`, `mail/`, `telemetry/`, `models/`, plus top-level
 modules for the CLI, the scheduler, configuration, logging and the JSON parser.
 
-**`tests/conftest.py` has two `autouse` fixtures.** One resets `settings` to the `Settings`
-class defaults so a developer's `.env` cannot leak into a test run. The other redirects
-telemetry and logging to in-memory SQLite. A new test that touches the database must bring
-its own in-memory engine; do not assume the autouse fixtures cover you.
-
-**mypy checks `packages = ["newsagent"]` only.** `tests/` and the frontend are outside it.
-A type error in a test would not have been caught.
-
-**ruff's rule set is pinned to `E4`, `E7`, `E9`, `F`,** deliberately narrower than ruff's own
-default. Version 0.16.0 widened that default, adding `B`, `I`, `UP` and `RUF`, which turned
-an unrelated linter release into red CI on untouched files. Do not modernize it.
+`tests/conftest.py` has two `autouse` fixtures: one resets `settings` to the code defaults,
+the other redirects telemetry and logging to in-memory SQLite. The testing traps and the
+pinned `ruff` and `mypy` scope are kept in [Project Context for AI Agents](../_bmad-output/project-context.md).
 
 ## Development Workflow
 

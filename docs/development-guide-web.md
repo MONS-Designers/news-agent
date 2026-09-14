@@ -70,23 +70,17 @@ npx playwright install --with-deps chromium
 ### The copy regression guard
 
 `src/__tests__/gendered-copy.spec.ts` is not a component test. It scans `.vue` files for
-Hebrew phrasings that assume the reader's gender. Being a targeted word-boundary scan rather
-than a parser, a genuinely new offending phrasing may need the denylist extended rather than
-the check silenced.
+Hebrew phrasings that assume the reader's gender. What to do when it fails is in
+[Project Context: Gender-neutral Hebrew](../_bmad-output/project-context.md#gender-neutral-hebrew).
 
 ## Conventions to respect
 
 ### Styling
 
-**Tailwind is version 4.** Design tokens live in an `@theme { ... }` block inside
-`src/style.css`. Do not add a `tailwind.config.js`, do not add version-3 `content` globs, and
-do not introduce scoped component CSS alongside the utility-class convention.
-
-There is no third-party UI kit. Reuse the existing tokens and the `BTN_BASE` utility string
-pattern rather than hand-rolling a new button.
-
-Every screen must be responsive at laptop, tablet and phone widths. Treat "not responsive" as
-a bug, not as polish.
+Design tokens live in an `@theme { ... }` block inside `src/style.css` (Tailwind 4). There is
+no third-party UI kit. Reuse the existing tokens and the `BTN_BASE` utility string pattern
+rather than hand-rolling a new button. The styling, responsiveness and accessibility rules are
+in [Project Context for AI Agents](../_bmad-output/project-context.md).
 
 ### The API boundary
 
@@ -94,23 +88,14 @@ a bug, not as polish.
 rather than calling `fetch` from a component.
 
 `API_BASE` resolves to `import.meta.env.VITE_API_BASE` and falls back to the relative `/api`.
-**Never hardcode a backend hostname anywhere in this part.** Vite's dev proxy and nginx both
-strip that prefix, and `Dockerfile.frontend` deliberately refuses a `VITE_API_BASE` build
-argument. Baking an absolute URL freezes one environment's hostname into the image, and has
-already broken OAuth login once after a deploy.
-
-If a change touches how the frontend finds the backend, send a short message to the
-infrastructure repository owner before assuming a deployment shape.
+Before changing how the frontend finds the backend, read
+[Project Context: Deployment shape](../_bmad-output/project-context.md#deployment-shape-is-not-this-repos-to-assume).
 
 ### State
 
-There is no store library, and adding Pinia would be a new dependency rather than a refactor.
 Shared state is a module-level `ref` with plain functions around it, as in `auth.ts` and
-`profile-draft.ts`.
-
-Remember that module-level refs survive single-page navigation but not a page reload, so any
-cache added this way must be invalidated on sign-out. `signOut()` already calls
-`clearProfileDraft()` for that reason.
+`profile-draft.ts`. See [architecture-web.md](./architecture-web.md#state-management) for how it
+works, and [Project Context for AI Agents](../_bmad-output/project-context.md) for the rules around it.
 
 ### TypeScript
 
@@ -120,21 +105,8 @@ when every test passes.
 
 ### Hebrew copy
 
-No user-facing Hebrew string may address the reader in a way that assumes their gender.
-Hebrew has no gender-neutral second-person present tense, so the trap is a present-tense verb
-or an imperative aimed at "you", not the pronouns themselves.
-
-Rewrite around the problem rather than using slashed forms in prose:
-
-- Prefer second-person **past** tense, which is spelled identically for both genders.
-- Possessive and object forms are already neutral in writing.
-- Replace a bare imperative with an infinitive construction or a noun phrase, or reword the
-  state entirely.
-- Slashed forms stay acceptable only in taxonomy role names the reader picks for themselves,
-  never in body copy.
-
-`src/newsagent/pipeline/render.py`'s welcome view is the reference example on the backend
-side.
+User-facing copy must never assume the reader's gender. The technique and the reference
+example are in [Project Context: Gender-neutral Hebrew](../_bmad-output/project-context.md#gender-neutral-hebrew).
 
 ### Two constants that are contracts
 

@@ -16,8 +16,8 @@
   boolean. `Digest.sent_at`, `Digest.opened_at`, `DigestLink.clicked_at`,
   `User.unsubscribed_at`, `User.welcomed_at` and `User.topics_stale_at` all share that
   shape, which answers both questions with one column and stays reversible.
-- Every migration uses `op.batch_alter_table` even though production is Postgres. Eight
-  existing migrations rely on it; it is not to be simplified away.
+- Column changes in migrations use `op.batch_alter_table` even though production is Postgres.
+  Why it stays is in [Project Context for AI Agents](../_bmad-output/project-context.md).
 
 ## Entity overview
 

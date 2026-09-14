@@ -11,9 +11,9 @@ of its own. Follow [development-guide-backend.md](./development-guide-backend.md
 
 ## Read this before your first local run
 
-**A local pipeline run sends real email and spends real money.** The checked-out `.env`
-carries real SMTP credentials and a real external LLM token, even though its database points
-at the test Neon branch. The database being safe does not make the run safe.
+**A local pipeline run sends real email and spends real money**, even though `.env` points at
+the test database. The full rules are in
+[Project Context: Secrets and the environment](../_bmad-output/project-context.md#secrets-and-the-environment).
 
 Two settings neutralize that, and both default to the harmless value:
 
@@ -27,8 +27,6 @@ NEWSAGENT_EMAIL_SENDER=console
 
 With `NEWSAGENT_EMAIL_OUTBOX_DIR` set, the console sender also writes each email's HTML to
 that directory, which is the practical way to inspect a rendered digest.
-
-**Never point a local run at `.env.prod`.**
 
 ## Command reference
 
@@ -214,9 +212,8 @@ tick and the lease.
 Stages are testable without patching because the provider and the sender are parameters. The
 mock LLM adapter and the console email sender stand in for the real ones directly.
 
-The two `autouse` fixtures in `tests/conftest.py` reset settings and redirect telemetry and
-logging to in-memory SQLite. A test that touches the database must bring its own in-memory
-engine.
+The test database rules, including what the `autouse` fixtures in `tests/conftest.py` do not
+cover, are in [Project Context: Testing](../_bmad-output/project-context.md#testing).
 
 ## Known behavior to be aware of
 

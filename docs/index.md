@@ -117,8 +117,8 @@ Full detail, including the OAuth redirect chain and shared-state ownership, is i
 
 - [README](../README.md) - scope, architecture summary, schedule, getting started, status
 - [CLAUDE.md](../CLAUDE.md) - cross-repo context, locked product decisions, content policies
-- [Project Context for AI Agents](../_bmad-output/project-context.md) - stack rules, comment
-  policy, environment and database safety
+- [Project Context for AI Agents](../_bmad-output/project-context.md) - the single source of
+  agent rules: approval gates, silent failures, testing traps, content and secrets policy
 - [User Management](./user-management.md) - operator notes on user accounts
 - [V1 Manual Test Plan](./v1-manual-test-plan.md) - manual verification script
 - [V1 Urgent Fixes](./v1-urgent-fixes-2026-08-24.md) - the 2026-08-24 fix log
@@ -167,16 +167,9 @@ python -m newsagent.cli --help
 
 ## Read This Before Running Anything Locally
 
-- **`.env` points at the TEST Neon branch. `.env.prod` holds the PRODUCTION database URL.**
-  Both are gitignored. Never print, log or commit either, and never point a local run at
-  `.env.prod`.
-- **`.env` also carries real SMTP credentials and a real LLM token.** A careless local
-  pipeline run sends real email and spends real money, even though its database is the test
-  branch. Keep `NEWSAGENT_LLM_PROVIDER=mock` and `NEWSAGENT_EMAIL_SENDER=console`.
-- **Configuration is read only through `newsagent.config.Settings`.** Never `os.environ`.
-- **`tests/conftest.py` has two `autouse` fixtures** that reset settings and redirect
-  telemetry and logging to in-memory SQLite. A new test touching the database must bring its
-  own in-memory engine.
+A local run can send real email and spend real money, even though `.env` points at the test
+database. The environment, secrets and database rules live in one place:
+[Project Context: Secrets and the environment](../_bmad-output/project-context.md#secrets-and-the-environment).
 
 ## For AI-Assisted Development
 
@@ -203,14 +196,9 @@ deployment topology.
 
 ### Conventions That Are Not Negotiable
 
-- Never widen the ruff rule set. It is pinned to `E4`, `E7`, `E9`, `F` deliberately.
-- SQLAlchemy 2.0 style only. Migrations keep `op.batch_alter_table`.
-- Tailwind is version 4. Tokens go in `@theme` in `style.css`; no config file, no scoped CSS.
-- Never hardcode a backend hostname in the frontend.
-- Backend pins are exact and deliberate. Bumping one is an approved change, never a side
-  effect.
-- No user-facing Hebrew string may assume the reader's gender.
-- The digest ships no images of women, currently satisfied by shipping no images at all.
+The rules an agent must follow are kept in one file, so they cannot drift between copies:
+[Project Context for AI Agents](../_bmad-output/project-context.md). This documentation set describes how the code is built;
+that file says what must not be broken.
 
 ---
 

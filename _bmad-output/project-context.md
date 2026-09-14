@@ -65,6 +65,11 @@ production.
 **A paid LLM stage filters to subscribed topics first** (`summarize.py`, GH #45). A new paid
 stage that skips the filter spends money on work nobody asked for, and nothing fails.
 
+**Digest delivery is at-least-once, on purpose.** `send.py` sends the email before it commits
+`sent_at`, so a process killed between the two re-sends a digest the reader already received.
+SMTP and the database share no transaction, so reversing the order only trades a duplicate for
+a lost digest. Do not "fix" the order.
+
 **Jinja templates ship as package data**, declared in `pyproject.toml` under
 `[tool.setuptools.package-data]`. A template or asset not listed there is missing from the
 installed package and fails only at runtime.
@@ -88,6 +93,10 @@ on it. Do not simplify it away.
 
 **`enum.Enum` appears nowhere.** Status values are module-level string constants beside the
 model or stage that owns them, on plain `String` columns. Do not introduce enums.
+
+**"Has this happened, and when" is a nullable timestamp, never a boolean.** No model has a
+boolean column; state like `sent_at` or `unsubscribed_at` is `datetime | None`. Do not add an
+`is_sent: bool`.
 
 **Pinia is not installed.** Shared frontend state is a module-level `ref` plus plain functions
 (`auth.ts`, `profile-draft.ts`). Those refs survive SPA navigation, so any cache holding
@@ -145,6 +154,15 @@ not implement and several components call in `onMounted`. A component that start
 missing browser API gets its stub added there, not mocked per spec. Mock the API module
 (`vi.mock("@/api/client", ...)`), never `fetch`.
 
+**A passing test is not proof that it checks anything.** When testing code where a mistake would
+be silent - two same-typed arguments swapped, a count printed in the wrong slot, work drifting
+outside a context manager - break the code by hand at each point that matters, run the tests,
+confirm one fails, then restore the file. It takes minutes and needs no tooling. GH #43's CLI
+tests passed while blind to seven such breaks until this was done. Mutation tooling (`mutmut`)
+was considered and not adopted (2026-09-14): it requires `fork`, so it cannot run natively on
+Windows, and a whole-package run buries the few mutants that matter under thousands that change
+no behaviour. Revisit only for a small, critical module, run in CI on Linux.
+
 ---
 
 ## Rules you must not miss
@@ -180,7 +198,9 @@ and never satisfy it with a slashed form.
 `.env` points at the **TEST** Neon branch; `.env.prod` holds the **PRODUCTION**
 `NEWSAGENT_DATABASE_URL` and nothing else. Both are gitignored. `.env` also carries **real** SMTP
 credentials and a real `EXTERNAL_LLM_AUTH_TOKEN`, so a careless local pipeline run sends real
-email and spends real money even though its database is the test branch.
+email and spends real money even though its database is the test branch. For a local run keep
+`NEWSAGENT_LLM_PROVIDER=mock` and `NEWSAGENT_EMAIL_SENDER=console`. Both are the code defaults,
+but `.env` sets both keys, so check what they resolve to before running anything.
 
 `db.py` builds `engine`/`SessionLocal` at **import time** from `settings.database_url`, so any
 code opening its own `SessionLocal()` talks to whatever `.env` resolved to. Config is read only
