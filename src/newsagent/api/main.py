@@ -65,6 +65,17 @@ def create_app() -> FastAPI:
             return {"status": "error"}
         return {"status": "ok"}
 
+    @app.get("/health/providers")
+    def health_providers() -> dict[str, str]:
+        # Which adapters this process resolved, so a post-deploy smoke test can
+        # fail on a fallback (mock / popularity) instead of the gap staying
+        # silent until a reader notices (GH #72). Names only - never URLs,
+        # models or tokens.
+        return {
+            "llm_provider": settings.llm_provider,
+            "suggestion_provider": settings.suggestion_provider,
+        }
+
     return app
 
 

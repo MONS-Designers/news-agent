@@ -46,6 +46,25 @@ def test_health_db_returns_503_when_db_unreachable(monkeypatch: pytest.MonkeyPat
     assert response.json() == {"status": "error"}
 
 
+@pytest.mark.parametrize(
+    ("llm_provider", "suggestion_provider"),
+    [("mock", "popularity"), ("external", "llm")],
+)
+def test_health_providers_reports_resolved_adapters(
+    monkeypatch: pytest.MonkeyPatch, llm_provider: str, suggestion_provider: str
+):
+    monkeypatch.setattr(settings, "llm_provider", llm_provider)
+    monkeypatch.setattr(settings, "suggestion_provider", suggestion_provider)
+
+    response = client.get("/health/providers")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "llm_provider": llm_provider,
+        "suggestion_provider": suggestion_provider,
+    }
+
+
 def test_cors_allows_configured_frontend_origin(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(settings, "frontend_url", "https://app.example.com")
     test_client = TestClient(create_app())
