@@ -74,9 +74,10 @@ user-interface concept only, and a curated pick and a typed "Other" value are st
 identically. `experience_bucket` is validated against a fixed illustrative set in
 `services/profile.py` and has no "Other" concept.
 
-**Delivery.** `digest_frequency`, not null, defaulting to `weekly`. It stores a key into
-`services.cadence.INTERVAL_DAYS` rather than a number of days, so the mapping can change
-without a data migration. Valid keys are `daily`, `twice_weekly`, `weekly`.
+**Delivery.** `digest_weekdays`, a not-null JSON list of `date.weekday()` numbers
+(Monday=0), defaulting to `[6]` (Sunday). Valid sets are one day, two days, or all six days
+Sunday to Friday; the frequency is derived from the count in `services/cadence.py` rather
+than stored beside it.
 `unsubscribed_at` is the reversible opt-out. `welcomed_at` records when the one-time beta
 welcome was delivered; a failed send leaves it null so the next run retries with the welcome
 intact rather than silently downgrading to an ordinary digest. It lives on the user rather

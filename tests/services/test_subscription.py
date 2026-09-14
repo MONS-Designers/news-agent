@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from newsagent.models import User
 from newsagent.models.base import Base
-from newsagent.services.subscription import set_unsubscribed
+from newsagent.services.subscription import set_digest_weekdays, set_unsubscribed
 
 
 @pytest.fixture
@@ -42,3 +42,26 @@ def test_resubscribing_when_already_active_is_a_no_op(db: Session):
     user = db.get(User, 1)
     set_unsubscribed(db, user, False)
     assert user.unsubscribed_at is None
+
+
+def test_setting_weekdays_stores_them_in_week_order(db: Session):
+    user = db.get(User, 1)
+    set_digest_weekdays(db, user, [2, 6])  # Wednesday, Sunday
+    db.expire_all()
+    assert db.get(User, 1).digest_weekdays == [6, 2]
+
+
+def test_invalid_weekdays_are_rejected_and_nothing_is_stored(db: Session):
+    user = db.get(User, 1)
+    with pytest.raises(ValueError):
+        set_digest_weekdays(db, user, [5])  # Saturday
+    db.expire_all()
+    assert db.get(User, 1).digest_weekdays == [6]
+
+
+def test_pausing_keeps_the_chosen_weekdays(db: Session):
+    user = db.get(User, 1)
+    set_digest_weekdays(db, user, [6, 2])
+    set_unsubscribed(db, user, True)
+    set_unsubscribed(db, user, False)
+    assert user.digest_weekdays == [6, 2]

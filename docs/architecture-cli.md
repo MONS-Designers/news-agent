@@ -195,28 +195,30 @@ which is why it is cheap enough to run continuously.
 
 ### Cadence rules
 
-`services/cadence.py` is the single place that turns a reader's chosen frequency into a
+`services/cadence.py` is the single place that turns a reader's chosen weekdays into a
 yes-or-no for today. It is kept apart from `pipeline/digest.py` on purpose: the build stage
 decides *what* goes in a digest, cadence decides *whether* one is owed at all, and the
 scheduler is the only thing that needs both.
 
-| Frequency key | Minimum days between sends |
+A reader picks fixed weekdays from Sunday to Friday; Saturday is never a send day. The
+frequency is derived from the number of days chosen and is not stored:
+
+| Frequency | Days chosen |
 | --- | --- |
-| `daily` | 1 |
-| `twice_weekly` | 3 |
-| `weekly` | 7 |
+| `daily` | all six, Sunday to Friday |
+| `twice_weekly` | exactly two |
+| `weekly` | exactly one (default: Sunday) |
 
-Cadence is a minimum gap rather than fixed weekdays, which keeps "twice a week" an
-approximation, every third day, rather than a standing slot. Exact weekdays would need a
-real schedule model naming which days in whose timezone; nothing outside this module should
-learn about days.
+Days are evaluated in Israel time (`Asia/Jerusalem`), whatever timezone the server runs in;
+the scheduler dates its digests with the same clock. An invalid stored day set falls back to
+the default rather than raising, so a row written by an older or newer version of the
+application cannot stop that reader's mail. Which frequencies a given reader may use is
+decided in one place, `services/subscription.py::frequency_allowed` - every frequency is
+free today.
 
-An unknown frequency value falls back to the default rather than raising, so a row written
-by an older or newer version of the application cannot stop that reader's mail.
-
-Due-ness is measured from the last **sent** digest's date, not the last built one: a digest
-that was built but never delivered has not started the reader's clock. A reader who has never
-been sent one is due immediately. The whole answer is one grouped query with no per-user
+A reader is due when today is one of their days and no **sent** digest is dated today: a
+digest that was built but never delivered is retried the same day. A chosen day that passes
+without a send is not made up the next day; its unsent articles roll into the next digest. The whole answer is one grouped query with no per-user
 work, because the scheduler asks on every tick and the answer is usually "nobody".
 
 ### Concurrency and shutdown
