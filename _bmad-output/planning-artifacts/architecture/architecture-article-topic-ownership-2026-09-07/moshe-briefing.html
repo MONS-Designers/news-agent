@@ -238,6 +238,7 @@
   <div class="brief">
     <p class="brief-title">בקצרה</p>
     <ul class="plain">
+      <li>בפרודקשן לא נרשמה אף קריאת LLM מאז 06.09, כי ההגדרות של ספקי ה‑LLM חסרות. זו הסיבה ל‑#72, וזה משפיע גם על הדיג'סטים.</li>
       <li>אין שירות, ספק LLM או תלות חדשים. אותם שלושה תהליכים ממשיכים לרוץ.</li>
       <li>הסיווג של כתבות לנושאים רץ רק בצינור היומי, לא בתוך ה‑API.</li>
       <li>המעבר דורש השהיה קצרה של לולאת המשלוח, ולא מצאנו איפה היא רצה בפרודקשן. זו השאלה הדחופה.</li>
@@ -315,6 +316,19 @@
     <div class="asks">
       <article class="ask">
         <div class="ask-head">
+          <h3>הגדרות LLM חסרות בפרודקשן</h3>
+          <span class="chip ask">דחוף</span>
+        </div>
+        <p>ב‑<code>app_settings</code> של <code>newsagent-api-prod</code> לא מוגדרים ספקי ה‑LLM, ולכן האפליקציה רצה על ברירות המחדל: הצעות נושאים בלי LLM, וסינון וסיכום על mock. הטלמטריה מאשרת את זה: הטבלה <code>outbound_calls</code> ריקה לגמרי מאז 06.09. זו הסיבה ל‑#72.</p>
+        <ul class="plain">
+          <li><code>NEWSAGENT_SUGGESTION_PROVIDER = "llm"</code>, יחד עם <code>LOCAL_LLM_BASE_URL</code>, <code>LOCAL_LLM_MODEL</code> ו‑<code>LOCAL_LLM_AUTH_TOKEN</code> כהפניה ל‑Key Vault.</li>
+          <li><code>NEWSAGENT_LLM_PROVIDER = "external"</code>, יחד עם <code>EXTERNAL_LLM_BASE_URL</code>, <code>EXTERNAL_LLM_MODEL</code> ו‑<code>EXTERNAL_LLM_AUTH_TOKEN</code>, בכל מקום שבו הצינור רץ.</li>
+        </ul>
+        <p class="ref">לא ראיתי את ההגדרות החיות ב‑Azure, רק את Terraform. הסודות קיימים היום רק ב‑GitHub Environments, ששום דבר לא קורא.</p>
+      </article>
+
+      <article class="ask">
+        <div class="ask-head">
           <h3>לולאת המשלוח בפרודקשן</h3>
           <span class="chip ask">נדרשת תשובה</span>
         </div>
@@ -335,6 +349,14 @@
           <span class="chip ask">דעתך</span>
         </div>
         <p>עדיין קריאה אחת לכתבה. בנוסף, כשנושא נכנס לרשימה (נוצר, או קיבל מנוי ראשון), הצינור מסווג אותו מול הכתבות מהחלון האחרון. זו הוצאה שמופעלת מפעילות של משתמשים ולא מהריצה המתוזמנת, ולכן היא מקבלת purpose נפרד בטלמטריה. את נפח הכתבות השבועי עוד לא מדדנו.</p>
+      </article>
+
+      <article class="ask">
+        <div class="ask-head">
+          <h3>רשימת המקורות שלך</h3>
+          <span class="chip ask">דעתך</span>
+        </div>
+        <p>ב‑#60 המקורות לכל נושא מתגלים אוטומטית, והרשימה הקשיחה ב‑news-agent נמחקת. ב‑news-agent-infra נשארת <code>sources/default_sources.yaml</code>, שלא מחוברת לאפליקציה. צריך להחליט מה קורה לה.</p>
       </article>
 
       <article class="ask">
@@ -382,10 +404,12 @@
   <section aria-labelledby="questions">
     <h2 id="questions">שאלות אליך</h2>
     <ol class="questions">
+      <li>מתי אפשר להוסיף לפרודקשן את הגדרות ה‑LLM, ומאיפה יגיעו הערכים של <code>LOCAL_LLM_*</code> ו‑<code>EXTERNAL_LLM_*</code>?</li>
       <li>איפה רצה לולאת המשלוח בפרודקשן, ומה הדרך הנכונה להשהות אותה לכמה דקות?</li>
       <li>איפה, ובאיזה תזמון, ירוץ הצינור היומי (fetch, filter, extract, summarize)?</li>
       <li>לגבי הסיווג החוזר: לקבוע לו סף הוצאה או התראה, או שמספיק לראות אותו בנפרד בטלמטריה?</li>
       <li>תכנון שבעת השלבים (מסווג זול, מאמת יקר, תרגום, ביקורת, שופט ממשפחה אחרת): זה יעד מוסכם או הצעה? זה לא חוסם את השינוי הזה, אבל משפיע על משימה נפרדת שמקדימה את בחירת הכתבות לפני הסיכום.</li>
+      <li>מה לעשות עם <code>sources/default_sources.yaml</code> אחרי שהמקורות יתגלו אוטומטית?</li>
     </ol>
   </section>
 
