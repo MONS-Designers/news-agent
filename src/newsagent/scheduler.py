@@ -10,8 +10,8 @@ Each tick does two independent passes:
      Ungated by cadence: their clock has not started, and the promise made at
      signup is "in a few minutes", so this is what makes the tick interval
      matter at all.
-  2. Regular cadence - whoever services/cadence.py says is due today, at
-     whatever frequency each of them chose.
+  2. Regular cadence - whoever services/cadence.py says is due today, on
+     whichever weekdays each of them chose.
 
 Both passes are bounded by a query that usually returns nobody, so an idle
 tick costs two SELECTs and no LLM call. That, not the interval, is what makes
@@ -88,7 +88,12 @@ def tick(
     Both build passes run before the single send pass: `send_pending_digests`
     delivers whatever is unsent regardless of which pass created it, so
     sending between the two builds would only split one mailing in half.
+
+    `today` defaults to Israel's date, not the server's, so a digest's date and
+    the weekday a reader chose always refer to the same day.
     """
+    if today is None:
+        today = cadence.local_today()
     digest_stage.build_digests(db, provider, today, user_ids=_unwelcomed_user_ids(db))
     digest_stage.build_digests(db, provider, today, user_ids=cadence.due_user_ids(db, today))
 
