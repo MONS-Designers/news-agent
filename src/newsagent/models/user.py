@@ -23,12 +23,10 @@ SUGGESTION_STATUS_FAILED = "failed"
 # it still settles on "ready" or "failed".
 SUGGESTION_STATUS_PENDING_SLOW = "pending_slow"
 
-# Digest cadence keys. Defined on the model (not in services/cadence.py) so the
-# column default does not import a service; cadence.py owns what each one means
-# in days.
-FREQUENCY_DAILY = "daily"
-FREQUENCY_TWICE_WEEKLY = "twice_weekly"
-FREQUENCY_WEEKLY = "weekly"
+# Sunday, in date.weekday() numbering (Monday=0). Defined on the model (not in
+# services/cadence.py) so the column default does not import a service;
+# cadence.py owns which day sets are valid and what frequency each one is.
+DEFAULT_DIGEST_WEEKDAYS = [6]
 
 
 class User(Base):
@@ -66,11 +64,11 @@ class User(Base):
     # Optional, no "Other" concept - same plain-string shape as experience_bucket.
     interest_free_text: Mapped[str | None] = mapped_column(String, nullable=True)
 
-    # How often this reader wants a digest - a key into
-    # services.cadence.INTERVAL_DAYS, not a number of days, so the mapping can
-    # change without a data migration. Defaults to the launch cadence.
-    digest_frequency: Mapped[str] = mapped_column(
-        String, default=FREQUENCY_WEEKLY, server_default=FREQUENCY_WEEKLY
+    # Which weekdays this reader gets a digest on (date.weekday() numbers).
+    # The frequency - daily / twice weekly / weekly - is derived from how many
+    # days are chosen, never stored beside it; see services/cadence.py.
+    digest_weekdays: Mapped[list[int]] = mapped_column(
+        JSON, default=lambda: list(DEFAULT_DIGEST_WEEKDAYS), server_default="[6]"
     )
 
     # When the one-time beta welcome was delivered. Null means it still owes

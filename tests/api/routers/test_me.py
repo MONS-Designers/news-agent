@@ -36,21 +36,36 @@ def test_put_then_get_reflects_new_subscriptions(as_user_with_db: TestClient):
     assert get_body == put_body
 
 
-def test_get_subscription_defaults_to_active(as_user_with_db: TestClient):
+def test_get_subscription_defaults_to_active_on_sunday(as_user_with_db: TestClient):
     response = as_user_with_db.get("/me/subscription")
     assert response.status_code == 200
-    assert response.json() == {"unsubscribed": False}
+    assert response.json() == {"unsubscribed": False, "digest_weekdays": [6]}
 
 
 def test_put_subscription_unsubscribes_then_resubscribes(as_user_with_db: TestClient):
     response = as_user_with_db.put("/me/subscription", json={"unsubscribed": True})
     assert response.status_code == 200
-    assert response.json() == {"unsubscribed": True}
-    assert as_user_with_db.get("/me/subscription").json() == {"unsubscribed": True}
+    assert response.json() == {"unsubscribed": True, "digest_weekdays": [6]}
+    assert as_user_with_db.get("/me/subscription").json()["unsubscribed"] is True
 
     response = as_user_with_db.put("/me/subscription", json={"unsubscribed": False})
     assert response.status_code == 200
-    assert response.json() == {"unsubscribed": False}
+    assert response.json()["unsubscribed"] is False
+
+
+def test_put_subscription_weekdays_only_leaves_pause_state_alone(as_user_with_db: TestClient):
+    as_user_with_db.put("/me/subscription", json={"unsubscribed": True})
+
+    response = as_user_with_db.put("/me/subscription", json={"digest_weekdays": [2, 6]})
+    assert response.status_code == 200
+    assert response.json() == {"unsubscribed": True, "digest_weekdays": [6, 2]}
+
+
+def test_put_subscription_rejects_an_invalid_day_set(as_user_with_db: TestClient):
+    for bad in ([5], [6, 0, 1], []):
+        response = as_user_with_db.put("/me/subscription", json={"digest_weekdays": bad})
+        assert response.status_code == 400
+    assert as_user_with_db.get("/me/subscription").json()["digest_weekdays"] == [6]
 
 
 def test_subscription_unauthenticated_gets_401(client: TestClient):

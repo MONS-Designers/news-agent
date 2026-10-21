@@ -41,7 +41,7 @@
           שינית את הפרופיל, אבל הנושאים נשארו כפי שהיו.
         </p>
         <p class="text-[13.5px] leading-[1.55] text-hd-body">
-          הנושאים שלמטה נבחרו לפי התשובות הקודמות שלך, ולכן {{ DIGEST_NOUN_WEEKLY }} עדיין נבנה
+          הנושאים שלמטה נבחרו לפי התשובות הקודמות שלך, ולכן {{ DIGEST_NOUN }} עדיין נבנה
           סביבן. אפשר לרענן אותם בהתאם לפרופיל החדש.
         </p>
         <button type="button" :class="[BTN_PRIMARY, 'mt-3.5']" @click="editing = true">
@@ -87,22 +87,60 @@
       </div>
 
       <div
-        class="flex flex-col items-stretch gap-3.5 rounded-2xl border border-white/[0.09] bg-white/[0.035] px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-5"
+        class="flex flex-col gap-5 rounded-2xl border border-white/[0.09] bg-white/[0.035] px-5 py-4 sm:px-6 sm:py-5"
       >
-        <div>
-          <p class="mb-1 text-sm font-semibold text-hd-fg">מיילים שבועיים</p>
-          <p :class="['text-xs', subscription?.unsubscribed ? 'text-hd-accent' : 'text-hd-subtitle']">
-            {{ subscription?.unsubscribed ? `מושהה - ${DIGEST_NOUN_WEEKLY} לא יישלח.` : "פעיל" }}
-          </p>
+        <div class="flex flex-col items-stretch gap-3.5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p class="mb-1 text-sm font-semibold text-hd-fg">משלוח {{ DIGEST_NOUN }}</p>
+            <p :class="['text-xs', subscription?.unsubscribed ? 'text-hd-accent' : 'text-hd-subtitle']">
+              {{ subscription?.unsubscribed ? `מושהה - ${DIGEST_NOUN} לא יישלח.` : "פעיל" }}
+            </p>
+          </div>
+          <button
+            type="button"
+            :disabled="subscriptionSaving"
+            :class="[BTN_SECONDARY, 'self-start sm:self-auto']"
+            @click="toggleSubscription"
+          >
+            {{ subscription?.unsubscribed ? "המשך" : "השהיה" }}
+          </button>
         </div>
-        <button
-          type="button"
-          :disabled="subscriptionSaving"
-          :class="[BTN_SECONDARY, 'self-start sm:self-auto']"
-          @click="toggleSubscription"
-        >
-          {{ subscription?.unsubscribed ? "המשך" : "השהיה" }}
-        </button>
+
+        <div>
+          <p class="mb-2.5 text-[13px] text-hd-subtitle">תדירות</p>
+          <div class="flex flex-wrap gap-2.5" role="group" aria-label="תדירות">
+            <button
+              v-for="option in FREQUENCY_OPTIONS"
+              :key="option.value"
+              type="button"
+              :class="chipClasses(frequency === option.value)"
+              :aria-pressed="frequency === option.value"
+              @click="selectFrequency(option.value)"
+            >
+              {{ option.label }}
+            </button>
+          </div>
+        </div>
+
+        <div v-if="frequency !== 'daily'">
+          <p class="mb-2.5 text-[13px] text-hd-subtitle">ימים</p>
+          <div class="flex flex-wrap gap-2.5" role="group" aria-label="ימי משלוח">
+            <button
+              v-for="day in WEEKDAY_OPTIONS"
+              :key="day.value"
+              type="button"
+              :class="chipClasses(selectedDays.includes(day.value))"
+              :aria-pressed="selectedDays.includes(day.value)"
+              :aria-label="`יום ${day.name}`"
+              @click="toggleDay(day.value)"
+            >
+              {{ day.short }}
+            </button>
+          </div>
+          <p v-if="daysHint" class="mt-2.5 text-xs text-hd-accent">{{ daysHint }}</p>
+        </div>
+
+        <p class="text-xs text-hd-muted">{{ DIGEST_NOUN }} לא נשלח בשבתות ובחגי ישראל.</p>
       </div>
     </div>
 
@@ -128,7 +166,7 @@ import {
 import HybridDepthBackground from "@/components/HybridDepthBackground.vue";
 import HybridSpinner from "@/components/HybridSpinner.vue";
 import ProfilePickerShell from "@/components/profile-picker/ProfilePickerShell.vue";
-import { DIGEST_NOUN_WEEKLY } from "@/branding";
+import { DIGEST_NOUN } from "@/branding";
 import { profileDraft as profile, preferencesDraft as preferences, initProfileDraft } from "@/profile-draft";
 
 // Reused verbatim from TopicsStep.vue / AboutYouStep.vue (see those files) -
@@ -154,8 +192,61 @@ const TOPIC_PICKED =
   "border-hd-accent-2/50 bg-gradient-to-b from-hd-accent-2/32 to-hd-accent-2/14 text-white";
 const TOPIC_READONLY_PICKED = `${TOPIC_BASE_READONLY} ${TOPIC_PICKED}`;
 
+// CHIP_BASE/CHIP_UNSELECTED/CHIP_SELECTED reused verbatim from ChipRow.vue -
+// the frequency and weekday pickers are toggle chips, not topic pills.
+const CHIP_BASE =
+  "inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-[10px] border px-4 py-[11px] text-[13.5px] [font-family:inherit] motion-reduce:transition-none [transition:border-color_0.18s_ease,background_0.18s_ease,transform_0.18s_ease] focus-visible:outline focus-visible:outline-2 focus-visible:outline-hd-accent-2 focus-visible:outline-offset-2 active:scale-[0.97]";
+const CHIP_UNSELECTED =
+  "border-white/[0.09] bg-white/[0.02] text-hd-chip [@media(hover:hover)]:hover:border-white/[0.22] [@media(hover:hover)]:hover:bg-white/[0.05] motion-safe:[@media(hover:hover)]:hover:-translate-y-px";
+const CHIP_SELECTED =
+  "border-hd-accent-2/55 bg-gradient-to-b from-hd-accent-2/32 to-hd-accent-2/14 text-white shadow-[0_0_0_1px_rgba(109,123,255,0.25),0_4px_14px_-6px_rgba(109,123,255,0.35)]";
+function chipClasses(selected: boolean): string {
+  return `${CHIP_BASE} ${selected ? CHIP_SELECTED : CHIP_UNSELECTED}`;
+}
+
+type Frequency = "daily" | "twice_weekly" | "weekly";
+
+// Mirrors the backend's services/cadence.py: Python date.weekday() numbers
+// (Monday=0), Sunday first, never Saturday. The frequency is derived from how
+// many days are chosen - the server stores only the days.
+const WEEKDAY_OPTIONS = [
+  { value: 6, short: "א׳", name: "ראשון" },
+  { value: 0, short: "ב׳", name: "שני" },
+  { value: 1, short: "ג׳", name: "שלישי" },
+  { value: 2, short: "ד׳", name: "רביעי" },
+  { value: 3, short: "ה׳", name: "חמישי" },
+  { value: 4, short: "ו׳", name: "שישי" },
+];
+const FREQUENCY_OPTIONS: { value: Frequency; label: string; dayCount: number }[] = [
+  { value: "daily", label: "יומי", dayCount: WEEKDAY_OPTIONS.length },
+  { value: "twice_weekly", label: "פעמיים בשבוע", dayCount: 2 },
+  { value: "weekly", label: "שבועי", dayCount: 1 },
+];
+
+function dayCountOf(value: Frequency): number {
+  return FREQUENCY_OPTIONS.find((option) => option.value === value)!.dayCount;
+}
+
+function frequencyOf(days: number[]): Frequency {
+  return FREQUENCY_OPTIONS.find((option) => option.dayCount === days.length)?.value ?? "weekly";
+}
+
 const subscription = ref<Subscription | null>(null);
 const subscriptionSaving = ref(false);
+
+// The picker's working state, which may be incomplete (twice weekly with one
+// day picked) - only a complete selection is sent. `subscription` stays the
+// last state the server confirmed, to revert to if a save fails.
+const frequency = ref<Frequency>("weekly");
+const selectedDays = ref<number[]>([]);
+let scheduleRequestSeq = 0;
+
+const daysHint = computed(() => {
+  const missing = dayCountOf(frequency.value) - selectedDays.value.length;
+  if (missing <= 0) return "";
+  if (frequency.value === "weekly") return "יש לבחור יום.";
+  return missing === 1 ? "יש לבחור עוד יום." : "יש לבחור שני ימים.";
+});
 // `loading` is component-local, so it would reset to true on every fresh
 // mount (every SPA navigation back to this route) regardless of what
 // profileDraft already knows - initialize it from the store's current state,
@@ -201,10 +292,9 @@ const headingTitle = computed(() =>
 const headingSubtitle = computed(() =>
   showWizard.value
     ? "שלושה שלבים מהירים. אפשר לשנות כל דבר אחר כך - שום דבר לא ננעל."
-    // Phrased to avoid a "ב" prefix on DIGEST_NOUN_WEEKLY - the constant
-    // already carries its own definite "ה", and the old wording rendered as
-    // "בהדייג'סט השבועי".
-    : `${DIGEST_NOUN_WEEKLY} שלך נבנה מהנושאים שנבחרו כאן.`,
+    // Phrased to avoid a "ב" prefix on DIGEST_NOUN - the constant already
+    // carries its own definite "ה", and a "ב" prefix renders as "בהדייג'סט".
+    : `${DIGEST_NOUN} שלך נבנה מהנושאים שנבחרו כאן.`,
 );
 
 // Mirrors AboutYouStep.vue's EXPERIENCE_BUCKETS display labels.
@@ -238,7 +328,7 @@ async function loadPreferences() {
       getMySubscription(),
     ]);
     initProfileDraft(prof, prefs);
-    subscription.value = sub;
+    applySubscription(sub);
     // Only the first load decides this - see `onboarding`'s declaration for
     // why it must not be recomputed once the wizard is running.
     if (!alreadyKnown) onboarding.value = !prof.field_name;
@@ -277,12 +367,61 @@ async function toggleSubscription() {
   if (!subscription.value) return;
   subscriptionSaving.value = true;
   try {
-    subscription.value = await updateMySubscription(!subscription.value.unsubscribed);
+    const updated = await updateMySubscription({ unsubscribed: !subscription.value.unsubscribed });
+    subscription.value = { ...subscription.value, unsubscribed: updated.unsubscribed };
   } catch {
     // Best-effort - leave the displayed state as-is on failure, no separate
     // error banner for a single toggle.
   } finally {
     subscriptionSaving.value = false;
+  }
+}
+
+function applySubscription(sub: Subscription) {
+  subscription.value = sub;
+  selectedDays.value = [...sub.digest_weekdays];
+  frequency.value = frequencyOf(sub.digest_weekdays);
+}
+
+function selectFrequency(value: Frequency) {
+  if (value === frequency.value) return;
+  const previous = frequency.value;
+  frequency.value = value;
+  if (value === "daily") {
+    selectedDays.value = WEEKDAY_OPTIONS.map((day) => day.value);
+  } else {
+    // Keep what the reader already picked where it still fits; coming from
+    // daily nothing was really picked, so start from an empty row.
+    selectedDays.value = previous === "daily" ? [] : selectedDays.value.slice(0, dayCountOf(value));
+  }
+  saveScheduleIfComplete();
+}
+
+function toggleDay(value: number) {
+  const days = selectedDays.value;
+  if (frequency.value === "weekly") {
+    selectedDays.value = [value];
+  } else if (days.includes(value)) {
+    selectedDays.value = days.filter((day) => day !== value);
+  } else {
+    // A third pick on twice weekly replaces the earlier of the two.
+    selectedDays.value = [...days, value].slice(-dayCountOf(frequency.value));
+  }
+  saveScheduleIfComplete();
+}
+
+// Saves on every complete selection, like the pause toggle - no Save button.
+// The sequence number drops a slower, older response so it cannot overwrite
+// a newer choice made while it was in flight.
+async function saveScheduleIfComplete() {
+  if (selectedDays.value.length !== dayCountOf(frequency.value) || !subscription.value) return;
+  const seq = ++scheduleRequestSeq;
+  try {
+    const updated = await updateMySubscription({ digest_weekdays: selectedDays.value });
+    if (seq === scheduleRequestSeq) applySubscription({ ...subscription.value, ...updated });
+  } catch {
+    // Best-effort, like the pause toggle: revert to the last confirmed schedule.
+    if (seq === scheduleRequestSeq && subscription.value) applySubscription(subscription.value);
   }
 }
 
