@@ -10,6 +10,11 @@ class Settings(BaseSettings):
     # Which LLM provider adapter the pipeline uses (see newsagent.llm.factory)
     llm_provider: str = "mock"
 
+    # Optional editorial instructions for the external article summarizer.
+    # The JSON schema and response-format requirements remain fixed in the
+    # adapter; this value controls the Hebrew writing/translation guidance.
+    summary_prompt: str = ""
+
     # Which Suggestion Source adapter the profile picker uses (see
     # newsagent.suggestions.factory) - independent of llm_provider (AD-3).
     suggestion_provider: str = "popularity"
