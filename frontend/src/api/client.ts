@@ -36,6 +36,9 @@ export interface TopicPreference {
 
 export interface Subscription {
   unsubscribed: boolean;
+  // Python date.weekday() numbers (Monday=0), Sunday first - see the
+  // backend's services/cadence.py.
+  digest_weekdays: number[];
 }
 
 export interface Me {
@@ -161,11 +164,12 @@ export async function getMySubscription(): Promise<Subscription> {
   return request("/me/subscription");
 }
 
-export async function updateMySubscription(unsubscribed: boolean): Promise<Subscription> {
+// Sends only the fields given - the backend leaves the others untouched.
+export async function updateMySubscription(update: Partial<Subscription>): Promise<Subscription> {
   return request("/me/subscription", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ unsubscribed }),
+    body: JSON.stringify(update),
   });
 }
 

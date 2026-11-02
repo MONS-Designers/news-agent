@@ -63,8 +63,16 @@ beforeEach(() => {
   getMySubscription.mockReset();
   updateMySubscription.mockReset();
   listMyPreferences.mockResolvedValue(PREFS);
-  getMySubscription.mockResolvedValue({ unsubscribed: false });
+  getMySubscription.mockResolvedValue({ unsubscribed: false, digest_weekdays: [6] });
 });
+
+function button(wrapper: ReturnType<typeof mountView>, text: string) {
+  return wrapper.findAll("button").find((b) => b.text() === text)!;
+}
+
+function dayButton(wrapper: ReturnType<typeof mountView>, name: string) {
+  return wrapper.find(`button[aria-label="יום ${name}"]`);
+}
 
 describe("PreferencesView - happy path", () => {
   it("shows a spinner beside the loading text before the initial fetch resolves, with neither summary nor wizard rendered underneath it", async () => {
@@ -185,7 +193,7 @@ describe("PreferencesView - happy path", () => {
 
   it("toggles the subscription pause/resume label and calls the API with the flipped value", async () => {
     getMyProfile.mockResolvedValue(RETURNING_PROFILE);
-    updateMySubscription.mockResolvedValue({ unsubscribed: true });
+    updateMySubscription.mockResolvedValue({ unsubscribed: true, digest_weekdays: [6] });
     const wrapper = mountView();
     await flushPromises();
 
@@ -194,8 +202,66 @@ describe("PreferencesView - happy path", () => {
     await toggleButton.trigger("click");
     await flushPromises();
 
-    expect(updateMySubscription).toHaveBeenCalledWith(true);
+    expect(updateMySubscription).toHaveBeenCalledWith({ unsubscribed: true });
     expect(wrapper.text()).toContain("מושהה");
+  });
+
+  it("shows the saved schedule - weekly on Sunday - and the Shabbat/holiday note", async () => {
+    getMyProfile.mockResolvedValue(RETURNING_PROFILE);
+    const wrapper = mountView();
+    await flushPromises();
+
+    expect(button(wrapper, "שבועי").attributes("aria-pressed")).toBe("true");
+    expect(dayButton(wrapper, "ראשון").attributes("aria-pressed")).toBe("true");
+    expect(dayButton(wrapper, "שני").attributes("aria-pressed")).toBe("false");
+    // Saturday is never offered.
+    expect(dayButton(wrapper, "שבת").exists()).toBe(false);
+    expect(wrapper.text()).toContain("לא נשלח בשבתות ובחגי ישראל");
+  });
+
+  it("switching to daily saves all six days and hides the day row", async () => {
+    getMyProfile.mockResolvedValue(RETURNING_PROFILE);
+    updateMySubscription.mockResolvedValue({ unsubscribed: false, digest_weekdays: [6, 0, 1, 2, 3, 4] });
+    const wrapper = mountView();
+    await flushPromises();
+
+    await button(wrapper, "יומי").trigger("click");
+    await flushPromises();
+
+    expect(updateMySubscription).toHaveBeenCalledWith({ digest_weekdays: [6, 0, 1, 2, 3, 4] });
+    expect(dayButton(wrapper, "ראשון").exists()).toBe(false);
+  });
+
+  it("twice weekly waits for a second day before saving, keeping the day already chosen", async () => {
+    getMyProfile.mockResolvedValue(RETURNING_PROFILE);
+    updateMySubscription.mockResolvedValue({ unsubscribed: false, digest_weekdays: [6, 2] });
+    const wrapper = mountView();
+    await flushPromises();
+
+    await button(wrapper, "פעמיים בשבוע").trigger("click");
+    expect(updateMySubscription).not.toHaveBeenCalled();
+    expect(dayButton(wrapper, "ראשון").attributes("aria-pressed")).toBe("true");
+    expect(wrapper.text()).toContain("יש לבחור עוד יום.");
+
+    await dayButton(wrapper, "רביעי").trigger("click");
+    await flushPromises();
+
+    expect(updateMySubscription).toHaveBeenCalledWith({ digest_weekdays: [6, 2] });
+    expect(wrapper.text()).not.toContain("יש לבחור");
+  });
+
+  it("weekly moves the single chosen day instead of adding a second one", async () => {
+    getMyProfile.mockResolvedValue(RETURNING_PROFILE);
+    updateMySubscription.mockResolvedValue({ unsubscribed: false, digest_weekdays: [3] });
+    const wrapper = mountView();
+    await flushPromises();
+
+    await dayButton(wrapper, "חמישי").trigger("click");
+    await flushPromises();
+
+    expect(updateMySubscription).toHaveBeenCalledWith({ digest_weekdays: [3] });
+    expect(dayButton(wrapper, "ראשון").attributes("aria-pressed")).toBe("false");
+    expect(dayButton(wrapper, "חמישי").attributes("aria-pressed")).toBe("true");
   });
 
   it("swaps the single page heading between the summary and the wizard instead of stacking two", async () => {
@@ -348,6 +414,19 @@ describe("PreferencesView - unhappy path / edge cases", () => {
 
     expect(wrapper.text()).toContain("פעיל"); // unchanged, not "מושהה"
     expect(toggleButton.attributes("disabled")).toBeUndefined(); // re-enabled for retry
+  });
+
+  it("reverts the picker to the last saved schedule when saving it fails", async () => {
+    getMyProfile.mockResolvedValue(RETURNING_PROFILE);
+    updateMySubscription.mockRejectedValue(new Error("boom"));
+    const wrapper = mountView();
+    await flushPromises();
+
+    await button(wrapper, "יומי").trigger("click");
+    await flushPromises();
+
+    expect(button(wrapper, "שבועי").attributes("aria-pressed")).toBe("true");
+    expect(dayButton(wrapper, "ראשון").attributes("aria-pressed")).toBe("true");
   });
 
   it("silently ignores a failed quiet refresh without showing an error", async () => {

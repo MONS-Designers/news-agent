@@ -17,7 +17,7 @@ from newsagent.api.schemas import (
 )
 from newsagent.models import Field, User
 from newsagent.models.feedback import RATING_CHOICES, SOURCE_APP
-from newsagent.services import feedback, preferences, profile, subscription, taxonomy
+from newsagent.services import cadence, feedback, preferences, profile, subscription, taxonomy
 
 router = APIRouter(prefix="/me", tags=["me"])
 
@@ -43,9 +43,16 @@ def update_my_preferences(
         raise HTTPException(status_code=400, detail=str(error)) from error
 
 
+def _subscription_out(user: User) -> SubscriptionOut:
+    return SubscriptionOut(
+        unsubscribed=user.unsubscribed_at is not None,
+        digest_weekdays=cadence.effective_weekdays(user.digest_weekdays),
+    )
+
+
 @router.get("/subscription", response_model=SubscriptionOut)
 def get_my_subscription(user: User = Depends(require_user)) -> SubscriptionOut:
-    return SubscriptionOut(unsubscribed=user.unsubscribed_at is not None)
+    return _subscription_out(user)
 
 
 @router.put("/subscription", response_model=SubscriptionOut)
@@ -54,8 +61,16 @@ def update_my_subscription(
     user: User = Depends(require_user),
     db: Session = Depends(get_db),
 ) -> SubscriptionOut:
-    updated = subscription.set_unsubscribed(db, user, body.unsubscribed)
-    return SubscriptionOut(unsubscribed=updated.unsubscribed_at is not None)
+    # Weekdays first: they are the only field that can be rejected, so a 400
+    # never leaves the pause switch half-applied.
+    if body.digest_weekdays is not None:
+        try:
+            subscription.set_digest_weekdays(db, user, body.digest_weekdays)
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+    if body.unsubscribed is not None:
+        subscription.set_unsubscribed(db, user, body.unsubscribed)
+    return _subscription_out(user)
 
 
 @router.post("/feedback")

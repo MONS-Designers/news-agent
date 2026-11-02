@@ -8,11 +8,11 @@ from newsagent.llm import MockLLMProvider
 from newsagent.mail.base import EmailSender
 from newsagent.models import Article, Digest, Source, Topic, User, UserTopicPreference
 from newsagent.models.base import Base
-from newsagent.models.user import FREQUENCY_DAILY, FREQUENCY_WEEKLY
 from newsagent.scheduler import tick
 from newsagent.services.scheduler_lease import acquire
 
-TODAY = date(2026, 8, 23)
+TODAY = date(2026, 8, 23)  # a Sunday
+SUNDAY, THURSDAY = 6, 3
 
 
 class RecordingSender(EmailSender):
@@ -103,7 +103,7 @@ def test_reader_with_no_articles_gets_the_welcome_only_email(db: Session):
 
 
 def test_tick_does_nothing_for_a_reader_who_is_not_due_yet(db: Session):
-    user = _reader(db, 1, welcomed_at=datetime(2026, 8, 20), digest_frequency=FREQUENCY_WEEKLY)
+    user = _reader(db, 1, welcomed_at=datetime(2026, 8, 20), digest_weekdays=[THURSDAY])
     db.add(Digest(user_id=user.id, date=date(2026, 8, 20), sent_at=datetime(2026, 8, 20)))
     db.commit()
     sender = RecordingSender()
@@ -115,7 +115,7 @@ def test_tick_does_nothing_for_a_reader_who_is_not_due_yet(db: Session):
 
 
 def test_tick_delivers_to_a_reader_whose_cadence_came_due(db: Session):
-    user = _reader(db, 1, welcomed_at=datetime(2026, 8, 22), digest_frequency=FREQUENCY_DAILY)
+    user = _reader(db, 1, welcomed_at=datetime(2026, 8, 22), digest_weekdays=[SUNDAY])
     db.add(Digest(user_id=user.id, date=date(2026, 8, 22), sent_at=datetime(2026, 8, 22)))
     db.commit()
     sender = RecordingSender()
