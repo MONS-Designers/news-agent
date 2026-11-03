@@ -48,16 +48,16 @@ Two stages, and only the second ships.
 uvicorn newsagent.api.main:app --host 0.0.0.0 --port 8000
 ```
 
-**This same image also carries the delivery scheduler.** Run it as a second container from
-the same image, overriding the command:
+The image runs the API only. The delivery pass is a one-shot command run by the daily
+infrastructure workflow after the content pipeline:
 
 ```bash
 python -m newsagent.scheduler
 ```
 
-The scheduler container needs the database URL and the mail settings, `NEWSAGENT_EMAIL_SENDER`
-plus the SMTP values. The API container does not. Extra scheduler replicas are safe, since the
-lease row lets only one deliver at a time, but they do no useful work, so one is enough.
+The command needs database, LLM, SMTP, and public backend URL settings. The API sends a new
+reader's first email from a background task after preferences are saved; the scheduled pass
+retries it if necessary.
 
 ### `Dockerfile.frontend`
 
@@ -172,9 +172,8 @@ Two scheduled jobs, not one, because the digest is weekly but the pipeline is no
 | `fetch`, `filter`, `extract`, `summarize` | daily | RSS feeds hold only the latest twenty to fifty items and roll the rest off |
 | `build-digests`, `send-digests` | weekly | one email per reader per week |
 
-The cron definitions live in `news-agent-infra`. Note that the scheduler process is an
-alternative to cron for the last two stages: it owns the send schedule in code and gates each
-reader by their own chosen cadence.
+The schedules live in `news-agent-infra`. Collection runs daily; after it completes, the
+one-shot delivery command checks each reader's cadence. The launch cadence is still weekly.
 
 `refresh-pricing` is also scheduled from the infrastructure side, and its exit codes are the
 whole contract: 0 means updated, 2 means the pricing source was unavailable this run and

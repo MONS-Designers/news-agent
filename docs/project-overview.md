@@ -57,8 +57,8 @@ delivery infrastructure, the default source list, secrets and cost control.
 
 - **Type:** command-line application
 - **Location:** `src/newsagent/cli.py`, `src/newsagent/pipeline/`, `src/newsagent/scheduler.py`
-- **Purpose:** the operator interface and the six content stages, plus a long-lived delivery
-  loop that owns the send schedule in code rather than in an external cron.
+- **Purpose:** the operator interface and the six content stages, plus a one-shot,
+  cadence-gated delivery pass invoked after the daily pipeline.
 - **Tech stack:** argparse, feedparser, trafilatura, httpx, Jinja2, smtplib
 
 ### How Parts Integrate
@@ -69,10 +69,9 @@ The web app talks to the backend over REST and JSON, authenticated by a signed s
 cookie. Every call goes through one typed client module whose base URL resolves to the
 relative path `/api`, which Vite's dev proxy and nginx both strip before forwarding.
 
-The command-line part and the scheduler are **not** clients of the API. They import the same
-domain services directly and open their own session against the same PostgreSQL database. That
-is the payoff of keeping the domain layer free of web-framework imports: one implementation
-serves an HTTP request and a cron job.
+The command-line part and the scheduled delivery pass are **not** clients of the API. They
+import the same domain services directly and open their own session against the same PostgreSQL
+database. The API uses the delivery module only for the post-response first-email task.
 
 See [integration-architecture.md](./integration-architecture.md).
 
@@ -175,7 +174,7 @@ level setting takes precedence over uvicorn's own.
 receive plain URLs, never the database session, so all writes stay on the calling thread.
 
 **Two guards against duplicate mail.** A single-row time-based lease claimed by one conditional
-update, and a sequential loop that sleeps after the tick rather than on a wall clock.
+update, and a one-shot delivery pass that runs after the daily content pipeline.
 
 ## Development Overview
 
@@ -227,7 +226,7 @@ See [source-tree-analysis.md](./source-tree-analysis.md).
 
 ## Current Status and Known Gaps
 
-The self-registration to profile to weekly-digest loop is built and shippable end to end,
+The self-registration to profile to weekly-digest path is built and shippable end to end,
 including real SMTP delivery, full-text extraction, click and open tracking, and per-run LLM
 usage accounting. Known gaps:
 

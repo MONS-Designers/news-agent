@@ -112,22 +112,17 @@ python -m newsagent.cli refresh-pricing
 python -m newsagent.scheduler
 ```
 
-A long-lived sequential loop with a 120-second tick. It needs the database URL and the mail
-settings; it does not need the OAuth or session settings the API needs.
+One cadence-gated delivery pass, then exit. The daily infrastructure workflow runs it after
+fetching and processing articles. It needs database, LLM, mail, and public backend URL settings.
+The normal cadence remains weekly; the daily pass only sends readers who are due.
 
-Each tick builds for unwelcomed readers, then for cadence-due readers, then runs one send
-pass. Both build passes are bounded by a query that usually returns nobody, so an idle tick
-costs two selects and no LLM call.
-
-Signal handlers finish the tick in flight and then exit, so a container stop does not kill a
-send midway.
-
-Running more than one instance is safe. The `scheduler_lease` row lets exactly one deliver at
-a time and the rest skip their tick, but the extras do no useful work, so one is enough.
+The API triggers a scoped first-email pass after a new reader saves preferences. The daily
+pass retries welcome and digest sends that failed. Both entry points use the same
+`scheduler_lease`, so only one delivery pass operates at a time.
 
 ## Exit codes
 
-Most commands return 0. Two do not:
+Most commands return 0. These commands can return nonzero:
 
 | Command | Code | Meaning |
 | --- | --- | --- |
@@ -135,6 +130,7 @@ Most commands return 0. Two do not:
 | `refresh-pricing` | 0 | Rates updated |
 | `refresh-pricing` | 2 | Pricing source unavailable this run; existing rates stay in effect. Not a failure. |
 | `refresh-pricing` | 1 | A real failure, such as the database write itself |
+| `python -m newsagent.scheduler` | 1 | A delivery pass failed or one or more emails could not be sent |
 
 **The `refresh-pricing` codes are the entire interface with the infrastructure repository's
 scheduler.** Changing them is a cross-repository contract change, not a local refactor.

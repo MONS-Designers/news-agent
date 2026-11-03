@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>עדכון מנגנון משלוח הדייג׳סט — NewsAgent</title>
+  <style>
+    :root {
+      --ink: #15263d;
+      --muted: #52647a;
+      --paper: #f4f7fb;
+      --card: #ffffff;
+      --line: #dce5ef;
+      --blue: #2463eb;
+      --blue-soft: #e9f0ff;
+      --teal: #087e78;
+      --teal-soft: #e4f6f3;
+      --amber: #a45b08;
+      --amber-soft: #fff3dd;
+      --shadow: 0 18px 48px rgba(27, 49, 77, .08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background:
+        radial-gradient(ellipse at 90% 0%, rgba(81, 137, 255, .12), transparent 35rem),
+        radial-gradient(ellipse at 0% 40%, rgba(17, 167, 151, .08), transparent 30rem),
+        var(--paper);
+      color: var(--ink);
+      font-family: "Segoe UI", Arial, sans-serif;
+      line-height: 1.65;
+    }
+    .page { width: min(1120px, calc(100% - 36px)); margin: 0 auto; padding: 42px 0 64px; }
+    .hero {
+      position: relative;
+      overflow: hidden;
+      padding: clamp(28px, 6vw, 64px);
+      border-radius: 28px;
+      color: #fff;
+      background: linear-gradient(128deg, #142f56 0%, #1c4d84 53%, #126f79 100%);
+      box-shadow: 0 24px 65px rgba(20, 47, 86, .22);
+    }
+    .hero::after {
+      content: ""; position: absolute; width: 350px; height: 350px; border: 1px solid rgba(255,255,255,.16);
+      border-radius: 50%; left: -90px; top: -170px; box-shadow: 0 0 0 32px rgba(255,255,255,.035), 0 0 0 68px rgba(255,255,255,.025);
+    }
+    .eyebrow { display: inline-flex; align-items: center; gap: 9px; font-size: .85rem; letter-spacing: .02em; color: #c8e7ff; font-weight: 700; }
+    .eyebrow::before { content: ""; width: 8px; height: 8px; background: #6ce0d0; border-radius: 50%; box-shadow: 0 0 0 5px rgba(108,224,208,.14); }
+    h1 { max-width: 780px; margin: 18px 0 12px; font-size: clamp(2rem, 5vw, 3.55rem); line-height: 1.12; letter-spacing: -.035em; }
+    .hero p { max-width: 760px; margin: 0; color: #e1efff; font-size: clamp(1rem, 2vw, 1.18rem); }
+    .hero-note { display: inline-flex; align-items: center; gap: 9px; margin-top: 28px; padding: 9px 14px; border: 1px solid rgba(255,255,255,.22); border-radius: 999px; background: rgba(255,255,255,.09); color: #fff; font-size: .9rem; }
+    .hero-note span { font-size: 1.05rem; }
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 22px 0 34px; }
+    .stat, .card { border: 1px solid var(--line); border-radius: 20px; background: var(--card); box-shadow: var(--shadow); }
+    .stat { padding: 21px 23px; }
+    .stat-label { color: var(--muted); font-size: .88rem; font-weight: 650; }
+    .stat-value { margin: 4px 0 1px; font-size: clamp(1.55rem, 3vw, 2.2rem); line-height: 1.25; font-weight: 800; letter-spacing: -.03em; }
+    .stat-detail { color: var(--muted); font-size: .86rem; }
+    .stat.blue .stat-value { color: var(--blue); }
+    .stat.teal .stat-value { color: var(--teal); }
+    .stat.amber .stat-value { color: var(--amber); }
+    section { margin-top: 34px; }
+    .section-heading { display: flex; align-items: end; justify-content: space-between; gap: 16px; margin: 0 2px 14px; }
+    h2 { margin: 0; font-size: clamp(1.4rem, 3vw, 1.85rem); letter-spacing: -.02em; }
+    .section-heading p { margin: 0; color: var(--muted); font-size: .92rem; }
+    .card { padding: clamp(20px, 3vw, 30px); }
+    .diagram-card { overflow: hidden; }
+    .diagram-title { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; font-weight: 800; font-size: 1.1rem; }
+    .badge { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 999px; font-size: .76rem; font-weight: 800; }
+    .badge.old { color: #914318; background: #ffede3; }
+    .badge.new { color: #086b63; background: #dff5f1; }
+    .diagram { display: block; width: 100%; height: auto; min-height: 205px; }
+    .diagram-wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .diagram-caption { margin: 10px 0 0; color: var(--muted); font-size: .9rem; }
+    .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .compare h3 { margin: 0 0 12px; font-size: 1.08rem; }
+    .compare ul, .list { margin: 0; padding: 0 1.2rem 0 0; }
+    .compare li, .list li { margin: 7px 0; padding-right: 2px; }
+    .before { border-top: 4px solid #e18a4a; }
+    .after { border-top: 4px solid #19a394; }
+    .risk-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .risk-card { position: relative; padding: 22px; border: 1px solid var(--line); border-radius: 18px; background: #fff; box-shadow: var(--shadow); }
+    .risk-card h3 { margin: 10px 0 6px; font-size: 1.02rem; }
+    .risk-card p { margin: 0; color: var(--muted); font-size: .92rem; }
+    .risk-tag { display: inline-flex; padding: 4px 9px; border-radius: 999px; font-size: .74rem; font-weight: 800; }
+    .risk-tag.high { color: #983d29; background: #ffebe5; }
+    .risk-tag.medium { color: #815010; background: #fff3d8; }
+    .risk-tag.low { color: #17665f; background: #e2f6f2; }
+    .risk-next { margin-top: 11px !important; padding-top: 10px; border-top: 1px solid #edf1f6; color: #344d69 !important; }
+    .callout { display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: start; padding: 20px 22px; border: 1px solid #f0d6a7; border-radius: 18px; background: var(--amber-soft); }
+    .callout-icon { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; background: #ffe2ab; font-size: 1.15rem; }
+    .callout strong { display: block; margin-bottom: 3px; }
+    .callout p { margin: 0; color: #684d2c; }
+    .pill-row { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 14px; }
+    .pill { padding: 6px 11px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: #f8fafd; font-size: .84rem; }
+    .release { display: grid; grid-template-columns: 1fr auto; gap: 20px; align-items: center; border-color: #c9d8f3; background: linear-gradient(110deg, #fff, #f2f6ff); }
+    .release h3 { margin: 0 0 5px; }
+    .release p { margin: 0; color: var(--muted); }
+    .release-status { white-space: nowrap; padding: 8px 13px; color: #244e8d; border-radius: 999px; background: var(--blue-soft); font-size: .82rem; font-weight: 800; }
+    .sources { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+    .sources a { color: #2459a8; text-decoration: none; border-bottom: 1px solid #b6c9e8; font-size: .9rem; }
+    .sources a:hover { color: #133b78; border-color: currentColor; }
+    footer { display: flex; justify-content: space-between; gap: 12px; margin: 26px 4px 0; color: #718096; font-size: .82rem; }
+    @media (max-width: 760px) {
+      .page { width: min(100% - 22px, 600px); padding-top: 12px; }
+      .hero { border-radius: 22px; }
+      .stats, .diagram-wrap, .compare { grid-template-columns: 1fr; }
+      .risk-grid { grid-template-columns: 1fr; }
+      .section-heading { display: block; }
+      .section-heading p { margin-top: 5px; }
+      .release { grid-template-columns: 1fr; }
+      .release-status { justify-self: start; }
+      footer { display: block; }
+    }
+    @media print {
+      body { background: #fff; }
+      .page { width: 100%; padding: 0; }
+      .hero, .stat, .card { box-shadow: none; break-inside: avoid; }
+      .hero { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+      a { color: inherit; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="hero">
+      <div class="eyebrow">NEWSAGENT · עדכון תפעולי</div>
+      <h1>משלוח הדייג׳סט: מבדיקה רציפה להרצה ממוקדת</h1>
+      <p>הוסר מנגנון שרץ לצד ה־API ובדק את מסד הנתונים כל שתי דקות. כעת מסירה נבדקת פעם אחת אחרי עיבוד התוכן היומי, ורק קוראים שהגיע זמנם מקבלים דייג׳סט.</p>
+      <div class="hero-note"><span>↗</span> התדירות שקבע הקורא נשארת הקובעת</div>
+    </header>
+
+    <div class="stats" aria-label="עיקרי השינוי">
+      <article class="stat blue">
+        <div class="stat-label">קצב הבדיקה הישן</div>
+        <div class="stat-value">כל 2 דקות</div>
+        <div class="stat-detail">עד 30 סבבים בשעה · 720 ביום</div>
+      </article>
+      <article class="stat teal">
+        <div class="stat-label">קצב הבדיקה החדש</div>
+        <div class="stat-value">פעם אחת</div>
+        <div class="stat-detail">אחרי צינור התוכן היומי בפרודקשן</div>
+      </article>
+      <article class="stat amber">
+        <div class="stat-label">הקצאת Neon במייל</div>
+        <div class="stat-value">81.3 / 100</div>
+        <div class="stat-detail">CU-hours שנצרכו לפי ההתראה</div>
+      </article>
+    </div>
+
+    <section>
+      <div class="section-heading">
+        <h2>מה השתנה בתהליך</h2>
+        <p>האיור מציג את מסלול הבדיקה והשליחה, לפני ואחרי.</p>
+      </div>
+      <div class="diagram-wrap">
+        <article class="card diagram-card">
+          <div class="diagram-title"><span class="badge old">לפני</span> תהליך רציף לצד ה־API</div>
+          <svg class="diagram" viewBox="0 0 560 225" role="img" aria-labelledby="old-title old-desc">
+            <title id="old-title">המנגנון הישן בדק את מסד הנתונים כל שתי דקות</title>
+            <desc id="old-desc">API הפעיל תהליך scheduler רציף, שבדק אם יש משתמשים או דייג׳סטים למשלוח וחזר לישון לשתי דקות.</desc>
+            <defs>
+              <marker id="arrow-old" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0L9 4.5L0 9z" fill="#d47a3f"/></marker>
+            </defs>
+            <rect x="385" y="54" width="132" height="70" rx="15" fill="#edf3fb" stroke="#9cb2cc" stroke-width="2"/>
+            <text x="451" y="83" text-anchor="middle" fill="#294563" font-size="16" font-weight="700">API</text>
+            <text x="451" y="105" text-anchor="middle" fill="#5b7189" font-size="12">Uvicorn</text>
+            <rect x="211" y="54" width="132" height="70" rx="15" fill="#fff0e5" stroke="#e8a16f" stroke-width="2"/>
+            <text x="277" y="82" text-anchor="middle" fill="#793d18" font-size="15" font-weight="700">Scheduler</text>
+            <text x="277" y="104" text-anchor="middle" fill="#975d35" font-size="12">לולאת בדיקה</text>
+            <rect x="36" y="54" width="132" height="70" rx="15" fill="#f3f6fa" stroke="#b5c2d1" stroke-width="2"/>
+            <text x="102" y="82" text-anchor="middle" fill="#34485f" font-size="15" font-weight="700">מסד הנתונים</text>
+            <text x="102" y="104" text-anchor="middle" fill="#697b8f" font-size="12">שאילתות חוזרות</text>
+            <path d="M385 89H350" stroke="#879ab0" stroke-width="2" marker-end="url(#arrow-old)"/>
+            <path d="M211 89H177" stroke="#d47a3f" stroke-width="2.5" marker-end="url(#arrow-old)"/>
+            <path d="M232 145 C235 192, 316 192, 322 145" fill="none" stroke="#d47a3f" stroke-width="2.5" marker-end="url(#arrow-old)"/>
+            <rect x="228" y="164" width="98" height="28" rx="14" fill="#fff3e8"/>
+            <text x="277" y="183" text-anchor="middle" fill="#934b20" font-size="12" font-weight="700">המתנה 120 שנ׳</text>
+          </svg>
+          <p class="diagram-caption">גם כשאין למי לשלוח, התהליך המשיך להתעורר ולבדוק שוב.</p>
+        </article>
+
+        <article class="card diagram-card">
+          <div class="diagram-title"><span class="badge new">עכשיו</span> בדיקת זכאות חד־פעמית</div>
+          <svg class="diagram" viewBox="0 0 560 225" role="img" aria-labelledby="new-title new-desc">
+            <title id="new-title">הצינור היומי מפעיל בדיקת מסירה אחת</title>
+            <desc id="new-desc">צינור תוכן יומי מפעיל הרצת scheduler חד פעמית, שבודקת תדירות וזכאות. משתמש חדש יכול להפעיל משלוח ברכה לאחר שמירת העדפות. מסירה נעשית רק למי שהגיע זמנו.</desc>
+            <defs>
+              <marker id="arrow-new" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0L9 4.5L0 9z" fill="#168c80"/></marker>
+            </defs>
+            <rect x="405" y="35" width="126" height="58" rx="13" fill="#e8f0ff" stroke="#9cb9ef" stroke-width="2"/>
+            <text x="468" y="60" text-anchor="middle" fill="#254c8b" font-size="14" font-weight="700">צינור תוכן</text>
+            <text x="468" y="79" text-anchor="middle" fill="#5b7190" font-size="11">Fetch → Summarize</text>
+            <rect x="229" y="35" width="132" height="58" rx="13" fill="#e3f7f3" stroke="#83cfc4" stroke-width="2"/>
+            <text x="295" y="60" text-anchor="middle" fill="#076c63" font-size="14" font-weight="700">מסירה חד־פעמית</text>
+            <text x="295" y="79" text-anchor="middle" fill="#43857d" font-size="11">בדיקת זכאות יומית</text>
+            <rect x="48" y="35" width="132" height="58" rx="13" fill="#f4f7fa" stroke="#b5c2d1" stroke-width="2"/>
+            <text x="114" y="60" text-anchor="middle" fill="#34485f" font-size="14" font-weight="700">תדירות הקורא</text>
+            <text x="114" y="79" text-anchor="middle" fill="#697b8f" font-size="11">דיילי / פעמיים / שבועי</text>
+            <path d="M405 64H369" stroke="#168c80" stroke-width="2.5" marker-end="url(#arrow-new)"/>
+            <path d="M229 64H188" stroke="#168c80" stroke-width="2.5" marker-end="url(#arrow-new)"/>
+            <path d="M295 98V133" stroke="#168c80" stroke-width="2.5" marker-end="url(#arrow-new)"/>
+            <rect x="229" y="139" width="132" height="52" rx="13" fill="#fff" stroke="#b8d9d3" stroke-width="2"/>
+            <text x="295" y="161" text-anchor="middle" fill="#17645e" font-size="13" font-weight="700">מייל רק כשמועדו</text>
+            <text x="295" y="178" text-anchor="middle" fill="#66827e" font-size="11">Lease מונע הרצות מקבילות</text>
+            <rect x="405" y="139" width="126" height="52" rx="13" fill="#f0edff" stroke="#b8aee9" stroke-width="2"/>
+            <text x="468" y="161" text-anchor="middle" fill="#51438b" font-size="12" font-weight="700">שמירת העדפות</text>
+            <text x="468" y="178" text-anchor="middle" fill="#776e9d" font-size="11">ברכה למשתמש חדש</text>
+            <path d="M405 165H369" stroke="#7566bf" stroke-width="2" marker-end="url(#arrow-new)"/>
+          </svg>
+          <p class="diagram-caption">הצינור רץ מדי יום; בדיקת הזכאות לא משנה את תדירות הדייג׳סט של הקורא.</p>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-heading">
+        <h2>ההבדל בפועל</h2>
+        <p>פחות התעוררויות למסד הנתונים, עם מסלול משלוח ברור.</p>
+      </div>
+      <div class="compare">
+        <article class="card before">
+          <h3>מה היה</h3>
+          <ul class="list">
+            <li>תהליך scheduler רץ לצד ה־API בלולאה.</li>
+            <li>כל 120 שניות נבדק אם יש ברכות או דייג׳סטים לשליחה.</li>
+            <li>הפעילות המחזורית יכלה להשאיר את מסד הנתונים פעיל ולצבור זמן compute.</li>
+          </ul>
+        </article>
+        <article class="card after">
+          <h3>מה קורה עכשיו</h3>
+          <ul class="list">
+            <li>פקודת scheduler מבצעת מעבר אחד ויוצאת.</li>
+            <li>ה־workflow מפעיל מסירה אחרי איסוף וסיכום התוכן.</li>
+            <li>שמירת העדפות של משתמש חדש מפעילה ניסיון ממוקד לברכה.</li>
+            <li>ה־lease הקיים ממשיך למנוע שתי הרצות מסירה במקביל.</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-heading">
+        <h2>מה עלול להיפגע או להתעכב</h2>
+        <p>אלה נקודות מעקב של המעבר, לא שינוי בתדירות שהקורא בחר.</p>
+      </div>
+      <div class="risk-grid">
+        <article class="risk-card">
+          <span class="risk-tag medium">השפעה בינונית · תזמון</span>
+          <h3>הדייג׳סט לא נשלח בדיוק ברגע שהקורא נעשה זכאי</h3>
+          <p>הזכאות נבדקת בהרצה היומית שאחרי צינור התוכן. אם GitHub Actions מתחיל באיחור או שהצינור מתעכב, גם המשלוח יגיע מאוחר יותר.</p>
+          <p class="risk-next"><strong>בקרה:</strong> לבדוק את זמן סיום ה־workflow ואת זמני יצירת הדייג׳סטים; המנגנון מיועד לשליחה לפי יום זכאות, לא לפי שעה מדויקת.</p>
+        </article>
+        <article class="risk-card">
+          <span class="risk-tag medium">השפעה בינונית · הרשמה</span>
+          <h3>ברכת הרשמה שנכשלה עשויה לחכות להרצה הבאה</h3>
+          <p>ניסיון הברכה מתחיל אחרי שמירת ההעדפות. אם יש תקלה בשליחה או שה־lease תפוס, הפעולה מתועדת וההרצה היומית הבאה משמשת ניסיון חוזר. מאחר שאין ריצה בשבת, זמן ההמתנה עשוי להתארך סביב סוף השבוע.</p>
+          <p class="risk-next"><strong>בקרה:</strong> לעקוב אחר שגיאות משלוח ולוודא שההרצה היומית הבאה מסתיימת בהצלחה.</p>
+        </article>
+        <article class="risk-card">
+          <span class="risk-tag high">השפעה גבוהה · סדר פריסה</span>
+          <h3>יש לפרוס את שינויי INFRA והאפליקציה בתיאום</h3>
+          <p>ב־Terraform הישן הוגדרה מעטפת שמפעילה מחדש את פקודת ה־scheduler כל 10 שניות. גרסת האפליקציה החדשה היא חד־פעמית; אם תעלה לפני הסרת המעטפת הישנה, היא עלולה לרוץ שוב ושוב בתדירות גבוהה יותר מהמצב המקורי.</p>
+          <p class="risk-next"><strong>סדר פריסה בטוח:</strong> תחילה להחיל ב־INFRA את הסרת <bdi>API_BOOT</bdi>; אחר כך לפרוס בפרודקשן את קוד האפליקציה החד־פעמי; ולבסוף להפעיל את שלב המסירה ב־workflow היומי.</p>
+        </article>
+        <article class="risk-card">
+          <span class="risk-tag medium">השפעה בינונית · תלות תפעולית</span>
+          <h3>המסירה היומית תלויה בהצלחת GitHub Actions ובהגדרות הסביבה</h3>
+          <p>ה־workflow זקוק לחיבור DB, להגדרות SMTP ולפרטי ספק ה־LLM. אם אחד מהם חסר או שה־workflow לא פועל, מסירת הדייג׳סטים המגיעים באותו יום עלולה להתעכב עד להרצה מוצלחת.</p>
+          <p class="risk-next"><strong>בקרה:</strong> לאחר הפריסה, לוודא שה־workflow המתוזמן הצליח ושסודות והמשתנים קיימים בסביבת prod.</p>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <div class="callout">
+        <div class="callout-icon" aria-hidden="true">ⓘ</div>
+        <div>
+          <strong>ההתראה על 81.3 CU-hours היא סימן לבדיקה, לא הוכחה שה־scheduler גרם לכל הצריכה.</strong>
+          <p>לולאה כל שתי דקות היא מקור סביר לפעילות DB חוזרת: עד 720 סבבים ביום. צריכת compute בפועל תלויה במשך הפעילות, בעומס ובשאר הפעולות בפרויקט. הנתון במייל לבדו לא מפרט את התרומה של כל מקור.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-heading">
+        <h2>מה נשאר ללא שינוי</h2>
+        <p>שינוי התזמון אינו משנה את הבטחת המוצר.</p>
+      </div>
+      <article class="card">
+        <ul class="list">
+          <li>ברירת המחדל למשלוח היא עדיין שבועית; התוכן נאסף ומעובד מדי יום.</li>
+          <li>המערכת מכבדת את תדירות המשלוח של כל קורא: יומי, פעמיים בשבוע או שבועי.</li>
+          <li>הרצת stage ידנית לא שולחת מיילים; מסירת דייג׳סט מופעלת בפרודקשן.</li>
+          <li>אם ניסיון ברכה נכשל או נדחה בגלל lease, המעבר היומי הבא ינסה שוב.</li>
+        </ul>
+        <div class="pill-row" aria-label="תדירויות נתמכות">
+          <span class="pill">יומי · מרווח של יום</span>
+          <span class="pill">פעמיים בשבוע · מרווח של 3 ימים</span>
+          <span class="pill">שבועי · מרווח של 7 ימים</span>
+        </div>
+      </article>
+    </section>
+
+    <section>
+      <article class="card release">
+        <div>
+          <h3>מצב השינוי והפריסה</h3>
+          <p>השינויים נשמרו מקומית ב־Changes area: קוד האפליקציה בענף <bdi>dev</bdi> ו־INFRA בענף <bdi>main</bdi>. לא נוצר commit, לא בוצע קימוט או מחיקה, ולא בוצעה פריסה. לכן פרודקשן ימשיך בהתנהגות הקיימת עד לפריסת השינויים.</p>
+          <div class="sources" aria-label="קבצים מרכזיים">
+            <a href="../src/newsagent/scheduler.py">scheduler.py</a>
+            <a href="../src/newsagent/api/routers/me.py">מסלול שמירת העדפות</a>
+            <a href="../../news-agent-infra/.github/workflows/daily-pipeline.yml">workflow יומי ב־INFRA</a>
+            <a href="../../news-agent-infra/terraform/main.tf">Terraform ב־INFRA</a>
+          </div>
+        </div>
+        <div class="release-status">מוכן לפריסה · עדיין לא בפרודקשן</div>
+      </article>
+    </section>
+
+    <footer>
+      <span>NewsAgent · הסבר לשינוי במנגנון משלוח</span>
+      <span>מסמך עצמאי · עברית · RTL</span>
+    </footer>
+  </main>
+</body>
+</html>

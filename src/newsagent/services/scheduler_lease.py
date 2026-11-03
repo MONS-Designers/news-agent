@@ -17,10 +17,10 @@ from newsagent.models.scheduler_lease import LEASE_ID, SchedulerLease
 
 logger = logging.getLogger(__name__)
 
-# Generously longer than any realistic tick, because expiry is what lets a
-# rival take over: if a tick ever outlasts the lease, a second process could
+# Generously longer than any realistic delivery pass, because expiry is what
+# lets a rival take over: if a pass ever outlasts the lease, a second process could
 # start delivering while the first is still mid-send - exactly the duplicate
-# this module exists to prevent. Renewed at the start of every tick, so the
+# this module exists to prevent. Renewed at the start of every pass, so the
 # only way to reach expiry is for the holder to actually stop.
 LEASE_SECONDS = 600
 

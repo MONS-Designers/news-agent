@@ -13,6 +13,7 @@ prevents concurrent delivery, not crash recovery.
 """
 
 import logging
+from collections.abc import Collection
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -70,17 +71,24 @@ def _subject(digest: Digest) -> str:
     return headline
 
 
-def send_pending_digests(db: Session, sender: EmailSender) -> SendReport:
+def send_pending_digests(
+    db: Session, sender: EmailSender, *, user_ids: Collection[int] | None = None
+) -> SendReport:
     report = SendReport()
+    if user_ids is not None and not user_ids:
+        return report
 
     # A user who unsubscribed (GH #46) after their digest was already built
     # but before it was sent must not receive it - build_digests skips them
     # going forward, but this catches the same-run race.
-    digests = db.scalars(
+    pending = (
         select(Digest)
         .join(User)
         .where(Digest.sent_at.is_(None), User.unsubscribed_at.is_(None))
-    ).all()
+    )
+    if user_ids is not None:
+        pending = pending.where(User.id.in_(user_ids))
+    digests = db.scalars(pending).all()
     for digest in digests:
         html = render_digest_html(digest, db)
         try:
@@ -101,7 +109,9 @@ def send_pending_digests(db: Session, sender: EmailSender) -> SendReport:
     return report
 
 
-def send_pending_welcomes(db: Session, sender: EmailSender) -> SendReport:
+def send_pending_welcomes(
+    db: Session, sender: EmailSender, *, user_ids: Collection[int] | None = None
+) -> SendReport:
     """The beta-only welcome, for a reader who finished setup but whose topics
     produced nothing to send yet - `build_digests` creates no Digest at all in
     that case, so `send_pending_digests` above would never reach them and the
@@ -111,14 +121,17 @@ def send_pending_welcomes(db: Session, sender: EmailSender) -> SendReport:
     who never picked anything has not asked for mail.
     """
     report = SendReport()
-    users = db.scalars(
-        select(User).where(
-            User.welcomed_at.is_(None),
-            User.unsubscribed_at.is_(None),
-            User.field_name.is_not(None),
-            ~User.digests.any(),
-        )
-    ).all()
+    if user_ids is not None and not user_ids:
+        return report
+    pending = select(User).where(
+        User.welcomed_at.is_(None),
+        User.unsubscribed_at.is_(None),
+        User.field_name.is_not(None),
+        ~User.digests.any(),
+    )
+    if user_ids is not None:
+        pending = pending.where(User.id.in_(user_ids))
+    users = db.scalars(pending).all()
     for user in users:
         html = render_welcome_html(user)
         try:

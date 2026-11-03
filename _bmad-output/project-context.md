@@ -228,9 +228,13 @@ runs on, so setting a GitHub secret changes nothing.
 ### Two schedules, not one
 
 `fetch`, `filter`, `extract`, `summarize` run **daily**, because an RSS feed holds only the
-latest few dozen items. `build-digests` and `send-digests` run **weekly**, one email per user.
-Ranking is tuned to match (`recency_half_life_hours=84`). Do not collapse them or assume a daily
-digest.
+latest few dozen items. After that pipeline finishes, one delivery pass checks which readers
+are due. The launch cadence remains **weekly**, one email per reader per week; a daily check
+does not imply a daily digest. Ranking is tuned to match (`recency_half_life_hours=84`).
+
+The first email is triggered after the final preferences save, so it does not depend on polling
+or wait for the next delivery pass. That pass retries any first email that could not be sent.
+Do not collapse the content pipeline into delivery or assume the product sends daily digests.
 
 ### Outbound fetching stays bounded
 

@@ -138,11 +138,10 @@ def build_digests(
     """Build digests for every eligible user, or only for `user_ids`.
 
     The caller decides *who* - this stage has no opinion about cadence or
-    onboarding. That split is what makes the scheduler's short tick affordable:
-    building a digest costs an LLM call for the editorial voice, so the loop
-    passes the handful of users who are actually due (see services/cadence.py)
-    and this does no LLM work at all on the ticks where nobody is. An empty
-    collection means nobody, which is different from `None` (everybody).
+    onboarding. The scheduler checks cadence first, so this stage only builds
+    for readers who are due (see services/cadence.py) or still need their first
+    email. An empty collection means nobody, which is different from `None`
+    (everybody).
     """
     if for_date is None:
         for_date = date.today()
