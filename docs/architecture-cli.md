@@ -4,15 +4,15 @@
 **Part:** `cli`
 **Root:** `src/newsagent/cli.py`, `src/newsagent/pipeline/`, `src/newsagent/scheduler.py`
 **Project type:** command-line application
-**Architecture pattern:** pipeline of stages over a shared database, plus a long-lived
-delivery loop
+**Architecture pattern:** pipeline of stages over a shared database, plus one-shot delivery
+passes
 
 ## Executive Summary
 
 Two entry points, one package. `python -m newsagent.cli <command>` is the operator
 interface: fifteen subcommands covering seeding, user management, the six content stages,
-and cost reporting. `python -m newsagent.scheduler` is a long-lived loop that owns the send
-schedule in code rather than in an external cron.
+and cost reporting. `python -m newsagent.scheduler` performs one cadence-gated delivery pass
+and exits; INFRA invokes it after the daily content pipeline.
 
 Neither is a client of the API. Both import the same `services/` and `pipeline/` modules the
 API uses and open their own session from the same `SessionLocal`. That is the payoff of the
@@ -173,25 +173,25 @@ introduction twice.
 
 ## The scheduler
 
-`python -m newsagent.scheduler` runs a sequential loop with a 120-second tick.
+`python -m newsagent.scheduler` runs one sequential pass and exits. INFRA calls it after the
+daily content pipeline has finished.
 
-Each tick does two independent build passes, then one send pass:
+Each pass does two independent build checks, then one send pass:
 
 1. **First email.** Anyone who finished setup and has not been welcomed yet. Ungated by
-   cadence, because their clock has not started and the promise made at signup is "in a few
-   minutes". This is what makes the tick interval matter at all.
+   cadence, because their clock has not started. The API triggers this pass after the final
+   preferences save, so the first email does not wait for the scheduled digest pass.
 2. **Regular cadence.** Whoever `services/cadence.py` says is due today, at whatever
    frequency each of them chose.
 3. **One send pass.** `send_pending_digests` delivers whatever is unsent regardless of which
    pass created it, so sending between the two builds would only split one mailing in half.
 
-Both build passes are bounded by a query that usually returns nobody, so an idle tick costs
-two selects and no LLM call. That, not the interval, is what makes a two-minute loop
-affordable.
+The regular pass runs once after content processing, rather than polling while the database is
+idle. The cadence gate still defaults to weekly, so the daily invocation does not make the
+product send daily digests.
 
-**Fetching, filtering and summarizing are deliberately not in this loop.** They stay in the
-daily pipeline run. The loop only selects from already-summarized articles and delivers,
-which is why it is cheap enough to run continuously.
+**Fetching, filtering and summarizing are deliberately not in this pass.** They stay in the
+daily pipeline run. The delivery pass selects from already-summarized articles and delivers.
 
 ### Cadence rules
 
@@ -216,20 +216,15 @@ by an older or newer version of the application cannot stop that reader's mail.
 
 Due-ness is measured from the last **sent** digest's date, not the last built one: a digest
 that was built but never delivered has not started the reader's clock. A reader who has never
-been sent one is due immediately. The whole answer is one grouped query with no per-user
-work, because the scheduler asks on every tick and the answer is usually "nobody".
+been sent one is due immediately. The answer is one grouped query with no per-user query loop.
 
 ### Concurrency and shutdown
 
 Two kinds of overlap could cause duplicate mail, and both are handled:
 
-- **Within the process**, none by construction. The loop is sequential and sleeps *after*
-  the tick returns, so a slow tick delays the next one rather than running alongside it. The
-  interval is a minimum gap, not a wall-clock schedule. A real cron would not give this for
-  free.
-- **Across processes**, the `scheduler_lease` row lets exactly one instance deliver at a
-  time; the rest skip their tick. Extra replicas are harmless but do no useful work, so one
-  is enough. A killed holder's lease expires and delivery resumes with no intervention.
+- **Across processes**, the `scheduler_lease` row lets exactly one invocation deliver at a
+  time; a concurrent invocation skips. A killed holder's lease expires and delivery resumes
+  on the next scheduled pass.
 
 Signal handlers set a stop flag rather than aborting, so a container stop finishes the tick
 in flight and then exits.

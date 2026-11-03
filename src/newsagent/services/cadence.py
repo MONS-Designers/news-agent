@@ -47,8 +47,8 @@ def due_user_ids(db: Session, today: date | None = None) -> list[int]:
     last *sent* digest's date, not the last built one: a digest that was built
     but never delivered has not started the reader's clock.
 
-    Cheap by design - one grouped query, no per-user work - because the
-    scheduler calls this on every tick and the answer is usually "nobody".
+Cheap by design - one grouped query, no per-user work - because the daily
+delivery pass checks every reader's cadence before building any digests.
     """
     if today is None:
         today = date.today()

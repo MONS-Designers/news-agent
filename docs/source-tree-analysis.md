@@ -89,7 +89,7 @@ news-agent/
 │       │   ├── digest.html.j2          # The Hebrew RTL email template
 │       │   └── assets/logo-mark.b64    # Inlined logo, base64
 │       ├── cli.py                      # ENTRY POINT. argparse operator CLI, 15 subcommands
-│       ├── scheduler.py                # ENTRY POINT. The long-lived delivery loop
+│       ├── scheduler.py                # ENTRY POINT. One-shot cadence-gated delivery
 │       ├── config.py                   # Settings - the ONLY way config is read
 │       ├── db.py                       # engine + SessionLocal, built at import time
 │       ├── logging_setup.py            # Wires the DB-backed log handler
@@ -142,7 +142,7 @@ news-agent/
 ├── .github/workflows/
 │   ├── ci.yml                          # lint + pytest, type-check + vitest, then Playwright
 │   └── trigger-deploy.yml              # repository_dispatch into news-agent-infra
-├── Dockerfile.backend                  # Two stages; ships the API and the scheduler
+├── Dockerfile.backend                  # Two stages; ships the API image
 ├── Dockerfile.frontend                 # Two stages; ships nginx + dist
 ├── nginx.frontend.conf.template        # SPA fallback + runtime /api reverse proxy
 ├── pyproject.toml                      # setuptools, mypy, ruff, pytest config
@@ -249,7 +249,7 @@ frontend/
 ```text
 src/newsagent/
 ├── cli.py           argparse, 15 subcommands, one SessionLocal for the whole run
-├── scheduler.py     the long-lived delivery loop
+├── scheduler.py     one cadence-gated delivery pass
 └── pipeline/        fetcher, relevance, extract, summarize, ranking, digest, render, send
 ```
 
@@ -275,7 +275,7 @@ src/newsagent/
 ### scheduler to pipeline
 
 - **Location:** `src/newsagent/scheduler.py`
-- **Type:** direct in-process function calls, on a loop
+- **Type:** direct in-process calls in a one-shot pass; first-email runs can be user-scoped
 - **Details:** each tick runs two passes, unwelcomed readers and cadence-due readers. Both
   are bounded by a query that usually returns nobody, so an idle tick costs two selects and
   no LLM call.
@@ -300,8 +300,8 @@ src/newsagent/
 
 - **Entry points:** `python -m newsagent.cli <command>` and `python -m newsagent.scheduler`
 - **Bootstrap:** `cli.main()` configures logging, builds the argparse tree, opens one
-  session, and dispatches on `args.command`. The scheduler installs signal handlers so a
-  container stop ends the loop cleanly.
+  session, and dispatches on `args.command`. The scheduler runs once and exits; it does not
+  install a polling loop or signal handlers.
 
 ## File Organization Patterns
 

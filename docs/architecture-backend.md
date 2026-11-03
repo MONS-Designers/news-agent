@@ -11,9 +11,9 @@
 A FastAPI application serving 23 endpoints across six routers, backed by PostgreSQL through
 SQLAlchemy 2.0. Its job is narrow: authenticate a reader through Google, let admins curate
 sources and taxonomy, let readers set a profile and topic preferences, and record digest
-opens and clicks. It does not fetch, summarize or send anything. That work lives in the CLI
-and scheduler processes, which share this part's domain layer and database but run
-separately.
+opens and clicks. Content collection and scheduled delivery live in one-shot CLI runs. After
+the final preferences save, the API also triggers a scoped background pass for that reader's
+first email; the daily pass retries it if necessary.
 
 Three architectural commitments shape the code:
 
@@ -252,10 +252,10 @@ See [development-guide-backend.md](./development-guide-backend.md).
 
 ## Deployment Architecture
 
-See [deployment-guide.md](./deployment-guide.md). In short: a two-stage `Dockerfile.backend`
-producing one image that carries both the API and the scheduler, run as two containers with
-different commands. Infrastructure, secrets and the schedule live in the sibling repository
-`news-agent-infra`.
+See [deployment-guide.md](./deployment-guide.md). In short: `Dockerfile.backend` ships the API
+image. Infrastructure runs the scheduled delivery pass separately, while the API triggers a
+scoped first-email pass after preferences are saved. Infrastructure and secrets live in the
+sibling repository `news-agent-infra`.
 
 ## Known Constraints and Gaps
 

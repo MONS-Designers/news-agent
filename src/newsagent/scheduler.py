@@ -1,47 +1,20 @@
-"""The delivery loop - the scheduler lives in this codebase, not in infra cron.
+"""One-shot delivery pass for readers whose cadence is due.
 
-Run as a long-lived process alongside the API:
+The daily content pipeline invokes this module after fetch, filtering,
+extraction, and summarization. Cadence still controls whether a reader gets a
+digest; the daily invocation does not turn the weekly product into a daily one.
 
-    python -m newsagent.scheduler
-
-Each tick does two independent passes:
-
-  1. First email - anyone who finished setup and has not been welcomed yet.
-     Ungated by cadence: their clock has not started, and the promise made at
-     signup is "in a few minutes", so this is what makes the tick interval
-     matter at all.
-  2. Regular cadence - whoever services/cadence.py says is due today, at
-     whatever frequency each of them chose.
-
-Both passes are bounded by a query that usually returns nobody, so an idle
-tick costs two SELECTs and no LLM call. That, not the interval, is what makes
-a two-minute loop affordable.
-
-Fetching, filtering and summarizing are NOT here - they stay in the daily
-pipeline run. This loop only selects from already-summarized articles and
-delivers, which is why it is cheap enough to run continuously.
-
-Two kinds of overlap could cause duplicate mail, and both are handled:
-
-  * Within this process there is none by construction - the loop is
-    sequential and sleeps *after* the tick returns, so a slow tick delays the
-    next one instead of running alongside it. The interval is a minimum gap,
-    not a wall-clock schedule. (A real cron would not give this for free.)
-  * Across processes, a lease row (services/scheduler_lease.py) lets exactly
-    one instance deliver at a time; the rest skip their tick. Extra replicas
-    are therefore harmless, and a killed holder's lease expires so delivery
-    resumes without anyone intervening.
+The first email is triggered by the final preferences save. The scheduled pass
+also retries any welcome or digest that could not be delivered at that time.
 """
 
 import logging
-import os
-import signal
 import socket
 import time
 import uuid
+from collections.abc import Collection
 from dataclasses import dataclass
 from datetime import date
-from types import FrameType
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -59,113 +32,132 @@ from newsagent.services import cadence, scheduler_lease
 
 logger = logging.getLogger(__name__)
 
-TICK_SECONDS = 120
-
 
 @dataclass
 class TickReport:
     digests_sent: int = 0
     welcomes_sent: int = 0
+    digests_failed: int = 0
+    welcomes_failed: int = 0
 
 
-def _unwelcomed_user_ids(db: Session) -> list[int]:
-    return list(
-        db.scalars(
-            select(User.id).where(
-                User.welcomed_at.is_(None), User.unsubscribed_at.is_(None)
-            )
-        )
+def _unwelcomed_user_ids(
+    db: Session, user_ids: Collection[int] | None = None
+) -> list[int]:
+    if user_ids is not None and not user_ids:
+        return []
+
+    pending = select(User.id).where(
+        User.welcomed_at.is_(None), User.unsubscribed_at.is_(None)
     )
+    if user_ids is not None:
+        pending = pending.where(User.id.in_(user_ids))
+    return list(db.scalars(pending))
 
 
 def tick(
-    db: Session, provider: LLMProvider, sender: EmailSender, today: date | None = None
+    db: Session,
+    provider: LLMProvider,
+    sender: EmailSender,
+    today: date | None = None,
+    *,
+    user_ids: Collection[int] | None = None,
+    welcome_only: bool = False,
 ) -> TickReport:
-    """One pass. Safe to call repeatedly - every write it drives is guarded by
-    `welcomed_at` or `sent_at`, so a tick that follows a completed one does
-    nothing.
+    """Build and send due digests, or a single new reader's first email.
 
-    Both build passes run before the single send pass: `send_pending_digests`
-    delivers whatever is unsent regardless of which pass created it, so
-    sending between the two builds would only split one mailing in half.
+    The scheduled pass processes all unwelcomed users and users due by cadence.
+    The profile-save event passes one user ID with ``welcome_only=True`` so an
+    unrelated signup cannot trigger another reader's regular digest.
     """
-    digest_stage.build_digests(db, provider, today, user_ids=_unwelcomed_user_ids(db))
-    digest_stage.build_digests(db, provider, today, user_ids=cadence.due_user_ids(db, today))
+    unwelcomed_ids = _unwelcomed_user_ids(db, user_ids)
+    digest_stage.build_digests(db, provider, today, user_ids=unwelcomed_ids)
 
+    if not welcome_only:
+        due_ids = cadence.due_user_ids(db, today)
+        if user_ids is not None:
+            allowed_ids = set(user_ids)
+            due_ids = [user_id for user_id in due_ids if user_id in allowed_ids]
+        digest_stage.build_digests(db, provider, today, user_ids=due_ids)
+
+    digest_report = send_stage.send_pending_digests(db, sender, user_ids=user_ids)
+    welcome_report = send_stage.send_pending_welcomes(db, sender, user_ids=user_ids)
     return TickReport(
-        digests_sent=send_stage.send_pending_digests(db, sender).sent,
-        welcomes_sent=send_stage.send_pending_welcomes(db, sender).sent,
+        digests_sent=digest_report.sent,
+        welcomes_sent=welcome_report.sent,
+        digests_failed=digest_report.failed,
+        welcomes_failed=welcome_report.failed,
     )
 
 
-_stopping = False
-
-
-def _request_stop(signum: int, frame: FrameType | None) -> None:
-    """Finish the tick in flight, then exit - a container stop must not kill
-    the process between rendering an email and marking it sent."""
-    global _stopping
-    logger.info("Signal %s received; stopping after this tick", signum)
-    _stopping = True
-
-
-def run() -> None:
-    configure_logging()
-    signal.signal(signal.SIGINT, _request_stop)
-    signal.signal(signal.SIGTERM, _request_stop)
-
+def run_once(
+    *, user_ids: Collection[int] | None = None, welcome_only: bool = False
+) -> TickReport | None:
+    """Run one leased delivery pass and exit; ``None`` means another run owns it."""
     provider = get_llm_provider()
     sender = get_email_sender()
-    holder = f"{socket.gethostname()}:{os.getpid()}:{uuid.uuid4().hex[:8]}"
-    logger.info("Scheduler started (tick every %ss, holder %s)", TICK_SECONDS, holder)
+    holder = f"{socket.gethostname()}:{socket.getpid()}:{uuid.uuid4().hex[:8]}"
 
-    while not _stopping:
+    with SessionLocal() as db:
+        if not scheduler_lease.acquire(db, holder):
+            logger.info("Another delivery run holds the lease; skipping this run")
+            return None
+
+        started = time.monotonic()
         try:
-            with SessionLocal() as db:
-                if not scheduler_lease.acquire(db, holder):
-                    logger.debug("Another scheduler holds the lease; skipping tick")
-                else:
-                    started = time.monotonic()
-                    report = tick(db, provider, sender)
-                    elapsed = time.monotonic() - started
+            report = tick(db, provider, sender, user_ids=user_ids, welcome_only=welcome_only)
+        finally:
+            try:
+                scheduler_lease.release(db, holder)
+            except Exception:
+                logger.warning("Could not release the delivery lease; it will expire", exc_info=True)
 
-                    # Overrunning the lease is the one way a second process
-                    # could start delivering while this one is still working,
-                    # so surface it well before it becomes possible.
-                    if elapsed > scheduler_lease.LEASE_SECONDS / 2:
-                        logger.warning(
-                            "Tick took %.0fs, over half the %ds lease - raise "
-                            "LEASE_SECONDS before it can be stolen mid-send",
-                            elapsed,
-                            scheduler_lease.LEASE_SECONDS,
-                        )
-                    if report.digests_sent or report.welcomes_sent:
-                        logger.info(
-                            "Tick: %d digests, %d welcome-only",
-                            report.digests_sent,
-                            report.welcomes_sent,
-                        )
-        except Exception:
-            # One bad tick (a dropped DB connection, a provider outage) must
-            # not end the loop - the next tick retries everything, since no
-            # work is marked done until it succeeds.
-            logger.exception("Tick failed; continuing")
+        elapsed = time.monotonic() - started
+        if elapsed > scheduler_lease.LEASE_SECONDS / 2:
+            logger.warning(
+                "Delivery pass took %.0fs, over half the %ds lease",
+                elapsed,
+                scheduler_lease.LEASE_SECONDS,
+            )
+        logger.info(
+            "Delivery pass: %d digests, %d welcome-only, %d failed",
+            report.digests_sent,
+            report.welcomes_sent,
+            report.digests_failed + report.welcomes_failed,
+        )
+        return report
 
-        for _ in range(TICK_SECONDS):
-            if _stopping:
-                break
-            time.sleep(1)
 
-    # Hand the lease back so a replacement container can start delivering at
-    # once instead of idling until the TTL runs out.
+def deliver_first_email_for_user(user_id: int) -> None:
+    """Background task for the final profile/preferences save."""
     try:
-        with SessionLocal() as db:
-            scheduler_lease.release(db, holder)
+        report = run_once(user_ids=[user_id], welcome_only=True)
+        if report is None:
+            logger.info(
+                "First-email delivery for user %s deferred to the next scheduled pass",
+                user_id,
+            )
     except Exception:
-        logger.warning("Could not release the lease; it will expire", exc_info=True)
+        # The daily pass retries unwelcomed readers, so a transient provider or
+        # database failure here must not fail the already-saved preferences.
+        logger.exception("First-email delivery failed for user %s", user_id)
 
-    logger.info("Scheduler stopped")
+
+def main() -> int:
+    """Command entry point used once after the daily content pipeline."""
+    configure_logging()
+    try:
+        report = run_once()
+    except Exception:
+        logger.exception("Scheduled delivery pass failed")
+        return 1
+
+    if report is None:
+        return 0
+    if report.digests_failed or report.welcomes_failed:
+        return 1
+    return 0
 
 
 if __name__ == "__main__":
-    run()
+    raise SystemExit(main())

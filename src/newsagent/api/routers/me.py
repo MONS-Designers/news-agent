@@ -17,6 +17,7 @@ from newsagent.api.schemas import (
 )
 from newsagent.models import Field, User
 from newsagent.models.feedback import RATING_CHOICES, SOURCE_APP
+from newsagent.scheduler import deliver_first_email_for_user
 from newsagent.services import feedback, preferences, profile, subscription, taxonomy
 
 router = APIRouter(prefix="/me", tags=["me"])
@@ -32,15 +33,23 @@ def list_my_preferences(
 @router.put("/preferences", response_model=list[TopicPreferenceOut])
 def update_my_preferences(
     body: PreferenceUpdateIn,
+    background_tasks: BackgroundTasks,
     user: User = Depends(require_user),
     db: Session = Depends(get_db),
 ) -> list[preferences.TopicChoice]:
     try:
-        return preferences.set_preferences(db, user, body.topic_ids, body.new_topic_names)
+        choices = preferences.set_preferences(db, user, body.topic_ids, body.new_topic_names)
     except preferences.TopicCapExceededError as error:
         raise HTTPException(status_code=400, detail=error.detail) from error
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
+
+    # This is the final onboarding save. Start the first email after the
+    # response; the scheduled daily pass retries it if the background task
+    # cannot deliver. Returning readers are ignored by the worker.
+    if user.welcomed_at is None and user.unsubscribed_at is None and user.field_name is not None:
+        background_tasks.add_task(deliver_first_email_for_user, user.id)
+    return choices
 
 
 @router.get("/subscription", response_model=SubscriptionOut)

@@ -322,11 +322,11 @@ than raising into application code.
 
 `id` (fixed at 1), `holder`, `expires_at`.
 
-A single fixed row, because there is one delivery loop and therefore one thing to hold.
-Using a constant id rather than one row per holder is what makes claiming it a single
+A single fixed row, shared by scheduled and signup-triggered delivery passes. Using a constant
+id rather than one row per holder is what makes claiming it a single
 conditional `UPDATE`, which the database executes atomically.
 
-It exists because sending is not idempotent across processes: two loops both reading
+It exists because sending is not idempotent across processes: two passes both reading
 `Digest.sent_at IS NULL` would each render and send the same digest. `welcomed_at` already
 protected the one-time welcome, but nothing protected an ordinary digest.
 

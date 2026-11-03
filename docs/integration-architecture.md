@@ -5,10 +5,10 @@
 
 ## Summary
 
-The three parts meet in exactly two places: a JSON HTTP contract between the web app and
-the backend, and the PostgreSQL database, which the API process and the pipeline process
-both read and write directly. There is no message queue, no gRPC, no shared in-process
-state, and the CLI never calls the API over HTTP.
+The three parts meet through a JSON HTTP contract between the web app and the backend, and
+through PostgreSQL, which the API and pipeline runs both read and write directly. There is no
+message queue, no gRPC, and the CLI never calls the API over HTTP. The API also starts a
+scoped first-email task after the final preferences save.
 
 ```text
    browser
@@ -21,6 +21,7 @@ state, and the CLI never calls the API over HTTP.
                                           ┌────────────────────────┐
                                           │  backend (uvicorn)     │
                                           │  newsagent.api.main    │
+                                          │  first-email task      │
                                           └───────────┬────────────┘
                                                       │ SQLAlchemy
                                                       ▼
@@ -29,9 +30,9 @@ state, and the CLI never calls the API over HTTP.
        │           SQLAlchemy             └────────────────────────┘
        ▼                                              ▲
 ┌─────────────────────┐                               │
-│  cli / scheduler    │───────────────────────────────┘
-│  newsagent.cli      │
-│  newsagent.scheduler│──────► RSS hosts, LLM provider, SMTP
+│  cli / delivery run │───────────────────────────────┘
+│  newsagent.cli      │──────► RSS hosts, LLM provider
+│  newsagent.scheduler│──────► LLM provider, SMTP
 └─────────────────────┘
 ```
 
@@ -188,7 +189,8 @@ deliberately favours a rare duplicate over a silent loss.
 
 ## Integration point 3: outbound calls to third parties
 
-All three leave from the CLI and scheduler processes, never from the API.
+Content collection and scheduled digest delivery run from the CLI. The API also sends a new
+reader's first email in a post-response background task after preferences are saved.
 
 | Target | Where | Configuration |
 | --- | --- | --- |
